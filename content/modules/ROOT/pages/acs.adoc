@@ -357,7 +357,7 @@ Confirm:
 
 . Open *Node File Activity* and confirm the event source is *Node* with the same style of *File Path* criteria.
 +
-TIP: The GitOps source for these policies is in the lab GitOps repository under `acs/acs-instance/templates/fim-deployment-policy.yaml` and `fim-node-policy.yaml`.
+TIP: The GitOps source for these policies is in the lab GitOps repository under `rhacs-operator/instance/templates/fim-deployment-policy.yaml` and `fim-node-policy.yaml`.
 
 . Confirm the FAM trigger workload from *Before You Begin* is running:
 +
