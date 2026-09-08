@@ -26,7 +26,7 @@ Each of these features is covered in more detail in the following sections. Part
 
 * Register for the link:https://docs.google.com/forms/d/e/1FAIpQLSdjrEjL3lCfmTTVEwwMct-H72UNZ729RsIkUQ8Wvp5yHmtrOw/viewform[ACS 5.0 Feedback Form^]. You can track your feedback in the doc and there is a link to the form at the end of each exercise.
 
-* Next, confirm you can open the OpenShift console and ACS Central tabs in the Showroom UI. Log in with the credentials given to you for the Early Access Program:
+* Next, confirm you can open the OpenShift console and ACS Central tabs in the Showroom UI. Log in with the credentials on the xref:index.adoc[Welcome] page:
 +
 [cols="1,1,1"]
 |===
@@ -197,7 +197,7 @@ image::acs-vm-openshift-virtualmachines.png[OpenShift console VirtualMachines pa
 +
 On the `rhel9-vm` overview, use *Open web console* (or open the *Console* tab).
 +
-Log in with username `{vm_user}` and the password from the credentials given to you for the Early Access Program.
+Log in with username `{vm_user}` and the VM password from the xref:index.adoc[Welcome] page.
 +
 Run the remaining guest commands in this procedure from the VM console, not from the Showroom terminal.
 
@@ -869,7 +869,7 @@ Organizations upgrading from ACS 4.x may want to preserve the previous behavior 
 
 The script is interactive — for each eligible policy it prompts you to apply the skip filter, skip it, or apply to all remaining policies. It automatically skips policies that already have evaluation filters, build-only policies, declarative (CRD-managed) policies, and audit/node event policies.
 
-NOTE: The GA version of this script is available at https://github.com/stackrox/contributions/tree/main/util-scripts/skip-init-container-evaluation[stackrox/contributions^]. The version included in `ea5-components` has been modified to accept the nightly ACS 5 builds used in this EAP environment, which may report a pre-5.0 version number.
+NOTE: The GA version of this script is available at https://github.com/stackrox/contributions/tree/main/util-scripts/skip-init-container-evaluation[stackrox/contributions^]. The version included in `ea5-components` has been modified to accept ACS 5 builds used in this lab environment, which may report a pre-5.0 version number.
 
 NOTE: Organizations using SecurityPolicy CRDs (policy-as-code) should instead manually add `skipContainerTypes: ["INIT"]` to the `evaluationFilter` specification in their manifests.
 

@@ -57,6 +57,7 @@
 * xref:05-acs-notifications-api.adoc[Notifications, API, and Integrations]
 * xref:06-acs-network-and-runtime.adoc[Network and Runtime Security]
 * xref:07-acs-installation.adoc[Installation]
+* xref:acs.adoc[ACS 5 Capabilities]
 
 .Software Supply Chain Security Modules
 * xref:tssc-INDEX.adoc[TSSC Labs Overview]

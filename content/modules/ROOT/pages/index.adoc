@@ -85,7 +85,7 @@ Use the *Terminal* / bastion tab (or SSH) for CLI work (`oc`, `roxctl`, `podman`
 
 Use these after (or alongside) the role track that owns the capability—especially DevSecOps, Platform Operator, and Security Architect.
 
-* xref:acs-INDEX.adoc[Advanced Cluster Security (RHACS)] — Setup, vulnerabilities, policy and risk, CI/CD gates, compliance, notifications and API, network and runtime, and installation.
+* xref:acs-INDEX.adoc[Advanced Cluster Security (RHACS) labs] — Setup, vulnerabilities, policy and risk, CI/CD gates, compliance, notifications and API, network and runtime, installation, and xref:acs.adoc[ACS 5 capabilities] (VM scanning, file activity monitoring, MCP, and init containers).
 * xref:tssc-INDEX.adoc[Trusted Software Supply Chain (TSSC)] — Trusted Artifact Signer (container and git signing) and Trusted Profile Analyzer (SBOM analysis).
 * xref:virt-INDEX.adoc[OpenShift Virtualization Security] — HyperConverged feature gates, virt RBAC, VM and storage isolation, VM networking, and host firmware/kernel controls from the OpenShift Virtualization hardening guide.
 

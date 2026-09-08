@@ -6,7 +6,7 @@ xref:index.adoc[← Back to HOME]
 
 == Overview
 
-These labs go deep on Red Hat Advanced Cluster Security (RHACS): setup and navigation, vulnerability management, policy and risk, CI/CD gates, compliance, notifications and API, network and runtime security, and installation.
+These labs go deep on Red Hat Advanced Cluster Security (RHACS): setup and navigation, vulnerability management, policy and risk, CI/CD gates, compliance, notifications and API, network and runtime security, installation, and ACS 5 capabilities (VM scanning, file activity monitoring, MCP, and init containers).
 
 Use this track after (or alongside) the role path that owns the capability—especially DevSecOps, Platform Operator, and Security Architect. Related framework labs include xref:301-04-runtime-threat-detection.adoc[301-04] and xref:301-05-incident-response-forensics.adoc[301-05].
 
@@ -26,6 +26,7 @@ Audience and prerequisites:
 . xref:05-acs-notifications-api.adoc[Notifications, API, and Integrations]
 . xref:06-acs-network-and-runtime.adoc[Network and Runtime Security]
 . xref:07-acs-installation.adoc[Installation]
+. xref:acs.adoc[ACS 5 Capabilities]
 
 == RHACS Labs Index
 
@@ -64,4 +65,8 @@ Audience and prerequisites:
 |xref:07-acs-installation.adoc[07]
 |Installation and RHACS Cloud Service
 |Deployment options and RHACS Cloud Service
+
+|xref:acs.adoc[ACS 5]
+|ACS 5 Capabilities
+|VM vulnerability scanning, file activity monitoring, ACS MCP, and init container coverage
 |===
