@@ -17,7 +17,7 @@ tabs:
   - name: OpenShift Console
     url: 'https://console-openshift-console.${DOMAIN}'
   - name: Red Hat Advanced Cluster Security
-    url: 'https://central-rhacs-operator.${DOMAIN}'
+    url: 'https://central-reencrypt-stackrox.${DOMAIN}'
   - name: OpenShift GitOps
     url: 'https://openshift-gitops-server-openshift-gitops.${DOMAIN}'
   - name: Quay

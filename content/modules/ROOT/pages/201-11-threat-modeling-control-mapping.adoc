@@ -45,7 +45,7 @@ Assets on that path: source, images, secrets, the database, CI credentials, the 
 
 This table is the 201 capstone. **301** is how you apply the same row when one wiki page cannot reach every cluster.
 
-[cols="1,2,2,2,2",options="header"]
+[cols="2,2,2,2,2",options="header"]
 |===
 |STRIDE |Typical OpenShift threat |Primary controls |You already practiced |At enterprise scale
 
