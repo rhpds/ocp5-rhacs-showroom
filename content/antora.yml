@@ -18,7 +18,7 @@ asciidoc:
     web_console_url: "{openshift_cluster_console_url}"
     openshift_admin_user: "{openshift_cluster_admin_username}"
     openshift_admin_password: "{openshift_cluster_admin_password}"
-    acs_route: "https://central-acs.{openshift_cluster_ingress_domain}"
+    acs_route: "https://central-rhacs-operator.{openshift_cluster_ingress_domain}"
     acs_portal_username: "{openshift_cluster_admin_username}"
     acs_portal_password: "{common_password}"
     openshift_gitops_url: "https://openshift-gitops-server-openshift-gitops.{openshift_cluster_ingress_domain}"

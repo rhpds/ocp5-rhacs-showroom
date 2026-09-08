@@ -2,7 +2,7 @@ apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
   name: rhel-webserver
-  namespace: acs-virt
+  namespace: rhacs-virt
   labels:
     app: rhel-webserver
 spec:

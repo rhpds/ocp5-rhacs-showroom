@@ -20,7 +20,7 @@ tabs:
     url: 'https://console-openshift-console.${DOMAIN}'
     external: true
   - name: Red Hat Advanced Cluster Security
-    url: 'https://central-acs.${DOMAIN}'
+    url: 'https://central-rhacs-operator.${DOMAIN}'
     external: true
   - name: OpenShift GitOps
     url: 'https://openshift-gitops-server-openshift-gitops.${DOMAIN}'

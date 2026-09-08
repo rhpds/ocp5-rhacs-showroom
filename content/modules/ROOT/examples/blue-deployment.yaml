@@ -11,7 +11,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: blue-app
-  namespace: acs-init-container-test
+  namespace: rhacs-init-container-test
   labels:
     app: blue-app
     acs-eap-test: init-container

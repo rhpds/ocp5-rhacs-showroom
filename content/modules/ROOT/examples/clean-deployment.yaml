@@ -7,7 +7,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: clean-app
-  namespace: acs-init-container-test
+  namespace: rhacs-init-container-test
   labels:
     app: clean-app
     acs-eap-test: init-container

@@ -32,7 +32,7 @@ Each of these features is covered in more detail in the following sections. Part
 
 | ACS Central
 | `admin`
-| https://central-acs.{openshift_cluster_ingress_domain}[ACS Central^]
+| https://central-rhacs-operator.{openshift_cluster_ingress_domain}[ACS Central^]
 |===
 
 * In the OpenShift Console, open the OpenShift Lightspeed dialog (the icon at the bottom right of the interface). Ask Lightspeed to create a shortcut to the ACS console:
@@ -56,7 +56,7 @@ image::acs-console.png[The ACS console]
 +
 [source,sh,subs="attributes",role=execute]
 ----
-oc get vmi -n acs-virt
+oc get vmi -n rhacs-virt
 ----
 +
 You should see `rhel9-vm` in a `Running` phase.
@@ -91,20 +91,20 @@ You should see `fam-target` & `juice-shop` in `Running` phase.
 +
 [source,sh,subs="attributes",role=execute]
 ----
-oc get pods -n acs-mcp
-oc get route -n acs-mcp
+oc get pods -n rhacs-mcp
+oc get route -n rhacs-mcp
 ----
 +
 Output should look like this:
 +
 [source,bash]
 ----
-oc get route -n acs-mcp
+oc get route -n rhacs-mcp
 NAME                                          READY   STATUS      RESTARTS   AGE
 acs-mcp-server-stackrox-mcp-b79597899-lz64s   1/1     Running     0          3h5m
 copy-central-ca-8jrsn                         0/1     Completed   0          178m
 NAME                          HOST/PORT                                                                    PATH   SERVICES                      PORT    TERMINATION          WILDCARD
-acs-mcp-server-stackrox-mcp   acs-mcp-server-stackrox-mcp-acs-mcp.apps.ocp.2bfz7.sandbox5240.opentlc.com          acs-mcp-server-stackrox-mcp   https   reencrypt/Redirect   None
+acs-mcp-server-stackrox-mcp   acs-mcp-server-stackrox-mcp-rhacs-mcp.apps.ocp.2bfz7.sandbox5240.opentlc.com          acs-mcp-server-stackrox-mcp   https   reencrypt/Redirect   None
 ----
 
 Awesome! You're ready to start the exercises.
@@ -167,13 +167,13 @@ Verifying and reviewing the prebuilt VM in ACS
 +
 [source,sh,subs="attributes",role=execute]
 ----
-oc get vmi -n acs-virt
+oc get vmi -n rhacs-virt
 ----
 +
 Output:
 [source,bash]
 ----
-oc get vmi -n acs-virt
+oc get vmi -n rhacs-virt
 NAME       AGE     PHASE     IP            NODENAME
 rhel9-vm   10m     Running   10.129.2.10   ip-10-0-161-177.ec2.internal
 ----
@@ -181,11 +181,11 @@ rhel9-vm   10m     Running   10.129.2.10   ip-10-0-161-177.ec2.internal
 You should see `rhel9-vm` in a `Running` phase. You can also confirm in the OpenShift console under *Virtualization > VirtualMachines*.
 
 [start=2]
-. In the OpenShift console, go to *Virtualization > VirtualMachines* and select the `acs-virt` project.
+. In the OpenShift console, go to *Virtualization > VirtualMachines* and select the `rhacs-virt` project.
 +
 Confirm that `rhel9-vm` is listed and shows a *Running* status.
 +
-image::acs-vm-openshift-virtualmachines.png[OpenShift console VirtualMachines page showing rhel9-vm Running in the acs-virt project,link=_images/acs-vm-openshift-virtualmachines.png,window=ea-images]
+image::acs-vm-openshift-virtualmachines.png[OpenShift console VirtualMachines page showing rhel9-vm Running in the rhacs-virt project,link=_images/acs-vm-openshift-virtualmachines.png,window=ea-images]
 
 . Open the web console for `rhel9-vm` and log in:
 +
@@ -207,7 +207,7 @@ sudo journalctl -u roxagent.service --no-pager -n 20
 
 . In ACS Central, open *Vulnerability Management > Results > Virtual Machines*.
 +
-You should see the `rhel9-vm` workload listed for the `acs-virt` namespace, including CVE counts by severity.
+You should see the `rhel9-vm` workload listed for the `rhacs-virt` namespace, including CVE counts by severity.
 +
 image::acs-vm-vulnerabilities-list.png[ACS Virtual machine vulnerabilities page listing rhel9-vm with CVE severity counts,link=_images/acs-vm-vulnerabilities-list.png,window=ea-images]
 
@@ -266,14 +266,14 @@ EOF
 +
 [source,sh,subs="attributes",role=execute]
 ----
-oc wait --for=jsonpath='{.status.phase}'=Running vmi/rhel-webserver -n acs-virt --timeout=300s
+oc wait --for=jsonpath='{.status.phase}'=Running vmi/rhel-webserver -n rhacs-virt --timeout=300s
 ----
 +
 Confirm the VMI status and guest IP:
 +
 [source,sh,subs="attributes",role=execute]
 ----
-oc get vmi rhel-webserver -n acs-virt
+oc get vmi rhel-webserver -n rhacs-virt
 ----
 +
 TIP: The VMI should reach `Running` within a couple of minutes. First-boot cloud-init (subscription, packages, `roxagent`) can still take several minutes after that.
@@ -333,7 +333,7 @@ First, confirm FAM is enabled on the SecuredCluster:
 
 [source,sh,subs="attributes",role=execute]
 ----
-oc get securedcluster -n acs -o jsonpath='{.items[0].metadata.name}{"\n"}{.items[0].spec.perNode.fileActivityMonitoring.mode}{"\n"}'
+oc get securedcluster -n rhacs-operator -o jsonpath='{.items[0].metadata.name}{"\n"}{.items[0].spec.perNode.fileActivityMonitoring.mode}{"\n"}'
 ----
 
 You should see the SecuredCluster name and `Enabled`.
@@ -402,8 +402,8 @@ Open a matching violation and review the runtime detail (file path, process cont
 +
 [source,bash,role="execute",subs="+attributes"]
 ----
-CENTRAL="https://central-acs.{openshift_cluster_ingress_domain}"
-ACS_PASS=$(oc get secret central-admin-password -n acs -o jsonpath='{.data.password}' | base64 -d)
+CENTRAL="https://central-rhacs-operator.{openshift_cluster_ingress_domain}"
+ACS_PASS=$(oc get secret central-admin-password -n rhacs-operator -o jsonpath='{.data.password}' | base64 -d)
 curl -sk -u "admin:${ACS_PASS}" -G "${CENTRAL}/v1/alerts/summary/groups" \
   --data-urlencode 'query=Policy:"Deployment File Activity"' | jq .
 ----
@@ -432,8 +432,8 @@ IMPORTANT: Plain `oc debug node` shells are classified as *deployment* events. T
 +
 [source,bash,role="execute",subs="+attributes"]
 ----
-CENTRAL="https://central-acs.{openshift_cluster_ingress_domain}"
-ACS_PASS=$(oc get secret central-admin-password -n acs -o jsonpath='{.data.password}' | base64 -d)
+CENTRAL="https://central-rhacs-operator.{openshift_cluster_ingress_domain}"
+ACS_PASS=$(oc get secret central-admin-password -n rhacs-operator -o jsonpath='{.data.password}' | base64 -d)
 curl -sk -u "admin:${ACS_PASS}" -G "${CENTRAL}/v1/alerts/summary/groups" \
   --data-urlencode 'query=Policy:"Node File Activity"' | jq .
 ----
@@ -457,7 +457,7 @@ The ACS MCP server is based on https://github.com/stackrox/stackrox-mcp[stackrox
 .How it fits together
 
 ACS MCP server::
-Runs in the `acs-mcp` namespace, speaks streamable HTTP MCP on `/mcp`, and calls Central on behalf of the client.
+Runs in the `rhacs-mcp` namespace, speaks streamable HTTP MCP on `/mcp`, and calls Central on behalf of the client.
 
 Authentication::
 External clients use *passthrough* auth: your MCP client sends `Authorization: Bearer <ACS API token>`. OpenShift Lightspeed is pre-wired with an Analyst token via secret `acs-mcp-api-token`.
@@ -467,7 +467,7 @@ OpenShift Lightspeed (in-console) or an external MCP client (Claude Code, Cursor
 
 .Prerequisites
 
-* The ACS MCP server Deployment and Route are available in `acs-mcp`.
+* The ACS MCP server Deployment and Route are available in `rhacs-mcp`.
 * Central is reachable and the secured cluster is reporting data.
 * For Lightspeed: OLSConfig includes the `MCPServer` feature gate and an `acs-mcp` server entry.
 * For an external client: an ACS API token with at least the *Analyst* role.
@@ -479,15 +479,15 @@ Verify the preinstalled ACS MCP server
 +
 [source,sh,subs="attributes",role=execute]
 ----
-oc get pods -n acs-mcp
-oc get route -n acs-mcp
+oc get pods -n rhacs-mcp
+oc get route -n rhacs-mcp
 ----
 
 . Check the health endpoint:
 +
 [source,sh,subs="attributes",role=execute]
 ----
-MCP_HOST=$(oc get route -n acs-mcp -o jsonpath='{.items[0].spec.host}')
+MCP_HOST=$(oc get route -n rhacs-mcp -o jsonpath='{.items[0].spec.host}')
 echo "MCP endpoint: https://${MCP_HOST}/mcp"
 curl -sk "https://${MCP_HOST}/health"
 ----
@@ -568,8 +568,8 @@ Use this path if you want to connect Claude Code, Cursor, or Claude Desktop the 
 +
 [source,bash,role="execute",subs="+attributes"]
 ----
-CENTRAL="https://central-acs.{openshift_cluster_ingress_domain}"
-ACS_PASS=$(oc get secret central-admin-password -n acs -o jsonpath='{.data.password}' | base64 -d)
+CENTRAL="https://central-rhacs-operator.{openshift_cluster_ingress_domain}"
+ACS_PASS=$(oc get secret central-admin-password -n rhacs-operator -o jsonpath='{.data.password}' | base64 -d)
 curl -sk -u "admin:${ACS_PASS}" \
   -X POST "${CENTRAL}/v1/apitokens/generate" \
   -H "Content-Type: application/json" \
@@ -582,7 +582,7 @@ Copy the token value. You can also create a token in ACS Central under *Platform
 +
 [source,sh,subs="attributes",role=execute]
 ----
-echo "https://$(oc get route -n acs-mcp -o jsonpath='{.items[0].spec.host}')/mcp"
+echo "https://$(oc get route -n rhacs-mcp -o jsonpath='{.items[0].spec.host}')/mcp"
 ----
 
 . Configure *Claude Code*:
@@ -634,19 +634,19 @@ In the OpenShift Lightspeed dialog, enter the following:
 
 [source,role="copypaste"]
 ----
-create a new project for me called acs-init-container-test
+create a new project for me called rhacs-init-container-test
 ----
 
 The MCP server requires approval, so approve when it asks you.
 
-On the left hand navigation, choose 'Projects' and then acs-init-container-test. All of the examples will be executed in this project to allow you to observe the results simply in
+On the left hand navigation, choose 'Projects' and then rhacs-init-container-test. All of the examples will be executed in this project to allow you to observe the results simply in
 the ACS console.
 
 In the built-in terminal on the right, run:
 
 [source,bash,role="execute"]
 ----
-oc project acs-init-container-test
+oc project rhacs-init-container-test
 ----
 
 Check the project has no workloads using:
@@ -663,7 +663,7 @@ In the terminal, run:
 
 [source,bash,role="execute"]
 ----
-oc adm policy add-scc-to-user privileged system:serviceaccount:acs-init-container-test:default
+oc adm policy add-scc-to-user privileged system:serviceaccount:rhacs-init-container-test:default
 ----
 
 This allows Pods, and Init Containers, to switch to Privileged to perform actions.
@@ -706,7 +706,7 @@ While in the terminal, have a look at these two policy definitions. Specifically
 [source,bash]
 ----
   policyName: "EAP-Init-Test: Privileged Container (Blue/Red)"
-  description: "Demo policy for the RHACS 5.0 EAP init-container test workflow. Fires on any privileged container - main or init - inside the acs-init-container-test namespace. Used to validate that Build/Deploy policy evaluation reaches init containers (Blue = legitimate/noise, Red = illegitimate/true-positive)."
+  description: "Demo policy for the RHACS 5.0 EAP init-container test workflow. Fires on any privileged container - main or init - inside the rhacs-init-container-test namespace. Used to validate that Build/Deploy policy evaluation reaches init containers (Blue = legitimate/noise, Red = illegitimate/true-positive)."
   rationale: "Containers running as privileged represent greater post-exploitation risk by allowing an attacker to access all host devices, run a daemon in the container, etc."
   remediation: "Verify that privileged capabilities are actually required (e.g. sysctl tuning) and cannot be provided via a narrower capability grant."
 ----
@@ -716,7 +716,7 @@ And for `fixable-important-cve.yaml`:
 [source,bash]
 ----
   policyName: "EAP-Init-Test: Fixable Important+ CVE (Dirty/Red)"
-  description: "Demo policy for the RHACS 5.0 EAP init-container test workflow. Fires when any container image - main or init - in the acs-init-container-test namespace has a fixable CVE with CVSS >= 7. Used to validate that image vulnerability scanning/policy evaluation attributes findings to init containers (Dirty and Red should match; Clean and Blue should not)."
+  description: "Demo policy for the RHACS 5.0 EAP init-container test workflow. Fires when any container image - main or init - in the rhacs-init-container-test namespace has a fixable CVE with CVSS >= 7. Used to validate that image vulnerability scanning/policy evaluation attributes findings to init containers (Dirty and Red should match; Clean and Blue should not)."
   rationale: "Fixable vulnerabilities above this severity threshold represent real, addressable risk and should not be shipped in any container, including init containers."
   remediation: "Rebuild the image against an updated base to pick up the available fix."
 ----
@@ -725,7 +725,7 @@ Switch to the RHACS console; select the resources pulldown and click on 'local-c
 
 image::acs-clusters.png[Selecting the local cluster]
 
-Now click on 'All Namespaces' and select 'acs-init-container-test'. There should be no violations (we have no workloads yet).
+Now click on 'All Namespaces' and select 'rhacs-init-container-test'. There should be no violations (we have no workloads yet).
 
 In the terminal, run:
 
@@ -739,7 +739,7 @@ oc create -f ~/ea5-components/clean-deployment.yaml
 This will create a deployment with a single Pod, which also executes an init-container. The init-container performs no dangerous actions (hence clean)
 ====
 
-Switch to the RHACS console. Make sure the 'Resources' is set to 'local-cluster', and select 'acs-init-container-test' in the Namespace pulldown.
+Switch to the RHACS console. Make sure the 'Resources' is set to 'local-cluster', and select 'rhacs-init-container-test' in the Namespace pulldown.
 
 You should see the dashboard which shows 1 low policy violation; if you examine the 'Active images at most risk' you will see two images displayed. Note that one of the images is 'distroless/base-debian12'.
 
@@ -769,7 +769,7 @@ Pods can contain more than one Container, and the pulldown allows you to examine
 
 The log will indicate that the init-container is well-behaved, but it based on image with known CVEs.
 
-Switch to the RHACS console; you should still be on the Dashboard, with the namespace acs-init-container-test selected. Refresh the page.
+Switch to the RHACS console; you should still be on the Dashboard, with the namespace rhacs-init-container-test selected. Refresh the page.
 
 [NOTE]
 ====
@@ -802,7 +802,7 @@ Once this has succeeded, click on *Workloads*, *Topology* and make sure the Depl
 This example provides an init-container that switches to privileged and performs a legitimate action.
 ====
 
-Switch to the RHACS interface. Click on *Dashboard* (or Violations if you wish), select the local-cluster, and then the namespace *acs-init-container-test* as before.
+Switch to the RHACS interface. Click on *Dashboard* (or Violations if you wish), select the local-cluster, and then the namespace *rhacs-init-container-test* as before.
 
 [NOTE]
 ====
@@ -831,7 +831,7 @@ Once the deployment has completed, click *Workloads*, *Topology*, then the round
 red-init: unpatched image with known CVEs, running privileged with no legitimate justification
 ----
 
-Switch to the RHACS console again. On the Dashboard, assuming you have selected *local-cluster* and the namespace *acs-init-container-test* you should now see this:
+Switch to the RHACS console again. On the Dashboard, assuming you have selected *local-cluster* and the namespace *rhacs-init-container-test* you should now see this:
 
 image::acs-deployment-red.png[indication of detection of critical CVE and violations in init-container for red]
 
@@ -850,13 +850,13 @@ First, generate an API token and set the required environment variables:
 
 [source,bash,role="execute",subs="+attributes"]
 ----
-CENTRAL="https://central-acs.{openshift_cluster_ingress_domain}"
-ACS_PASS=$(oc get secret central-admin-password -n acs -o jsonpath='{.data.password}' | base64 -d)
+CENTRAL="https://central-rhacs-operator.{openshift_cluster_ingress_domain}"
+ACS_PASS=$(oc get secret central-admin-password -n rhacs-operator -o jsonpath='{.data.password}' | base64 -d)
 export ROX_API_TOKEN=$(curl -sk -u "admin:${ACS_PASS}" \
   -X POST "${CENTRAL}/v1/apitokens/generate" \
   -H "Content-Type: application/json" \
   -d '{"name":"skip-init-eval","roles":["Admin"]}' | jq -r .token)
-export ROX_ENDPOINT="central-acs.{openshift_cluster_ingress_domain}:443"
+export ROX_ENDPOINT="central-rhacs-operator.{openshift_cluster_ingress_domain}:443"
 ----
 
 Then run the script from the `ea5-components` directory you cloned earlier:

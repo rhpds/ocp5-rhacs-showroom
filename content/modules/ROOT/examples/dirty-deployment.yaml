@@ -12,7 +12,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: dirty-app
-  namespace: acs-init-container-test
+  namespace: rhacs-init-container-test
   labels:
     app: dirty-app
     acs-eap-test: init-container

@@ -11,7 +11,7 @@
 :gitops_password: {openshift_gitops_password}
 
 // ACS
-:acs_namespace: acs
+:acs_namespace: rhacs-operator
 
 // VM
 :vm_user: cloud-user
