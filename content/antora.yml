@@ -19,8 +19,14 @@ asciidoc:
     openshift_admin_user: "{openshift_cluster_admin_username}"
     openshift_admin_password: "{openshift_cluster_admin_password}"
     acs_route: "https://central-acs.{openshift_cluster_ingress_domain}"
-    acs_portal_username: admin
-    acs_portal_password: "(see environment credentials)"
+    acs_portal_username: "{openshift_cluster_admin_username}"
+    acs_portal_password: "{common_password}"
+    openshift_gitops_url: "https://openshift-gitops-server-openshift-gitops.{openshift_cluster_ingress_domain}"
+    quay_console_url: "https://quay.{openshift_cluster_ingress_domain}"
+    quay_url: "quay.{openshift_cluster_ingress_domain}"
+    quay_admin_username: admin
+    quay_admin_password: "{common_password}"
+    quay_user: admin
     page-links:
     - url: https://redhat.com
       text: Red Hat

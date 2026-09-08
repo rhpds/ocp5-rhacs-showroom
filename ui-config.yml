@@ -25,3 +25,6 @@ tabs:
   - name: OpenShift GitOps
     url: 'https://openshift-gitops-server-openshift-gitops.${DOMAIN}'
     external: true
+  - name: Quay
+    url: 'https://quay.${DOMAIN}'
+    external: true

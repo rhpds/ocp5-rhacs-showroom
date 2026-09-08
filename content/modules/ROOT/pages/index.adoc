@@ -13,7 +13,7 @@ This course offers hands-on experience with Kubernetes-native security on Red Ha
 
 == Environment setup
 
-From the bastion terminal tab, run the following commands to setup the lab environment.
+From the *Terminal* tab, run the following commands to set up the lab environment.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
@@ -35,21 +35,20 @@ TIP: Using the Showroom allows you to move through the console tabs while you wo
 
 === Red Hat^(R)^ OpenShift Container Platform (OCP)
 
-. Open the *OpenShift* tab (or go to `{openshift_cluster_console_url}`).
+. Open the *OpenShift Console* tab (or go to `{openshift_cluster_console_url}`).
 . Sign in with the credentials below.
 
 [cols="1,1"]
 |===
 |Console URL| {openshift_cluster_console_url}
+|API URL| {openshift_api_server_url}
 |Username| {openshift_cluster_admin_username}
 |Password| {openshift_cluster_admin_password}
 |===
 
-RHACM and OpenShift GitOps (ArgoCD) are available from the same OpenShift console (*Applications*, *Pipelines*, and GitOps in the left menu or cluster dropdown).
-
 === Red Hat^(R)^ Advanced Cluster Security (RHACS)
 
-. Open the *RHACS* tab to the right (or go to `{acs_route}[{acs_route}^]`).
+. Open the *Red Hat Advanced Cluster Security* tab (or go to `{acs_route}[{acs_route}^]`).
 . Sign in with the credentials below.
 
 [cols="1,1"]
@@ -71,13 +70,37 @@ RHACM and OpenShift GitOps (ArgoCD) are available from the same OpenShift consol
 |Password| {quay_admin_password}
 |===
 
-=== Red Hat^(R)^ Enterprise Linux (RHEL) bastion
+=== OpenShift GitOps (Argo CD)
 
-Use the *Terminal* / bastion tab (or SSH) for CLI work (`oc`, `roxctl`, `podman`, `curl`, etc.).
+. Open the *OpenShift GitOps* tab (or go to `{openshift_gitops_url}[{openshift_gitops_url}^]`).
+. Sign in with the credentials below.
 
 [cols="1,1"]
 |===
-|SSH Command| {bastion_ssh_command}
+|Console URL| {openshift_gitops_url}[{openshift_gitops_url}^]
+|Username| {openshift_gitops_user}
+|Password| {openshift_gitops_password}
+|===
+
+=== Keycloak
+
+[cols="1,1"]
+|===
+|Admin console| {keycloak_admin_console}
+|Username| {keycloak_admin_user}
+|Password| {keycloak_admin_password}
+|===
+
+=== Red Hat^(R)^ Enterprise Linux (RHEL) bastion
+
+Use the *Terminal* tab (or SSH) for CLI work (`oc`, `roxctl`, `podman`, `curl`, etc.).
+
+[cols="1,1"]
+|===
+|SSH command| `{bastion_ssh_command}`
+|Host| {bastion_public_hostname}
+|Port| {bastion_ssh_port}
+|Username| {bastion_ssh_user_name}
 |Password| {bastion_ssh_password}
 |===
 
