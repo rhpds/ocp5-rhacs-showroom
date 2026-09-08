@@ -18,15 +18,9 @@ Red Hat Advanced Cluster Security (ACS) 5 introduces several new capabilities fo
 
 Each of these features is covered in more detail in the following sections. Part of each walkthrough will be to discuss how the feature is setup, how it works, and how it can be used to secure your environment.
 
-====
-*The ACS team asks that you provide feedback on the feature by completing the structured feedback form at the end of each exercise.*
-====
-
 == Before You Begin
 
-* Register for the link:https://docs.google.com/forms/d/e/1FAIpQLSdjrEjL3lCfmTTVEwwMct-H72UNZ729RsIkUQ8Wvp5yHmtrOw/viewform[ACS 5.0 Feedback Form^]. You can track your feedback in the doc and there is a link to the form at the end of each exercise.
-
-* Next, confirm you can open the OpenShift console and ACS Central tabs in the Showroom UI. Log in with the credentials on the xref:index.adoc[Welcome] page:
+* Confirm you can open the OpenShift console and ACS Central tabs in the Showroom UI. Log in with the credentials on the xref:index.adoc[Welcome] page:
 +
 [cols="1,1,1"]
 |===
@@ -298,13 +292,6 @@ A line such as `Sent message with index report containing 492 packages to host` 
 +
 With `ROX_VIRTUAL_MACHINES_SCRAPER_POLL_INTERVAL=1m`, allow about one to two minutes after `roxagent` is listening for Sensor to pull the first report and for results to show. Without that setting, first results can take up to an hour.
 
-[.step-title]
-Structured feedback for VM Vulnerability Management
-
-Please help us improve by submitting feedback for VM Vulnerability Management:
-
-link:https://docs.google.com/forms/d/e/1FAIpQLSdjrEjL3lCfmTTVEwwMct-H72UNZ729RsIkUQ8Wvp5yHmtrOw/formResponse[ACS 5.0 Feedback Form — VM Vulnerability Management^]
-
 === Exercise 2: File Activity Monitoring (FAM)
 
 File Activity Monitoring watches file access, modification, and rename operations on paths you define, including wildcards, and can combine those events with process context. That gives runtime visibility that image scanning alone cannot provide, and it supports compliance controls such as PCI-DSS.
@@ -452,13 +439,6 @@ curl -sk -u "admin:${ACS_PASS}" -G "${CENTRAL}/v1/alerts/summary/groups" \
 ----
 +
 NOTE: Node FAM alerts now appear on the *Violations* page, and remain available through the API and notifiers.
-
-[.step-title]
-Structured feedback for File Activity Monitoring
-
-Please help us improve by submitting feedback for File Activity Monitoring:
-
-link:https://docs.google.com/forms/d/e/1FAIpQLSdjrEjL3lCfmTTVEwwMct-H72UNZ729RsIkUQ8Wvp5yHmtrOw/formResponse[ACS 5.0 Feedback Form — File Activity Monitoring^]
 
 === Exercise 3: ACS MCP Server
 
@@ -633,13 +613,6 @@ claude mcp add --transport http acs \
 Replace `<acs-mcp-route-host>` and `<paste-your-token-here>` with the values from the previous steps.
 
 . In your external client, run the same prompts as in the Lightspeed section (list clusters, Log4Shell CVE, multi-CVE deployments, node CVE) and confirm tools are invoked successfully.
-
-[.step-title]
-Structured feedback on the ACS MCP Server
-
-Thank you for completing this exercise! Please help us improve by submitting feedback for ACS MCP Server:
-
-link:https://docs.google.com/forms/d/e/1FAIpQLSdjrEjL3lCfmTTVEwwMct-H72UNZ729RsIkUQ8Wvp5yHmtrOw/formResponse[ACS 5.0 Feedback Form — ACS MCP Server^]
 
 === Exercise 4: Init Container Security Coverage
 
@@ -899,13 +872,6 @@ The script will list all eligible policies and prompt you for each one. Answer `
 After running the script, navigate to the RHACS console and open *Platform Configuration > Policy Management*. Policies that were updated by the script will show a "Skips init" indicator next to them. Note that the declarative (CRD-managed) policies we applied earlier (`EAP-Init-Test: Privileged Container` and `EAP-Init-Test: Fixable Important+ CVE`) were explicitly skipped by the script — these must be managed separately by adding `skipContainerTypes: ["INIT"]` to the `evaluationFilter` in their CRD manifests.
 
 image::acs-skip-init-policy-management.png[Policy Management showing Skips init indicator on updated policies,link=_images/acs-skip-init-policy-management.png,window=ea-images]
-
-[.step-title]
-Structured feedback (Init Container Security Coverage)
-
-Thank you for completing this exercise! Please help us improve by submitting feedback for Init Container Security Coverage:
-
-link:https://docs.google.com/forms/d/e/1FAIpQLSdjrEjL3lCfmTTVEwwMct-H72UNZ729RsIkUQ8Wvp5yHmtrOw/formResponse[ACS 5.0 Feedback Form — Init Container Security Coverage^]
 
 == Key Takeaways
 
