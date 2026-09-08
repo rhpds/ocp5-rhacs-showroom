@@ -1,0 +1,5 @@
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+cd ~/openshift-security-roadshow
+bash setup/lab-cleanup.sh --module {lab-cleanup-module}
+----

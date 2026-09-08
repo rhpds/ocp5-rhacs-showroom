@@ -1,0 +1,400 @@
+= Compliance
+:toc:
+:sectnums:
+:icons: font
+
+== Module Goals
+* Set up the Compliance Operator
+* Understand the Compliance dashboard
+* Schedule a scan in the Compliance Coverage dashboard
+
+== Compliance Operator and Compliance in ACS
+
+The OpenShift Compliance Operator allows OpenShift Container Platform administrators to define the desired compliance state of a cluster and provides an overview of gaps and ways to remediate any non-compliant policy.
+
+The OpenShift Compliance Operator assesses both Kubernetes API resources and OpenShift Container Platform resources, as well as the nodes running the cluster. The Compliance Operator uses OpenSCAP, a NIST-certified tool, to scan and enforce security policies provided by the content.
+
+Red Hat Advanced Cluster Security for Kubernetes (RHACS) supports OpenShift Container Platform configuration compliance standards through an integration with the OpenShift Container Platform Compliance Operator. In addition, it allows you to measure and report on configuration security best practices for OpenShift Container Platform.
+
+== Install the Compliance Operator
+
+Many Showroom / roadshow clusters already have the Compliance Operator installed by instructor setup (`setup/rhacs-configure.sh`). Check first:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get pods -n openshift-compliance
+----
+
+*If the operator pods are Running*, skip the OperatorHub install and sensor restart below and continue with *Managing the Compliance Coverage Feature* (or review the existing daily schedule named `acs-catch-all` under *Compliance → Schedules*).
+
+*If the operator is not installed*, follow this procedure:
+
+*Procedure*
+. Log into the OCP console at `{web_console_url}`:
+. Click the *rhsso* option
+. Enter the OCP credentials: 
+
+[cols="1,1"]
+|===
+| *User:*| {openshift_admin_user} 
+| *Password:*| {openshift_admin_password} 
+|===
+
+image::01-ocp-login-admin.png[link=self, window=blank, width=100%]
+
+[start=4]
+. In the web console, go to the Operators → OperatorHub page:
+. Enter compliance operator into the Filter by keyword box to find the Compliance Operator:
+
+image::06-comp-1.png[link=self, window=blank, width=100%]
+
+[start=6]
+. Select the Compliance Operator to view the details page:
+. Read the information about the Operator, select the defaults, and then click Install:
+
+image::06-comp-2.png[link=self, window=blank, width=100%]
+
+Since RHACS was installed prior to the Compliance Operator, we’ll need to restart the ACS sensor in the OpenShift cluster to see these results.
+
+[start=8]
+. Run the following command to restart the RHACS scanner pod. This will speed up the process for the profiles to appear in RHACS Central:
+
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc delete pods -l app.kubernetes.io/component=sensor -n stackrox
+----
+
+With the Sensor restarted, kick off a compliance scan in ACS to see the updated results.
+
+IMPORTANT: RHACS 4.11 removed the classic *Compliance → Dashboard* (Scan environment, NIST/HIPAA/PCI workload scores). Use *Compliance → Coverage* and *Compliance → Schedules* instead. Instructor setup already installs the Compliance Operator and creates a daily `acs-catch-all` schedule.
+
+== Execute Your First Compliance Scan (RHACS 4.10 and earlier)
+
+When installing RHACS 4.10 or earlier you can kick off a classic compliance scan so the legacy dashboard has data. Skip this section on RHACS 4.11.
+
+*Procedure*
+
+. Head to the Compliance -> Dashboard:
+. Click the "Scan environment" button on the top left:
+
+image::06-comp-3.png[link=self, window=blank, width=100%]
+
+[start=3]
+Wait a few seconds and your dashboard should populate.
+
+== Review the Compliance Reports in the Compliance Dashboard
+
+NOTE: Skip this section on RHACS 4.11 (classic dashboard removed). Continue with *Managing the Compliance Coverage Feature*.
+
+The compliance reports gather information for configuration, industry standards, and best practices for container-based workloads running in Kubernetes and OpenShift.
+
+Each standard represents a series of controls, with guidance provided by RHACS on the specific OpenShift configuration or DevOps process required to meet that control.
+
+*Let's review the dashboard.*
+
+In the top right of the dashboard, you will see two of the dropdown options:
+ 
+image::06-comp-6.png[link=self, window=blank, width=100%]
+
+* Manage standards &
+* Export
+
+*Click the "Manage standards button":*
+
+image::06-comp-6.png[link=self, window=blank, width=100%]
+
+You will see all of the standards available to you in the dashboard. These standards will affect ALL of the controls that you see in the dashboard. For example:
+
+*Remove all of the options except NIST SP 800-53*:
+
+image::06-comp-8.png[link=self, window=blank, width=100%]
+
+And you should end up with a dashboard that looks like this:
+
+image::06-comp-9.png[link=self, window=blank, width=100%]
+
+Focusing on the standards that matter most to you is essential for reducing unnecessary noise in the UI.
+
+IMPORTANT: Add all the standards back before progressing to the next section.
+
+*Click the "Manage standards button":*
+
+. Click on PCI, or the PCI percentage bar, in the upper-left “Passing Standards Across Clusters” graph
+
+image::06-comp-4.png[link=self, window=blank, width=100%]
+
+[start=2]
+. Click on Control 1.1.4, “Requirements for a firewall…”
+
+image::06-comp-5.png[link=self, window=blank, width=100%]
+
+For example, PCI-DSS has controls that refer to firewalls and DMZ - not exactly cloud-native.
+
+In OpenShift, that requirement, and other isolation requirements, is met by Network Policies, and the 6% compliance score here indicates that very few deployments have correctly defined policies.
+
+=== Evidence Export
+Last thing about compliance - you’re only as compliant as you can prove!
+
+. Click on the Export button in the upper right to show the “Download evidence as CSV” option
+
+This is the evidence export that your auditors will want to see for proof that the security controls mandated are actually in place.
+
+====
+How would you bring this standard up to 100%?
+====
+
+== Managing the Compliance Coverage Feature (Technology Preview)
+
+You can view the compliance results associated with your cluster by using the Compliance Coverage feature in the Red Hat Advanced Cluster Security for Kubernetes (RHACS) portal. The feature collects compliance information gathered by the Compliance Operator into a single interface.
+
+Currently, the Compliance Coverage feature and the Compliance Operator evaluate only infrastructure and platform compliance.
+
+=== Viewing the Cluster Compliance Page
+
+By viewing the cluster compliance page, you can get a comprehensive overview of the compliance status of your clusters.
+
+.Procedure
+. In the RHACS portal, go to the Compliance → Coverage tab:
+
+image::06-comp-10.png[link=self, window=blank, width=100%]
+
+The cluster compliance page organizes information in the following groups:
+
+*1. Cluster:* Gives the details of your cluster and provides a snapshot of its current state and configurations.
+
+*2. Operator status:* Assesses the health and operational status of the Compliance Operator instance within your cluster and ensures that the Operator is running optimally and functioning seamlessly.
+
+*3. Compliance:* Shows the percentage of checks that have been passed for the scanned profiles.
+
+====
+There is currently nothing in the coverage dashboard since no schedule has been created yet!
+====
+
+image::06-comp-11.png[link=self, window=blank, width=100%]
+
+=== Creating a Compliance Scan Schedule
+
+By creating a compliance scan schedule, you can customize and automate your compliance scans to align with your operational requirements.
+
+.Procedure
+. In the RHACS portal, go to the Compliance → Schedules tab:
+. Click Create scan schedule: 
+
+In the Configuration options page, provide the following information:
+
+[cols="1,1"]
+|===
+| Name: | first-scan
+| Description: | Specify the reason for each compliance scan.
+| Configure schedule: | Adjust the scan schedule to fit your required schedule:
+| Frequency: | From the drop-down list, select how often you want to perform the scan. Frequencies include Daily, Weekly, and Monthly.
+| On day(s): | From the list, select one or more days of the week on which you want to perform the scan. Valid values include Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday, The first of the month, and The middle of the month.
+*These values are only applicable if you specify the frequency of scan as Weekly or Monthly.*
+| Time: | Start to type the time in hh:mm at which you want to run the scan. From the list that is displayed, select a time.
+|===
+
+[start=3]
+. Click Next:
+
+. In the Clusters page, select one or more clusters that you want to include in the scan:
+
+image::06-comp-12.png[link=self, window=blank, width=100%]
+
+[start=5]
+. Click *Next*:
+. In the Profiles page, select the *ocp4-cis* profile. This is the most up-to-date CIS benchmarks for OpenShift Container Platform 4:
+. Click *Next*:
+. Review your scan configuration, and then click Create:
+. Click the ellipses on the side and select "Run scan":
+
+image::06-comp-12.5.png[link=self, window=blank, width=100%]
+
+=== Viewing the Compliance Scan Status
+
+By viewing the status of a compliance scan, you can efficiently monitor and analyze the health of your clusters. Let's take a look!
+
+*Procedure*
+
+. In the RHACS portal, go to the *Compliance* → *Coverage* tab:
+. Select the compliance scan you have created:
+
+image::06-comp-13.png[link=self, window=blank, width=100%]
+
+=== Compliance Scan Status Overview
+
+The scans will have varying results. Review the options that will show up in RHACS.
+
+OPTIONAL: From the Compliance status dropdown list, select one or more statuses by using which you want to filter the scan details. Compliance statuses include Pass, Fail, Error, Info, Manual, Not Applicable, and Inconsistent.
+
+[cols="1,1"]
+|===
+| Status 
+| Description
+| Fail 
+| The compliance check failed.
+| Pass 
+| The compliance check passed.
+| Not Applicable 
+| Skipped the compliance check because it was not applicable.
+| Info 
+| The compliance check gathered data, but RHACS could not make a pass or fail determination.
+| Error 
+| The compliance check failed due to a technical issue.
+| Manual 
+| Manual intervention is required to ensure compliance.
+| Inconsistent 
+| The compliance scan data is inconsistent, and requires closer inspection and targeted resolution.
+|=== 
+
+====
+The scan shows 62 passing controls, 8 failing controls, and 21 manual controls.
+====
+
+Let's dive a little deeper.
+
+*Procedure*
+
+. Sort the scan by the *Fail* status only:
+
+image::06-comp-14.png[link=self, window=blank, width=100%]
+
+[start=2]
+. Review the failing standard called 'ocp4-cis-configure-network-policies-namespaces':
+
+image::06-comp-15.png[link=self, window=blank, width=100%]
+
+You'll notice in details it gives you a Rationale, Description, and Instructions on how to ensure a passing grade in the future. Let's try running those commands.
+
+[start=3]
+. Run the following command to get all the non-control plane namespaces:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get  namespaces -o json | jq '[.items[] | select((.metadata.name | startswith("openshift") | not) and (.metadata.name | startswith("kube-") | not) and .metadata.name != "default") | .metadata.name ]'
+----
+
+*Sample Output*
+
+[.console-output]
+[source,bash,subs="+macros,+attributes"]
+----
+[lab-user@bastion pipeline]$ oc get  namespaces -o json | jq '[.items[] | select((.metadata.name | startswith("openshift") | not) and (.metadata.name | startswith("kube-") | not) and .metadata.name != "default") | .metadata.name ]'
+[
+  "backend",
+...
+  "vault"
+]
+----
+
+[start=4]
+. Next, compare this list to the previous one. To get all the non-control plane namespaces with a NetworkPolicy, run the following command:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get networkpolicies -A -o json | jq '[.items[] | select((.metadata.namespace | startswith("openshift") | not) and (.metadata.namespace | startswith("kube-") | not) and .metadata.namespace != "default") | .metadata.namespace] | unique'
+----
+
+*Sample Output*
+
+[.console-output]
+[source,bash,subs="+macros,+attributes"]
+----
+[lab-user@bastion pipeline]$ oc get --all-namespaces networkpolicies -o json | jq '[.items[] | select((.metadata.namespace | startswith("openshift") | not) and (.metadata.namespace | startswith("kube-") | not) and .metadata.namespace != "default") | .metadata.namespace] | unique'
+[
+  "janus-argocd",
+  "medical",
+  "sonataflow-infra",
+  "stackrox",
+  "trusted-profile-analyzer",
+  "vault"
+]
+----
+
+> It's great to know that StackRox (RHACS) is covered!
+
+In the Networking section, we will go about fixing this issue through the generation and application of network policy. For now, I offer you a challenge.
+
+== A Task to Complete on Your Own
+
+*Here is your mission:*
+
+image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExa3R1YjV5eGt3MTQ2a2UxOGM0ZThzaTQwdXE3cHdmMGo3NXUzOHB0MiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/MrCYIN3x0SgdG/giphy.gif[link=self, window=blank, width=100%, class="center"]
+
+*Should you choose to accept it:*
+
+====
+Implement a daily scan with the rhcos4-stig profile.
+====
+
+And for those wondering, review this link discussing link:https://www.perforce.com/blog/kw/what-is-DISA-STIG[what is DISA STIG?]
+
+Your mission is completed with a successful run of a DISA STIG compliance run altering the compliance status of the *production* cluster.
+
+== Security Exercise: ACME Incident Response
+
+The audit log showed `cicd-pipeline-runner-sa` had exec permissions it should never have used in production. Map that gap to compliance controls.
+
+include::partial$acme-incident-context.adoc[]
+
+=== Scenario
+
+[quote, Morgan, Infosec]
+The pipeline service account had edit plus exec. Which compliance standards flag excessive RBAC and missing least privilege?
+
+=== Your task
+
+include::partial$security-exercise-task-intro.adoc[]
+
+.Step 1 — Review the compliance dashboard
+[%collapsible]
+====
+. In RHACS, open *Compliance* and review the cluster compliance dashboard.
+====
+
+.Step 2 — Identify RBAC-related failing controls
+[%collapsible]
+====
+. Note the overall compliance percentage and any failing controls related to RBAC or access management.
+====
+
+.Step 3 — Map the audit finding to compliance controls
+[%collapsible]
+====
+. Cross-reference with the audit finding: the `container-executor` Role granted `pods/exec` to `cicd-pipeline-runner-sa`.
+====
+
+.Step 4 — Discuss least-privilege gaps
+[%collapsible]
+====
+Discuss which controls would have flagged this before the breach:
+
+* Excessive permissions on automation service accounts
+* Lack of separation between CI/CD deploy and runtime exec capabilities
+* Missing audit review for privileged subresource access
+====
+
+=== What you learned
+
+* Compliance dashboards translate incident findings into control framework language.
+* The payment gateway breach violated least-privilege principles enshrined in CIS and STIG profiles.
+* Compliance monitoring complements audit forensics for post-incident remediation planning.
+
+
+== Summary
+
+
+What he said ^!
+
+In this lab, you installed the Compliance Operator and set up a daily scan that will report against OpenShift CIS benchmarks. You also reviewed platform compliance in the RHACS Compliance Coverage view. 
+
+On to xref:05-acs-notifications-api.adoc[Notifications, API, and Integrations]!
+
+image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMGh0OWkxemNoNmF4dG9lNHE4bncwOWpkdzR6NHJ6dDNuOW0xYnMwaSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/7auaKlfmip8gE/giphy.gif[link=self, window=blank, width=100%, class="center"]
+
+== Cleanup
+
+Before moving to the next module, run the lab cleanup script to reset transient resources from this module.
+
+:lab-cleanup-module: 04
+include::partial$lab-cleanup.adoc[]

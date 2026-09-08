@@ -1,0 +1,348 @@
+= CI/CD and Automation
+:toc:
+:sectnums:
+:icons: font
+
+== Module Goals
+
+
+== Implement Policy-as-Code in ACM with OpenShift GitOps
+
+Here, you will manage ACS security policies via RHACM and OpenShift GitOps. First, you must create an ArgoCD controller in RHACM.
+
+=== RHACM Console Access
+
+The RHACM console is available in the OpenShift cluster console at: {openshift_console_url}
+
+Administrator login is available with:
+
+[cols="1,1"]
+|===
+| *Username:* | {openshift_admin_user}
+| *Password:* | {openshift_admin_password} 
+|===
+
+Navigate to the *Cluster* dropdown menu and then select *All Clusters*: 
+
+image::05-acm-00.png[link=self, window=blank, width=100%, Cluster Selection Menu]
+
+=== Implement Security Policy-as-Code
+
+*Procedure*
+
+. Navigate to *Applications* from the left side menu:
+
+image::05-acm-02.png[link=self, window=blank, width=100%]
+
+[start=2]
+. Click *Create application*, select *ArgoCD ApplicationSet-Push Model*:
+. Configure the Application:
+* Name: Give the application the name *pac-custom-policies*:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+pac-custom-policies
+----
+
+[start=3]
+. Under the Argo server, select *Add Argo Server*: 
+
+image::05-acm-03.png[link=self, window=blank, width=100%]
+
+[start=5]
+. Enter the following information:
+* *Name:* openshift-gitops
+* *Namespace:* openshift-gitops
+* *ClusterSet:* default:
+. Click "Add," then make sure to select the created Argo server:
+
+image::05-acm-04.png[link=self, window=blank, width=100%]
+
+link:https://github.com/mfosterrox/skupper-security-demo/tree/main/PaC-custom-policies[PaC Custom Policies on GitHub]
+
+[start=7]
+. Click "*Next*"
+. In the Template tab, select *Git Repository* and enter the URL of the GitHub repository containing the custom policies - URL: https://github.com/mfosterrox/skupper-security-demo.git:
+. Select "Main":
+. Select "PaC-custom-policies":
+. Enter the remote namespace of "stackrox":
+
+image::05-acm-05.png[link=self, window=blank, width=100%]
+
+[start=12]
+. Click "*Next* TWICE":
+. Set the following in the Placement tab:
+* Cluster sets: *default*:
+. Under *Label expressions*, click *add label* and select the following:
+* *Label:* name
+* *Operator:* equals any of
+* *Values:* local-cluster:
+
+image::05-acm-06.png[link=self, window=blank, width=100%]
+
+[start=14]
+. Click "*Next*":
+. Click "*Submit*":
+. Click on "Topology" and wait for the policies to go green:
+
+image::05-acm-06.5.png[link=self, window=blank, width=100%]
+
+== Ensure That the Policies Are Properly Configured
+
+Let's run the check again to check if the policies were successful.
+
+*Procedure*
+
+[start=1]
+. Perform an image security scan using roxctl to check for policy violations:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+roxctl -e $ROX_CENTRAL_ADDRESS:443 image check --image $QUAY_URL/$QUAY_USER/frontend:0.1
+----
+
+*Expected:* Failing APK and GitOps-managed policies. If you created *Alpine Linux Package Manager in Image - Enforce Deploy* in xref:02-acs-policy-and-risk.adoc[02 Policy and Risk], it appears here as well.
+
+> You should see a second APK policy violation from the externally managed GitOps policy.
+
+=== Check on Your Policies
+
+*Procedure*
+
+. Go to the RHACS dashboard and head to the Platform Configuration -> Policy Management dashboard: 
+. Search by `Policy` the `alpine`:
+
+image::05-acm-07.png[link=self, window=blank, width=100%]
+
+> Notice how the policies are System, Locally managed, and Externally managed?
+
+What's the difference?
+
+* System policies come with RHACS by default
+* Locally managed policies are created in RHACS or via the API
+* Externally managed policies are managed via GitOps and policy as code
+
+[start=3]
+. Delete a locally managed conflicting build policy if you created one earlier (skip if the name is not found):
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+POLICY_ID=$(curl -X GET \
+  -H "Authorization: Bearer $ROX_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  https://$ROX_CENTRAL_ADDRESS/v1/policies | jq -r '.policies[] | select(.name=="Alpine Linux Package Manager in Image - Enforce Build") | .id')
+
+curl -X DELETE \
+  -H "Authorization: Bearer $ROX_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "id": "$POLICY_ID"
+      }' \
+  https://$ROX_CENTRAL_ADDRESS/v1/policies/$POLICY_ID
+----
+
+> Nice job! 
+
+== Implementing Security Checks into Your CI/CD Pipeline
+
+RHACS integrates into CI/CD via *roxctl* and the admission controller for image scanning, secret handling, and compliance checks. Best practices include RBAC on pipelines, minimal base images, dependency pinning, and policy-as-code.
+
+== Review a Basic CI/CD Pipeline
+
+Review a simple OpenShift Pipelines (Tekton) workflow that scans images with roxctl before deploy.
+
+*Procedure*
+
+. Log in to the OpenShift console at `{web_console_url}` (same credentials as earlier modules). Select *local-cluster*, then open *Pipelines*.
+
+[start=2]
+. Apply the pipeline resources:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc apply -f $TUTORIAL_HOME/openshift-pipelines/ --recursive
+----
+
+*Expected:* `rox-pipeline`, `roxsecrets`, and Tekton tasks are created.
+
+> Find *rox-pipeline* in project *pipeline-demo*, or switch the project filter to *pipeline-demo*.
+
+image::05-cd-03.png[link=self, window=blank, width=100%]
+
+> Start a pipeline run:
+
+[start=8]
+. Click the three dots on the right side of the screen and select *start*:
+
+image::05-cd-05.png[link=self, window=blank, width=100%]
+
+----
+This pipeline works by taking an image that you have created and passing it through a "roxctl image scan" and a "roxctl image check" process.
+----
+
+[start=9]
+. Let's use the *frontend:0.1* image that we've been using all day. Run the following and input it into the image bar:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+echo $QUAY_URL/$QUAY_USER/frontend:0.1
+----
+
+image::05-cd-06.png[link=self, window=blank, width=100%]
+
+IMPORTANT: The pipeline should fail. 
+
+====
+Why do you think the pipeline failed?
+====
+
+Let's look at the logs.
+
+[start=10]
+. Take a look at the log snippet on the bottom right of the page:
+
+image::05-cd-09.png[link=self, window=blank, width=100%]
+
+*Expected:* Initial failure—`Could not resolve host: ROX_CENTRAL_ENDPOINT` and missing `roxctl` indicate incorrect pipeline secret variables.
+
+> Inspect the pipeline secret template:
+
+[start=11]
+. Run the following in the terminal:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+cat $TUTORIAL_HOME/openshift-pipelines/secrets/rox-secrets.yml
+----
+
+The secret requires `rox_central_endpoint` and `rox_api_token`. Update placeholders with your Central route and API token:
+
+[start=12]
+. Run the following in the terminal to update the RHACS Central address and API Token:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+ACS_URL=$(oc -n stackrox get route central -o jsonpath='{.spec.host}')
+ACS_URL_PORT=$(echo "$ACS_URL" | sed 's/$/:443/')
+sed -i "s|ROXCTL_CENTRAL_ENDPOINT|$ACS_URL_PORT|g" $TUTORIAL_HOME/openshift-pipelines/secrets/rox-secrets.yml
+sed -i "s|API_TOKEN|$ROX_API_TOKEN|g" $TUTORIAL_HOME/openshift-pipelines/secrets/rox-secrets.yml
+----
+
+[start=14]
+. Apply the updated secret:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc apply -f $TUTORIAL_HOME/openshift-pipelines/secrets/rox-secrets.yml
+----
+
+=== Let's Try Again
+
+*Procedure*
+
+. Go back to the pipelines view:
+
+image::05-cd-12.png[link=self, window=blank, width=100%]
+
+[start=2]
+. Click the *Actions* dropdown and select *Rerun*. Then relax for a few seconds and grab a sip of water: 
+
+image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExeXdiMmFwaTNrbW02cTNod3BmaTh2aGRrdDJsc3d4NHpqNXY5ZzkwNiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/073QSCJf2tIbtWjZpb/giphy.gif[link=self, window=blank, width=100%, class="center"]
+
+image::05-cd-13.png[link=self, window=blank, width=100%]
+
+====
+What happened? Did you expect this behavior?
+====
+
+[start=3]
+. Check the log snippet in the bottom right of the page.
+
+*Expected:* Pipeline fails on enforced policy—`ERROR: failed policies found: 1 policies violated` (e.g. *Ubuntu Package Manager in Image - Build-time*).
+
+So our policy-as-code example blocked the pipeline from executing successfully.
+
+== What Would You Do?
+
+* How would you implement roxctl into your pipelines?
+* Would you have enforcement off at the beginning?
+* Are there any organizational policies that should be enforced in all pipelines?
+
+== Security Exercise: ACME Incident Response
+
+At 02:14 AM Morgan paged Sarah to trace how the attacker got shell access. The answer is in the audit logs—and it implicates a CI/CD service account.
+
+include::partial$acme-incident-context.adoc[]
+
+=== Scenario
+
+[quote, Sarah, Platform Engineering]
+I'm querying control-plane audit logs for exec events in our namespace. Morgan needs to know if this is bigger than one pod.
+
+=== Your task
+
+include::partial$security-exercise-task-intro.adoc[]
+
+.Step 1 — Switch to your payment gateway namespace
+[%collapsible]
+====
+include::partial$payment-gateway-namespace.adoc[]
+====
+
+.Step 2 — Search audit logs for the compromised exec
+[%collapsible]
+====
+Search audit logs on control plane nodes for the compromised exec:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+namespace=$(oc project --short)
+
+for master in $(oc get nodes --selector node-role.kubernetes.io/master --output name); do
+  echo "=== Searching logs on ${master} ==="
+  oc adm node-logs "${master}" --path=kube-apiserver/audit.log \
+    | jq --arg ns "${namespace}" 'first(select(.objectRef.namespace == $ns
+          and .objectRef.name == "payment-gateway"
+          and .verb == "create"
+          and .objectRef.subresource == "exec"))'
+done
+----
+====
+
+.Step 3 — Interpret the audit log output
+[%collapsible]
+====
+Review the output. Key fields to identify:
+
+* `user.username` — should be `system:serviceaccount:payment-gateway-{workshop_user_suffix}:cicd-pipeline-runner-sa`
+* `requestURI` — URL-encoded payload with `SHADOW_PIVOT`, `/tmp/.hidden_toolkit/exfil.sh`
+* `responseStatus.code` — `101` (WebSocket upgrade = successful exec)
+* `annotations` — RBAC binding that allowed the exec
+
+image::fsi-security/sarah-call.png[Incident investigation,link=self, window=blank, width=100%]
+====
+
+=== What you learned
+
+* Audit logs attribute exec actions to the exact service account and source IP.
+* Over-permissioned CI/CD credentials are a common real-world attack path.
+* Pipeline automation accounts should not have live pod exec permissions in production.
+
+
+== Summary
+
+
+THUMBS UP!
+
+In this lab, you reviewed a basic CI/CD use case that implemented build-time policy checks with `roxctl` and GitOps-managed policies. You then adjusted the pipeline secret so the scan could reach Central. 
+
+Congrats! On to xref:04-acs-compliance.adoc[Compliance]!
+
+image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbTkyMGVyZW5qaG84dHB1cWM3Z3l0eWlpNWhseW9vODZocTVyZmZhMiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7abGQa0aRJUurpII/giphy.gif[link=self, window=blank, width=100%, class="center"]
+
+== Cleanup
+
+Before moving to the next module, run the lab cleanup script to reset transient resources from this module.
+
+:lab-cleanup-module: 03
+include::partial$lab-cleanup.adoc[]

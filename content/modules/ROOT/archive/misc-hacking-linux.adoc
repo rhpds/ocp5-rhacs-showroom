@@ -1,0 +1,41 @@
+= Capture the Flag
+
+== Module goals
+.Goals
+* A CTF challenge: Web hacking a running container on OpenShift
+* There are three flags found during the journey.
+
+== The CTF challenge
+
+This vulnerable web application is intentionally designed with minimal interaction but contains flaws that can be exploited through SQL injection and cross-site scripting (XSS) attacks. There are three hidden flags to discover.
+
+Have fun exploring!
+
+== Getting access
+
+Start by networking the running container so that you can access it. The following commands deploy our vulnerable container to EKS and creates a LoadBalancer service to make it publicly accessible. 
+
+[source,sh,role=execute]
+----
+oc config use-context eks-admin
+export TUTORIAL_HOME="$(pwd)/demo-apps"
+oc apply -f $TUTORIAL_HOME/kubernetes-manifests/ctf-web-to-system/ctf-w2s.yml
+----
+
+[.console-output]
+[source,bash,subs="+macros,+attributes"]
+----
+Switched to context "eks-admin".
+service/ctf-web-to-system-service unchanged
+deployment.apps/ctf-web-to-system configured
+----
+
+[source,sh,role=execute]
+----
+oc get svc ctf-web-to-system-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+----
+
+IMPORTANT: Use the amazonaws.com link to access the vulnerable container
+
+
+

@@ -1,0 +1,67 @@
+= Advanced Cluster Security (RHACS) Labs Overview
+:toc:
+:icons: font
+
+xref:index.adoc[← Back to HOME]
+
+== Overview
+
+These labs go deep on Red Hat Advanced Cluster Security (RHACS): setup and navigation, vulnerability management, policy and risk, CI/CD gates, compliance, notifications and API, network and runtime security, and installation.
+
+Use this track after (or alongside) the role path that owns the capability—especially DevSecOps, Platform Operator, and Security Architect. Related framework labs include xref:301-04-runtime-threat-detection.adoc[301-04] and xref:301-05-incident-response-forensics.adoc[301-05].
+
+Audience and prerequisites:
+
+* OpenShift cluster with RHACS Central and secured clusters available (this environment is pre-configured)
+* Familiarity with OpenShift console navigation and basic CLI (`oc`, `roxctl`)
+* Credentials and console links are on the xref:index.adoc[home page]
+
+== Recommended Sequence
+
+. xref:00-acs-setup-install-navigation.adoc[Setup and Navigation]
+. xref:01-acs-vulnerability-management.adoc[Vulnerability Management]
+. xref:02-acs-policy-and-risk.adoc[Policy and Risk]
+. xref:03-acs-cicd-and-automation.adoc[CI/CD Automation and Integration]
+. xref:04-acs-compliance.adoc[Compliance]
+. xref:05-acs-notifications-api.adoc[Notifications, API, and Integrations]
+. xref:06-acs-network-and-runtime.adoc[Network and Runtime Security]
+. xref:07-acs-installation.adoc[Installation]
+
+== RHACS Labs Index
+
+[cols="1,3,2",options="header"]
+|===
+|Lab | Title | Focus
+
+|xref:00-acs-setup-install-navigation.adoc[00]
+|Setup and Navigation
+|Environment, consoles, dashboard, and search
+
+|xref:01-acs-vulnerability-management.adoc[01]
+|Vulnerability Management
+|CVE findings, prioritization, and reporting
+
+|xref:02-acs-policy-and-risk.adoc[02]
+|Policy and Risk
+|Risk scoring, filters, and deploy-time enforcement
+
+|xref:03-acs-cicd-and-automation.adoc[03]
+|CI/CD and Automation
+|Pipeline gates and build-time checks
+
+|xref:04-acs-compliance.adoc[04]
+|Compliance
+|Compliance standards and assessment results
+
+|xref:05-acs-notifications-api.adoc[05]
+|Notifications, API, and Integrations
+|Notifiers, webhooks, and Central API
+
+|xref:06-acs-network-and-runtime.adoc[06]
+|Network and Runtime Security
+|Network graph, netpol, and runtime enforcement
+
+|xref:07-acs-installation.adoc[07]
+|Installation and RHACS Cloud Service
+|Deployment options and RHACS Cloud Service
+|===

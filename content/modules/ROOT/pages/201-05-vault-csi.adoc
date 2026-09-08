@@ -1,0 +1,540 @@
+= Secrets Without Static Copies – Vault CSI Integration
+:role: Intermediate Secret Management
+:skills: Vault CSI, Dynamic Secrets, Rotation
+:labid: LAB-201-05
+:toc:
+:icons: font
+
+**Duration:** ~25 minutes
+
+== Overview
+Wire HashiCorp Vault and External Secrets Operator so pods get secrets at runtime without baking static copies into Git or images—dev-mode Vault for learning only.
+
+include::partial$console-access.adoc[]
+
+== Why it matters
+Static credentials in images, manifests, and long-lived Kubernetes Secrets are prime loot after a foothold. Vault keeps the source of truth off the cluster disk and issues access on demand so a stolen YAML file is no longer enough.
+
+== What does it solve
+
+* Secrets committed to Git or baked into images
+* Long-lived cluster Secrets with no rotation story
+* Apps that cannot prove where credentials came from
+
+== Your Mission
+Stand up Vault, configure Kubernetes auth and policies, then prove a pod can consume secrets without carrying static copies—an attacker who clones the app repo still does not get the database password.
+
+NOTE: This lab runs Vault in *dev mode* (auto-unsealed, root token `root`). Dev mode is for learning only—data is lost when the Vault pod restarts. Do not use it in production.
+
+This lab tracks the https://github.com/validatedpatterns/layered-zero-trust[Layered Zero Trust Validated Pattern] pattern for secrets (Vault and External Secrets Operator).
+
+Click each step only if you need a hint.
+
+.Run install-vault.sh
+[%collapsible]
+====
+The installer lives in this roadshow repo. It deploys the HashiCorp Helm chart into `vault` with the Agent Injector enabled (dev mode, root token `root`).
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+cd ~/openshift-security-roadshow/setup/vault-lab
+./install-vault.sh
+----
+
+TIP: CTRL+click the URL the script prints to open the Vault UI.
+====
+
+.Get pods, services, and the Route in namespace vault
+[%collapsible]
+====
+Confirm the server and injector are up before you exec in.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get pods,svc,route -n vault
+----
+
+TIP: `vault-0` and `vault-agent-injector` are `Running`, and a Route exists.
+====
+
+.Exec into vault-0
+[%collapsible]
+====
+Stay in this shell for the next Vault CLI steps.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc exec -it -n vault vault-0 -- /bin/sh
+----
+
+TIP: Your prompt is now inside `vault-0`.
+====
+
+.Set VAULT_ADDR and VAULT_TOKEN inside the pod
+[%collapsible]
+====
+Dev-mode token is `root`. Paste these in the `vault-0` shell.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+export VAULT_ADDR=http://127.0.0.1:8200
+export VAULT_TOKEN=root
+----
+
+TIP: `vault status` should succeed after this.
+====
+
+.Write /home/vault/read-policy.hcl
+[%collapsible]
+====
+The policy only allows `read` on `secret*`.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+cat <<EOF > /home/vault/read-policy.hcl
+path "secret*" {
+  capabilities = ["read"]
+}
+EOF
+----
+
+TIP: Run this inside the Vault pod shell from the previous step.
+====
+
+.Write Vault policy read-policy
+[%collapsible]
+====
+Apply the HCL file you just created.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+vault policy write read-policy /home/vault/read-policy.hcl
+----
+
+TIP: `Success! Uploaded policy: read-policy`.
+====
+
+.Enable Kubernetes auth
+[%collapsible]
+====
+Pods will authenticate with their SA token, not the root token.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+vault auth enable kubernetes
+----
+
+TIP: `Success! Enabled kubernetes auth method at: kubernetes/`.
+====
+
+.Write auth/kubernetes/config
+[%collapsible]
+====
+Point Vault at this cluster’s API using the pod’s SA token and CA.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+vault write auth/kubernetes/config \
+  token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+  kubernetes_host="https://kubernetes.default.svc:443" \
+  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+----
+
+TIP: `Success! Data written to: auth/kubernetes/config`.
+====
+
+.Enable KV v2 at path secret/
+[%collapsible]
+====
+Ignore the error if the engine is already on.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+vault secrets enable -path=secret kv-v2 2>/dev/null || true
+----
+
+TIP: Engine is available at `secret/`.
+====
+
+.Create Kubernetes auth role vault-role
+[%collapsible]
+====
+Bind policy `read-policy` to SA `vault-serviceaccount` in namespace `vault`. Vault 1.21 checks the token `aud` claim.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+AUD=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token | cut -d. -f2 | base64 -d 2>/dev/null | sed -n 's/.*"aud":\["\([^"]*\)".*/\1/p')
+vault write auth/kubernetes/role/vault-role \
+  bound_service_account_names=vault-serviceaccount \
+  bound_service_account_namespaces=vault \
+  policies=read-policy \
+  ttl=1h \
+  audience="${AUD}"
+----
+
+TIP: `Success! Data written to: auth/kubernetes/role/vault-role`.
+====
+
+.Exit the Vault pod shell
+[%collapsible]
+====
+Leave `vault-0` before you run `oc` commands again.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+exit
+----
+
+TIP: Your prompt is the bastion again.
+====
+
+.Exec into vault-0 again
+[%collapsible]
+====
+Reconnect if you already exited.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc exec -it -n vault vault-0 -- /bin/sh
+----
+
+TIP: You are inside `vault-0` again.
+====
+
+.Set VAULT_ADDR and VAULT_TOKEN again
+[%collapsible]
+====
+Paste these in the `vault-0` shell.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+export VAULT_ADDR=http://127.0.0.1:8200
+export VAULT_TOKEN=root
+----
+
+TIP: Ready to run `vault kv` commands.
+====
+
+.Put secret/login in Vault
+[%collapsible]
+====
+This path is what the Agent Injector will mount later.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+vault kv put secret/login rhos-token=workshop-token-abc123
+----
+
+TIP: `created` / `version` metadata prints.
+====
+
+.Put secret/my-first-secret in Vault
+[%collapsible]
+====
+Username and password for the first sample app.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+vault kv put secret/my-first-secret username=workshop-user password=workshop-password
+----
+
+TIP: A new KV version is stored.
+====
+
+.List secrets under secret/
+[%collapsible]
+====
+Confirm both paths exist.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+vault kv list secret
+----
+
+TIP: List includes `login` and `my-first-secret`.
+====
+
+.Exit the Vault pod shell after creating secrets
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+exit
+----
+
+TIP: Back on the bastion.
+====
+
+.Print the Vault UI URL
+[%collapsible]
+====
+Open the URL in a new tab (Ctrl+click or Cmd+click).
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+echo "https://$(oc get route vault -n vault -o jsonpath='{.spec.host}')/"
+----
+
+TIP: Sign in with method *Token* and token `root`.
+====
+
+.Create secret/my-second-secret in the Vault UI
+[%collapsible]
+====
+ESO will sync this path into a Kubernetes Secret. The names are different on purpose.
+
+. Navigate to *Secrets Engines* → *secret*.
+. Click *Create secret*.
+. Path: `my-second-secret`
+. Keys: `username` = `workshop-user-2`, `password` = `workshop-password-2`
+. Click *Save*.
+
+IMPORTANT: The Vault path must be exactly `my-second-secret` (under the `secret` engine). ESO writes Kubernetes Secret `my-second-secret-sync`.
+====
+
+.Apply vault-secrets-app.yaml
+[%collapsible]
+====
+The Agent Injector mutates the pod and writes files under `/vault/secrets/`.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc apply -f ~/openshift-security-roadshow/setup/vault-lab/vault-secrets-app.yaml
+----
+
+TIP: Deployment and Route are created in namespace `vault`.
+====
+
+.Watch vault-secrets-app pods
+[%collapsible]
+====
+Wait for `2/2` Ready (app + Vault Agent sidecar). Press Ctrl+C when it is Ready.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get pods -n vault -l app=vault-secrets-app -w
+----
+
+TIP: `2/2` Running.
+====
+
+.Print the vault-secrets-app Route
+[%collapsible]
+====
+Open the app in a new tab.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+echo "https://$(oc get route vault-secrets-app -n vault -o jsonpath='{.spec.host}')/"
+----
+
+TIP: You should see the Vault Secrets App welcome page.
+====
+
+.Set POD to the vault-secrets-app pod name
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+POD=$(oc get pod -n vault -l app=vault-secrets-app -o jsonpath='{.items[0].metadata.name}')
+echo "$POD"
+----
+
+TIP: A pod name prints. Re-run this if you open a new terminal.
+====
+
+.Cat injected files from the web container
+[%collapsible]
+====
+Read `/vault/secrets/login` and `/vault/secrets/my-first-secret`.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc exec -n vault "${POD}" -c web -- sh -c "cat /vault/secrets/login && echo && cat /vault/secrets/my-first-secret"
+----
+
+TIP: Expect `rhos-token=workshop-token-abc123` and `username=workshop-user` / `password=workshop-password`.
+====
+
+.Read vault-agent-init logs if the mount is empty
+[%collapsible]
+====
+Use the same `POD` variable from the previous step, or set it again.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc logs -n vault "${POD}" -c vault-agent-init
+----
+
+TIP: Auth and render errors show up here if files are missing.
+====
+
+.Add the external-secrets Helm repo
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+helm repo add external-secrets https://charts.external-secrets.io
+----
+
+TIP: `external-secrets` is in your Helm repo list.
+====
+
+.Update the external-secrets Helm repo
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+helm repo update external-secrets
+----
+
+TIP: Charts are current.
+====
+
+.Helm install External Secrets Operator
+[%collapsible]
+====
+ESO copies Vault data into native Kubernetes Secrets.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+helm upgrade --install external-secrets external-secrets/external-secrets \
+  -n external-secrets \
+  --create-namespace \
+  --set installCRDs=true \
+  --wait --timeout 10m
+----
+
+TIP: Helm reports a successful install.
+====
+
+.Get pods in namespace external-secrets
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get pods -n external-secrets
+----
+
+TIP: The `external-secrets` pod is `Running`.
+====
+
+.Apply eso-secretstore.yaml
+[%collapsible]
+====
+Creates the token Secret, SecretStore, and ExternalSecret that read `my-second-secret`.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc apply -f ~/openshift-security-roadshow/setup/vault-lab/eso-secretstore.yaml
+----
+
+TIP: SecretStore and ExternalSecret exist in namespace `vault`.
+====
+
+.Get ExternalSecret and SecretStore in vault
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get externalsecret,secretstore -n vault
+----
+
+TIP: `sync-my-second-secret` is listed.
+====
+
+.Check ExternalSecret Ready status
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get externalsecret sync-my-second-secret -n vault -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}{"\n"}'
+----
+
+TIP: `True`. If `SecretSyncedError`, confirm `my-second-secret` in the Vault UI has both keys.
+====
+
+.Decode username from Secret my-second-secret-sync
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get secret my-second-secret-sync -n vault -o jsonpath='{.data.username}{"\n"}' | base64 -d && echo
+----
+
+TIP: Decoded username is `workshop-user-2`.
+====
+
+.Apply eso-vault-test.yaml
+[%collapsible]
+====
+This app reads env from the synced Kubernetes Secret, not Agent files.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc apply -f ~/openshift-security-roadshow/setup/vault-lab/eso-vault-test.yaml
+----
+
+TIP: Deployment is created in namespace `vault`.
+====
+
+.Watch eso-read-vault-secret pods
+[%collapsible]
+====
+Press Ctrl+C when the pod is `1/1` Ready.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get pods -n vault -l app=eso-read-vault-secret -w
+----
+
+TIP: `1/1` Running.
+====
+
+.Set ESO_POD to the eso-read-vault-secret pod name
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+ESO_POD=$(oc get pod -n vault -l app=eso-read-vault-secret -o jsonpath='{.items[0].metadata.name}')
+echo "$ESO_POD"
+----
+
+TIP: A pod name prints.
+====
+
+.Print USERNAME and PASSWORD from the ESO app pod
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc exec -n vault "${ESO_POD}" -c app -- sh -c 'echo "username=${USERNAME}" && echo "password=${PASSWORD}"'
+----
+
+TIP: `username=workshop-user-2` and `password=workshop-password-2`.
+====
+
+== Debrief
+
+You consumed Vault secrets two ways—Agent Injector files under `/vault/secrets/` and External Secrets Operator sync into a native Secret—so credentials are not baked into Git or images.
+
+What breaks without this:
+
+* Static Secrets in etcd/Git/images → long-lived loot after a foothold
+* No rotation path → stolen credentials stay valid
+
+IMPORTANT: Vault (or equivalent) as source of truth, Kubernetes auth bound to namespace/SA, injector for file delivery, ESO when apps need native Secret mounts, and least-privilege Vault roles.
+
+NOTE: prefer short-lived, identity-bound access over copied passwords. Lab cleanup runs `setup/vault-lab/cleanup-vault-lab.sh` via `lab-cleanup.sh --module 201-05`.
+
+image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYzMyaHRsNTdwZWRlejRycGtpNTkxOGlyMjJsODE4OHFiaWd3NjFpNyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/rVVFWyTINqG7C/giphy.gif[link=self, window=blank, width=100%, class="center"]
+
+== Cleanup
+
+When you finish this module, run the roadshow cleanup script. It uninstalls External Secrets Operator and Vault and removes the related namespaces.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+cd ~/openshift-security-roadshow
+bash setup/lab-cleanup.sh --module 201-05
+----

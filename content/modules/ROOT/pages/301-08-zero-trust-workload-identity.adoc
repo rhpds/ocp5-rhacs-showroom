@@ -1,0 +1,334 @@
+= Zero-Trust Database Access with SPIFFE mTLS
+:role: Advanced Runtime Security
+:skills: Workload Identity Frameworks, Confidential Execution Runtimes, Hardware-Backed Attestation
+:labid: LAB-301-08
+:toc:
+:icons: font
+:page-toclevels: 1
+
+**Duration:** ~20 minutes
+
+== Overview
+xref:201-11-threat-modeling-control-mapping.adoc[201-11] **Spoofing**: a stolen or long-lived service account token is still a password. This lab is the scale-up of xref:201-01-custom-rbac.adoc[201-01] / `automountServiceAccountToken: false` (xref:301-01-platform-security-governance.adoc[301-01]): identity becomes a **short-lived X.509 certificate** (SPIFFE) instead of a Secret.
+
+Replace shared database passwords with SPIFFE workload identity and mutual TLS via the Zero Trust Workload Identity Manager (ZTWIM)—certificates tied to Kubernetes service accounts instead of static Secrets.
+
+include::partial$console-access.adoc[]
+
+
+Your payment-processing service needs PostgreSQL. The database team refuses another shared password in a Kubernetes `Secret`—and they are right. Static credentials in Git, images, or long-lived Secrets are exactly what attackers hunt after a breach. Here you use no database password at all: ZTWIM issues short-lived X.509 certificates bound to each workload identity, and PostgreSQL trusts those certificates.
+
+== Why it matters
+Network reachability alone is not trust. Password spray, stolen Secret mounts, and forgotten shared credentials keep working until rotation catches up. Cryptographic workload identity makes every connection prove *who* is calling, not just *that* TLS is on.
+
+== What does it solve
+
+* Static database passwords that enable persistence after theft
+* Password-only auth that invites spray and reuse
+* Network-only isolation that fails after a lateral foothold
+* Manual cert rotation that leaves stale credentials valid
+* Missing mutual authentication (server cannot verify client)
+
+== Your Mission
+Wire ZTWIM and PostgreSQL so only cert-bearing workloads connect—then prove bare connections are rejected and certificates rotate without another shared password to steal.
+
+Click each step only if you need a hint.
+
+.Prepare the platform and deploy PostgreSQL
+[%collapsible]
+======
+ZTWIM is already installed on this cluster. You'll register the trust domain and SPIRE configuration, then deploy PostgreSQL and a client workload—each in its own namespace with its own service account so the database can enforce *who* connects, not just *that* TLS is enabled.
+
+[NOTE]
+====
+**Showroom environments:** The ZTWIM operator is pre-installed. Run the setup script to prepare SPIRE for the PostgreSQL lab.
+====
+
+. From the bastion, run the platform setup script:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+cd ~/openshift-security-roadshow/setup/ztwim-lab
+./configure-ztwim-lab.sh
+----
++
+. Wait until the script reports *ZTWIM platform is ready*.
++
+TIP: The script configures SPIRE server, agents, the CSI driver, and OIDC discovery endpoints. If it fails, check `oc get pods -n openshift-zero-trust-workload-identity-manager` before re-running.
++
+. Deploy the PostgreSQL server and client workloads:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+cd ~/openshift-security-roadshow/setup/ztwim-lab
+./configure-ztwim-postgresql-lab.sh deploy
+----
++
+. Confirm both pods are `2/2 Running`—one application container plus one `spiffe-helper` sidecar that keeps certificates fresh:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get pods -n postgresql-spiffe
+oc get pods -n postgresql-spiffe-client
+----
+
+[NOTE]
+====
+The client certificate Common Name (`postgresql_spiffe`) must match the PostgreSQL database user. PostgreSQL maps the CN to the username during certificate authentication.
+====
+======
+
+.Inspect SPIFFE certificates
+[%collapsible]
+====
+Before connecting, look at what ZTWIM actually issued. Certificates are automatically mounted at `/opt/postgresql-certs/` by the `spiffe-helper` sidecar—you never create or copy PEM files by hand.
+
+. On the **server** pod, dump the certificate and focus on three fields—*who* it represents, *how long* it's valid, and the canonical SPIFFE identity URI:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc rsh -n postgresql-spiffe -c postgresql-spiffe deployment/postgresql-spiffe \
+  cat /opt/postgresql-certs/svid.pem | openssl x509 -noout -text
+----
++
+TIP: Look for these in the output:
+
+* *Subject* — server hostname (`CN=postgresql-spiffe.postgresql-spiffe.svc`)
+* *Validity* — short lifespan (default: 1 hour); `Not After` is roughly one hour after `Not Before`
+* *Subject Alternative Name* — DNS name and SPIFFE ID URI:
++
+[source,text]
+----
+X509v3 Subject Alternative Name:
+    DNS:postgresql-spiffe.postgresql-spiffe.svc
+    URI:spiffe://<trust-domain>/ns/postgresql-spiffe/sa/postgresql-spiffe
+----
+
+The SPIFFE ID format is `spiffe://<trust-domain>/ns/<namespace>/sa/<serviceaccount>`. In production, auditors often ask for the SPIFFE ID URI—not just the CN—because it binds identity to Kubernetes namespace and service account.
+
+. List the certificate files on the server. You should see three files owned by `postgres`:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc rsh -n postgresql-spiffe -c postgresql-spiffe deployment/postgresql-spiffe \
+  ls -la /opt/postgresql-certs/
+----
++
+* `svid.key` — private key (`600` permissions, readable only by `postgres`)
+* `svid.pem` — workload certificate
+* `svid_bundle.pem` — CA bundle for verification
++
+. On the **client** pod, run the same inspection and compare identities side by side:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc rsh -n postgresql-spiffe-client -c postgresql-spiffe-client deployment/postgresql-spiffe-client \
+  cat /opt/postgresql-certs/svid.pem | openssl x509 -noout -text
+----
++
+The client CN must match the PostgreSQL database user:
++
+[source,text]
+----
+Subject: C=US, O=SPIRE, CN=postgresql_spiffe
+----
++
+Each workload gets a unique SPIFFE ID:
+
+* *Server*: `spiffe://.../ns/postgresql-spiffe/sa/postgresql-spiffe`
+* *Client*: `spiffe://.../ns/postgresql-spiffe-client/sa/postgresql-spiffe-client`
++
+. Check when the client certificate expires:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc rsh -n postgresql-spiffe-client -c postgresql-spiffe-client deployment/postgresql-spiffe-client \
+  sh -c 'echo "Current time: $(date)"; openssl x509 -in /opt/postgresql-certs/svid.pem -noout -dates'
+----
+
+The `spiffe-helper` sidecar fetches a new certificate approximately 30 minutes before expiration. Short lifetimes are a feature—if an attacker steals a cert, the window of abuse is measured in minutes, not months until someone rotates a password.
+====
+
+.Connect and verify mutual TLS
+[%collapsible]
+====
+Time to put the certificates to work. You'll connect from the client pod using `psql` with `sslmode=verify-full`: the client proves its identity, PostgreSQL proves *its* identity, and hostname verification must pass. No password prompt—because there is no password.
+
+. Run a one-line connection test:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc rsh -n postgresql-spiffe-client -c postgresql-spiffe-client deployment/postgresql-spiffe-client \
+  psql "host=postgresql-spiffe.postgresql-spiffe.svc port=5432 user=postgresql_spiffe dbname=testdb sslmode=verify-full sslcert=/opt/postgresql-certs/svid.pem sslkey=/opt/postgresql-certs/svid.key sslrootcert=/opt/postgresql-certs/svid_bundle.pem" \
+  -c "SELECT current_user, current_database();"
+----
++
+NOTE: Expected output:
++
+[source,text]
+----
+   current_user    | current_database
+-------------------+------------------
+ postgresql_spiffe | testdb
+(1 row)
+----
+
+That's the payoff: `current_user` is `postgresql_spiffe` because the certificate CN matched the database role. Key connection parameters: `user` must match the certificate CN; `sslmode=verify-full` is the strictest mode (server verified, hostname matched, client cert required); `sslcert`, `sslkey`, and `sslrootcert` point to the SPIFFE-issued files under `/opt/postgresql-certs/`.
+
+. Gather evidence that TLS is actually in use:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc rsh -n postgresql-spiffe-client -c postgresql-spiffe-client deployment/postgresql-spiffe-client \
+  psql "host=postgresql-spiffe.postgresql-spiffe.svc port=5432 user=postgresql_spiffe dbname=testdb sslmode=verify-full sslcert=/opt/postgresql-certs/svid.pem sslkey=/opt/postgresql-certs/svid.key sslrootcert=/opt/postgresql-certs/svid_bundle.pem" \
+  -c '\conninfo' \
+  -c 'SELECT ssl_is_used();' \
+  -c 'SELECT version();'
+----
++
+TIP: Look for `SSL connection (protocol: TLSv1.3, ...)` in the output and `ssl_is_used` returning `t`. Cluster IP and PostgreSQL build string may differ on your environment.
++
+. Prove you have a working session—insert a row and read it back:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc rsh -n postgresql-spiffe-client -c postgresql-spiffe-client deployment/postgresql-spiffe-client \
+  psql "host=postgresql-spiffe.postgresql-spiffe.svc port=5432 user=postgresql_spiffe dbname=testdb sslmode=verify-full sslcert=/opt/postgresql-certs/svid.pem sslkey=/opt/postgresql-certs/svid.key sslrootcert=/opt/postgresql-certs/svid_bundle.pem" <<'SQL'
+INSERT INTO test_table (name, text)
+VALUES ('spiffe-test', 'Authenticated with certificates!');
+SELECT * FROM test_table;
+SQL
+----
+====
+
+.Prove zero-trust enforcement
+[%collapsible]
+====
+Zero trust means *verify every connection*, not "trust the internal network." If an attacker can reach port 5432, they should still fail without a valid SPIFFE identity.
+
+. Deliberately omit the client cert and key from the connection string:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc rsh -n postgresql-spiffe-client -c postgresql-spiffe-client deployment/postgresql-spiffe-client \
+  psql "host=postgresql-spiffe.postgresql-spiffe.svc port=5432 user=postgresql_spiffe dbname=testdb sslmode=require" \
+  2>&1 | head -5
+----
++
+NOTE: Expected error:
++
+[source,text]
+----
+psql: error: connection to server at "postgresql-spiffe.postgresql-spiffe.svc" failed:
+FATAL: connection requires a valid client certificate
+----
+
+Network connectivity alone is insufficient—PostgreSQL `pg_hba.conf` requires SSL *and* valid client certificates (`hostssl ... cert`), and no password bypass exists for the `postgresql_spiffe` user.
+
+. Launch a random pod in the same namespace—no SPIFFE sidecar, no issued certificate—and try again:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc run unauthorized-client --image=registry.redhat.io/rhel9/postgresql-16:latest \
+  -n postgresql-spiffe-client --command -- sleep infinity
+oc wait --for=condition=Ready pod/unauthorized-client -n postgresql-spiffe-client --timeout=60s
+oc exec -n postgresql-spiffe-client unauthorized-client -- \
+  psql "host=postgresql-spiffe.postgresql-spiffe.svc port=5432 user=postgresql_spiffe dbname=testdb" \
+  2>&1 | head -3
+----
++
+TIP: You should see `connection requires a valid client certificate`. Even pods in the same namespace cannot connect without valid SPIFFE certificates—NetworkPolicy might let them talk; PostgreSQL still says no.
++
+. Clean up the test pod:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc delete pod unauthorized-client -n postgresql-spiffe-client
+----
+====
+
+.Observe automatic certificate rotation
+[%collapsible]
+======
+Static passwords rot until someone notices. SPIFFE certificates expire on a schedule—and `spiffe-helper` renews them before they do, without restarting your application containers.
+
+.Procedure
+. Start tmux with two panes:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+tmux new-session \; split-window -v \; attach
+----
++
+. In the first pane, follow `spiffe-helper` logs:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc logs -n postgresql-spiffe-client -l app=postgresql-spiffe-client -c spiffe-helper --tail=20 -f
+----
++
+. Press *Ctrl+b*, then *o* to switch to the second pane.
++
+[IMPORTANT]
+====
+`Ctrl+b` is the tmux prefix key. `o` switches to the next pane.
+====
++
+. In the second pane, capture the current certificate serial number and expiry:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc rsh -n postgresql-spiffe-client -c postgresql-spiffe-client deployment/postgresql-spiffe-client \
+  sh -c 'openssl x509 -in /opt/postgresql-certs/svid.pem -noout -serial -enddate'
+----
++
+[NOTE]
+====
+Rotation happens on a schedule tied to certificate lifetime (roughly 30 minutes before expiry). In a short lab you may see only the initial `X.509 certificates updated` event—that still confirms the sidecar is watching and writing certs.
+====
++
+. Re-check the serial number and confirm the database connection still works:
++
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc rsh -n postgresql-spiffe-client -c postgresql-spiffe-client deployment/postgresql-spiffe-client \
+  sh -c 'openssl x509 -in /opt/postgresql-certs/svid.pem -noout -serial -enddate'
+oc rsh -n postgresql-spiffe-client -c postgresql-spiffe-client deployment/postgresql-spiffe-client \
+  psql "host=postgresql-spiffe.postgresql-spiffe.svc port=5432 user=postgresql_spiffe dbname=testdb sslmode=verify-full sslcert=/opt/postgresql-certs/svid.pem sslkey=/opt/postgresql-certs/svid.key sslrootcert=/opt/postgresql-certs/svid_bundle.pem" \
+  -c "SELECT 'Connection successful after rotation' AS status;"
+----
++
+. Exit tmux and return to the bastion host terminal:
+.. Type `exit` or press *Ctrl-D* to leave the tmux session.
+.. Press *Ctrl+C* in the first pane if `oc logs` is still running.
+.. type `exit` to leave the tmux session.
++
+
+Congrats! You've seen new serial number, same trust chain, uninterrupted access—that's operational zero trust without a 2 a.m. password rotation runbook.
+======
+
+== Debrief
+
+You replaced shared database passwords with SPIFFE workload identity and mTLS via ZTWIM—short-lived certs bound to namespace and ServiceAccount.
+
+What you proved:
+
+* Reachability without a valid SVID still fails
+* Unauthorized pods cannot present the right identity
+* Certificates rotate on a short lifetime via `spiffe-helper`
+
+Controls that matter: SPIRE/ZTWIM issuance, mutual TLS on the data path, and identity-based authorization instead of static Secrets.
+
+Quick facts: this is one layer of a larger zero-trust stack—pair with NetworkPolicy and admission so stolen network access alone is not enough.
+
+image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcjJmczc4MmswYmk1cnhvZ254ZXBiZ2M3bGJzbDV5eDQ3OGlqNWdwdyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/QSSA5Bd56W25ytLIwz/giphy.gif[link=self, window=blank, width=100%, class="center"]
+
+== Cleanup
+
+Run the roadshow module cleanup script. It removes the PostgreSQL SPIFFE namespaces and leaves the ZTWIM operator in place.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+cd ~/openshift-security-roadshow
+bash setup/lab-cleanup.sh --module 301-08
+----

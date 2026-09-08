@@ -1,0 +1,32 @@
+---
+site:
+  title: OpenShift Security Roadshow
+  url: https://www.redhat.com/en/events/openshift-roadshows/security
+  start_page: modules::index.adoc
+
+content:
+  sources:
+  - url: .
+    start_path: content
+
+ui:
+  bundle:
+    url: https://github.com/jnewsome97/rhdp_showroom_theme_execute/releases/download/rh-one-2025-execute-v3/ui-bundle.zip
+    snapshot: true
+  supplemental_files:
+    - path: ./content/supplemental-ui
+    - path: ./content/lib
+    - path: .nojekyll
+    - path: ui.yml
+      contents: "static_files: [ .nojekyll ]"
+
+runtime:
+  cache_dir: ./.cache/antora
+
+antora:
+  extensions:
+  - require: ./content/lib/dev-mode.js
+    enabled: true
+
+output:
+  dir: ./www

@@ -1,6 +1,6 @@
 ---
 site:
-  title: OpenShift 5 Early Access
+  title: OpenShift Security Roadshow
   url: https://github.com/rhpds/ocp5-ea-showroom
   start_page: modules::index.adoc
 
@@ -20,9 +20,8 @@ asciidoc:
   attributes:
     showroom-collection-version: v1.5.2
 
-antora:
-  extensions:
-    - '@andrew-jones/antora-tabs-extension'
+runtime:
+  fetch: true
 
 output:
   dir: ./www

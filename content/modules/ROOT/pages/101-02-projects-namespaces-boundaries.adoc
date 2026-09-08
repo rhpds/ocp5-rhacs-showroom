@@ -1,0 +1,275 @@
+= Projects & Namespaces as Security Boundaries
+:labid: LAB-101-02
+:cis-summary: "Use OpenShift projects and namespaces as security boundaries for multi-tenancy and resource isolation."
+:mitre-summary: "Prevents unauthorized access and resource conflicts by establishing namespace-level security boundaries."
+:toc:
+:icons: font
+
+**Duration:** ~15 minutes
+
+== Overview
+Projects and namespaces draw hard lines between teams and apps. Use them to keep RBAC, quotas, and network rules scoped so one tenant cannot casually reach another.
+
+Create a project with security labels, bind RBAC, and apply a ResourceQuota so you can see how namespaces isolate ownership and capacity.
+
+TIP: An OpenShift *project* is a namespace plus metadata/access controls; create one boundary per team/environment/app; namespaces can talk by default—restrict with NetworkPolicy.
+
+== Why it matters
+On a shared cluster, a single flat namespace becomes everyone’s problem
+
+* Shared secrets access
+* Contested CPU
+* Tangled NetworkPolicies
+
+Clear project boundaries make ownership obvious and keep mistakes contained.
+
+== What does it solve
+
+* Multi-tenant isolation
+* Resource conflict prevention
+* Access control boundaries
+* Compliance and audit organization
+* Network segmentation foundation
+
+== Your Mission
+Without project boundaries, one compromised identity or runaway workload can reach every tenant’s Secrets, CPU, and pods. Draw hard lines—labels, RBAC, and quotas—so a break-in stays trapped in one namespace instead of becoming a cluster-wide outage.
+
+Click each step only if you need a hint.
+
+.Create project 101-02-demo
+[%collapsible]
+====
+Stand up a dedicated project so this tenant has its own boundary -- not shared free-for-all space.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc new-project 101-02-demo --display-name="Security Demo" --description="101-02 Lab Project"
+----
+
+TIP: `Now using project "101-02-demo"`.
+====
+
+.Label namespace 101-02-demo security-tier and environment
+[%collapsible]
+====
+Label the namespace so policy engines (and operators) can target this tenant by security tier and environment.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc label namespace 101-02-demo security-tier=basic environment=dev
+----
+
+Confirm the labels stuck on the project:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get namespace 101-02-demo --show-labels
+----
+
+TIP: Labels should include `security-tier=basic` and `environment=dev`.
+====
+
+.Create RoleBinding dev-team with clusterrole edit
+[%collapsible]
+====
+Bind group `dev-team` to `edit` only inside this project.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc create rolebinding dev-team --clusterrole=edit --group=dev-team -n 101-02-demo
+----
+
+TIP: `rolebinding.rbac.authorization.k8s.io/dev-team created`.
+====
+
+.Confirm the default SA cannot create pods
+[%collapsible]
+====
+The default service account is still denied. That closes the "any SA can do anything" path.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc auth can-i create pods --as=system:serviceaccount:101-02-demo:default -n 101-02-demo
+----
+
+NOTE: Expect `no`. The RoleBinding targets the `dev-team` group; the default service account is still denied.
+====
+
+.Create ResourceQuota demo-quota in 101-02-demo
+[%collapsible]
+====
+Buggy apps (and noisy neighbors) burn the cluster with oversized requests. Put a ceiling on CPU, memory, and pods so one namespace cannot starve the rest.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc create quota demo-quota --hard=requests.cpu=2,requests.memory=2Gi,limits.cpu=4,limits.memory=4Gi,pods=10 -n 101-02-demo
+----
+
+Inspect the quota to confirm the hard limits and current usage:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc describe quota demo-quota -n 101-02-demo
+----
+
+TIP: Hard limits should show 2 CPU request, 2Gi memory, 10 pods.
+====
+
+== Challenge: onboard a new team
+
+Platform ops just approved a new application team. You must stand up their *default* project the same way you did for `101-02-demo`—without copying the demo commands blindly. Work from the requirements below first. Use the hidden solution only if you get stuck.
+
+=== Scenario
+
+The *Payments* team is joining the shared cluster. They need a dedicated development project before they deploy anything. Your platform standard for every new team is:
+
+. One OpenShift *project* per team/environment (not a shared sandbox).
+. Consistent *labels* so policy and reporting can find the tenant.
+. A namespace-scoped *RoleBinding* for the team’s IdP group (`edit` only in that project).
+. A *ResourceQuota* so a runaway deploy cannot starve other tenants.
+
+=== Requirements
+
+Create and configure a project that meets all of these checks:
+
+[cols="1,2",options="header"]
+|===
+|Requirement | Target value
+
+|Project name
+|`team-payments-dev`
+
+|Display name
+|`Payments Team (Dev)`
+
+|Description
+|`Default project for Payments team development workloads`
+
+|Labels
+|`team=payments`, `environment=dev`, `security-tier=basic`
+
+|RBAC
+|RoleBinding named `payments-devs` granting ClusterRole `edit` to group `payments-devs` in `team-payments-dev`
+
+|ResourceQuota name
+|`team-quota`
+
+|ResourceQuota hard limits
+|`requests.cpu=1`, `requests.memory=1Gi`, `limits.cpu=2`, `limits.memory=2Gi`, `pods=5`
+|===
+
+=== Prove it works
+
+Before you open the solution, verify your own work:
+
+* Labels are present on the namespace.
+* The default service account in `team-payments-dev` still *cannot* create pods (`oc auth can-i` should return `no`).
+* `oc describe quota team-quota -n team-payments-dev` shows the hard limits above.
+
+=== Solution (try yourself first)
+
+Click each step only if you need a hint.
+
+.Create project team-payments-dev
+[%collapsible]
+====
+Use the display name and description from the requirements table.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc new-project team-payments-dev \
+  --display-name="Payments Team (Dev)" \
+  --description="Default project for Payments team development workloads"
+----
+
+TIP: `Now using project "team-payments-dev"`.
+====
+
+.Label team-payments-dev with team, environment, and security-tier
+[%collapsible]
+====
+Labels: `team=payments`, `environment=dev`, `security-tier=basic`.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc label namespace team-payments-dev team=payments environment=dev security-tier=basic
+----
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get namespace team-payments-dev --show-labels
+----
+
+TIP: All three labels should appear on the namespace.
+====
+
+.Create RoleBinding payments-devs with clusterrole edit
+[%collapsible]
+====
+Grant ClusterRole `edit` to group `payments-devs` in this project only.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc create rolebinding payments-devs \
+  --clusterrole=edit \
+  --group=payments-devs \
+  -n team-payments-dev
+----
+
+TIP: `rolebinding.rbac.authorization.k8s.io/payments-devs created`.
+====
+
+.Confirm the default SA cannot create pods
+[%collapsible]
+====
+The default service account in `team-payments-dev` should still be denied.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc auth can-i create pods \
+  --as=system:serviceaccount:team-payments-dev:default \
+  -n team-payments-dev
+----
+
+TIP: Expect `no`.
+====
+
+.Create ResourceQuota team-quota and describe it
+[%collapsible]
+====
+Hard limits: `requests.cpu=1`, `requests.memory=1Gi`, `limits.cpu=2`, `limits.memory=2Gi`, `pods=5`.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc create quota team-quota \
+  --hard=requests.cpu=1,requests.memory=1Gi,limits.cpu=2,limits.memory=2Gi,pods=5 \
+  -n team-payments-dev
+----
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc describe quota team-quota -n team-payments-dev
+----
+
+TIP: `oc describe` should list the hard limits from the table.
+====
+
+== Debrief
+
+You drew a project boundary, scoped `edit` RBAC inside it, and capped CPU/memory/pods with a ResourceQuota. This traps a compromise or a runaway workload in one namespace instead of the whole cluster.
+
+What breaks without this:
+
+* No RBAC scope → lateral access and Secret theft across teams
+* No ResourceQuota → noisy-neighbor DoS
+* No NetworkPolicy (next labs) → open east-west traffic by default
+* Inconsistent labels → policy engines like Red Hat Advanced Cluster Security miss the tenant
+
+image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbnY0NDA0ZnJqNXh6cGNqeHNxZGd5Zm5qMnlpOHhrbm1hY2pwcG5ydSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/p18ohAgD3H60LSoI1C/giphy.gif[link=self, window=blank, width=100%, class="center"]
+
+== Cleanup
+
+Before moving to the next module, run the lab cleanup script to reset transient resources from this module.
+
+:lab-cleanup-module: 101-02
+include::partial$lab-cleanup.adoc[]

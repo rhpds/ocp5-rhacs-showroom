@@ -42,3 +42,18 @@ package-lock.json
 
 # Ignore yarn.lock for Yarn
 yarn.lock
+
+# Accidental Finder duplicate; do not commit
+ui-config copy.yml
+
+
+.DS_Store
+.cache
+content/modules/ROOT/pages/openshift-security-roadshow.code-workspace
+node_modules
+www
+.editorconfig
+package-lock.json
+gameify/results.log
+gameify/bastion_output_local.log
+gameify/.venv/

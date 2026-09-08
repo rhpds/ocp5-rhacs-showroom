@@ -1,0 +1,134 @@
+= GitOps a Hardened Python Image (Red Hat catalog)
+:role: Advanced Automation & Compliance
+:skills: GitOps Reconciliation, Digest Pinning, Red Hat Hardened Images
+:labid: LAB-301-02
+:toc:
+:icons: font
+
+**Duration:** ~25 minutes
+
+== Overview
+xref:201-11-threat-modeling-control-mapping.adoc[201-11] Tampering: unsigned or floating tags get admitted. This lab deploys a **Red Hat catalog Python image** from https://images.redhat.com/[Red Hat Images] (`registry.access.redhat.com/ubi9/python-311`) as GitOps YAML, **pinned to a digest**, with no automounted SA token.
+
+That image is signed by Red Hat, runs as non-root, and is the workload xref:301-04-runtime-threat-detection.adoc[301-04] will police at runtime. It is *not* Docker Hub `python:alpine` and *not* the workshop `python-alpine-golden` FROM used in xref:201-04-shift-left-pipeline.adoc[201-04].
+
+If OpenShift GitOps (Argo CD) is installed, the same directory is what an Application would sync. This roadshow applies it with `oc` so you do not need a public Git remote.
+
+== Why it matters
+Click-ops Deployments on `:latest` are how a registry swap becomes production. Git + digest is the reviewable, auditable path (Repudiation as well as Tampering). UBI Python is the enterprise default for a small HTTP service you can still exec into for runtime policy tests.
+
+== What does it solve
+
+* Mutable tags that silently change what the cluster runs
+* Public Python bases that are not in your approved catalog
+* GitOps theater (Argo installed, workloads still created in the console)
+* ServiceAccounts that still automount tokens on a simple app
+
+== Your Mission
+Resolve the UBI Python digest, apply the in-repo manifests, prove the running image is digest-pinned, and (optional) show Argo CD would sync the same path.
+
+=== Prerequisites
+
+* `oc` logged in with permission to create namespaces and Deployments
+* Egress to `registry.access.redhat.com` (or a cluster mirror of UBI)
+* Optional: OpenShift GitOps Operator (`applications.argoproj.io`)
+
+Click each step only if you need a hint.
+
+=== Part A: Catalog image
+
+.Look up the image on Red Hat Images
+[%collapsible]
+====
+Open https://images.redhat.com/[images.redhat.com] and search for **Python** / **ubi9/python-311**. The pull spec this lab uses is `registry.access.redhat.com/ubi9/python-311` (the same catalog image; `registry.redhat.io` if your cluster is authenticated to the entitlements registry).
+
+TIP: Catalog pages show architecture, security metadata, and the recommended pull spec. Do not switch this lab to `docker.io/library/python`.
+====
+
+.Resolve the digest
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc image info registry.access.redhat.com/ubi9/python-311:latest --filter-by-os=linux/amd64
+----
+
+TIP: Note the `Digest: sha256:…` line. That is what GitOps should pin. If `oc image info` fails, the apply script falls back to the tag and prints a warning.
+====
+
+=== Part B: Apply desired state
+
+.Apply the pinned manifests
+[%collapsible]
+====
+YAML lives in this roadshow repo (`setup/gitops-lab/`). The helper rewrites the Deployment image to `image@sha256:…` then `oc apply`.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+cd ~/openshift-security-roadshow/setup/gitops-lab
+chmod +x apply-pinned.sh
+./apply-pinned.sh
+----
+
+TIP: `Applied python-app in 301-02-python using registry.access.redhat.com/ubi9/python-311@sha256:…`.
+====
+
+.Wait for the pod and confirm the digest
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc rollout status deploy/python-app -n 301-02-python --timeout=120s
+oc get deploy python-app -n 301-02-python -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+oc get sa app -n 301-02-python -o jsonpath='{.automountServiceAccountToken}{"\n"}'
+oc get pods -n 301-02-python -o jsonpath='{.items[0].status.containerStatuses[0].imageID}{"\n"}'
+----
+
+TIP: Deployment image contains `@sha256:`. SA automount is `false`. `imageID` is the same digest the node pulled.
+====
+
+.Hit the app from inside the cluster
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc exec deploy/python-app -n 301-02-python -- python3 -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/', timeout=5).status)"
+----
+
+TIP: Prints `200`. The process is `python3`; ACS can still see exec in 301-04/05.
+====
+
+=== Part C: GitOps operator (optional)
+
+.If Argo CD is present, inspect it — do not require a new Git remote
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get crd applications.argoproj.io 2>/dev/null && oc get argocd -A || echo "OpenShift GitOps not installed — oc apply -k is the GitOps path for this lab"
+ls ~/openshift-security-roadshow/setup/gitops-lab
+----
+
+TIP: The kustomize directory *is* the desired state. On a customer cluster you would point an `Application` at this path in Git. You already applied it; skip creating an Application that needs a clone URL.
+====
+
+== Debrief
+
+GitOps of a **Red Hat catalog Python image by digest** is Tampering control at deploy time. Runtime is xref:301-04-runtime-threat-detection.adoc[301-04]. Provenance depth (SBOM, signatures, admit unsigned) is xref:301-06-supply-chain-integrity.adoc[301-06].
+
+What breaks without this:
+
+* `:latest` in production → yesterday’s scan is not what ran today
+* Docker Hub Python in a “hardened” program → you skipped the catalog you already pay for
+* Policy YAML only on the hub, workloads still click-ops → two sources of truth
+
+IMPORTANT: pin digest, UBI Python from https://images.redhat.com/[images.redhat.com], no automount. Leave `301-02-python` running if you are continuing to 301-04.
+
+image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExa3R1YjV5eGt3MTQ2a2UxOGM0ZThzaTQwdXE3cHdmMGo3NXUzOHB0MiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/MrCYIN3x0SgdG/giphy.gif[link=self, window=blank, width=100%, class="center"]
+
+== Cleanup
+
+Deletes project `301-02-python`. Skip cleanup if you are going straight to 301-04 / 301-06.
+
+:lab-cleanup-module: 301-02
+include::partial$lab-cleanup.adoc[]

@@ -1,9 +1,76 @@
 * xref:index.adoc[Welcome]
-* Exercises
-** xref:agentic-troubleshooting.adoc[Agentic Troubleshooting]
-** xref:mcp-server.adoc[MCP Server]
-** xref:mcp-gateway.adoc[MCP Gateway]
-** xref:acs.adoc[ACS 5]
-* Appendices
-** xref:byom.adoc[Appendix A: Bring Your Own Model]
-** xref:cluster-details.adoc[Appendix B: Technical Cluster Details]
+
+.Role tracks
+* xref:track-application-developer.adoc[Application Developer]
+* xref:track-platform-operator.adoc[Platform Operator]
+* xref:track-devsecops-engineer.adoc[DevSecOps Engineer]
+* xref:track-security-architect.adoc[Security Architect]
+* xref:track-network-infrastructure.adoc[Network & Infrastructure Engineer]
+
+.101 OpenShift Security Modules: Core Concepts & Foundations
+* xref:basic-INDEX.adoc[101 Labs Overview]
+* xref:101-01-default-secure-behavior.adoc[101-01 - Default Secure Behavior & Why OpenShift Differs from Vanilla Kubernetes]
+* xref:101-02-projects-namespaces-boundaries.adoc[101-02 - Projects & Namespaces as Security Boundaries]
+* xref:101-03-rbac-basics.adoc[101-03 - Role-Based Access Control Basics]
+* xref:101-04-scc-resource-guardrails.adoc[101-04 - SCC Limits, Resource Guardrails & Pod Security Basics]
+* xref:101-05-network-policy-basics.adoc[101-05 - NetworkPolicy Basics]
+* xref:101-06-secrets-management.adoc[101-06 - Secrets Management]
+* xref:101-07-image-provenance-guardrails.adoc[101-07 - Image Provenance Guardrails]
+* xref:101-08-etcd-encryption-control-plane.adoc[101-08 - Etcd Encryption at Rest & Basic Control Plane Hardening]
+* xref:101-09-audit-exec-events.adoc[101-09 - Audit Logging & Exec Events]
+* xref:101-10-security-compliance-addons.adoc[101-10 - CIS Audit Log Checks (Compliance Operator)]
+* xref:101-11-rebuilding-images.adoc[101-11 - Rebuilding & Hardening Images]
+* xref:101-12-enforcing-tls-routes.adoc[101-12 - Enforcing TLS on Routes]
+
+.201 OpenShift Security Modules: Intermediate Hardening & Shift-Left
+* xref:intermediate-INDEX.adoc[201 Labs Overview]
+* xref:201-01-custom-rbac.adoc[201-01 - Custom RBAC & ClusterRoles]
+* xref:201-02-workload-hardening.adoc[201-02 - Custom SCC, Seccomp, SELinux & User Namespaces Basics]
+* xref:201-03-file-integrity-monitoring.adoc[201-03 - File Integrity Monitoring & Node Hardening]
+* xref:201-04-shift-left-pipeline.adoc[201-04 - CI/CD Scanning, Image Signing & Cosign/Sigstore Basics]
+* xref:201-05-vault-csi.adoc[201-05 - Secret Lifecycle Externalization (Vault, ESO, CSI Driver)]
+* xref:201-06-audit-monitoring-correlation.adoc[201-06 - Audit Log Correlation & Anomaly Detection Basics]
+* xref:201-07-compliance-tailoring.adoc[201-07 - Advanced Compliance Operator Usage & Tailoring]
+* xref:201-08-cert-manager-mtls.adoc[201-08 - Certificate Management & mTLS Basics (cert-manager Operator)]
+* xref:201-09-sandboxed-containers-intro.adoc[201-09 - Sandboxed Containers & Workload Isolation Intro]
+* xref:201-10-admission-governance.adoc[201-10 - RHACM Policy Governance (DoD / NIST baseline)]
+* xref:201-11-threat-modeling-control-mapping.adoc[201-11 - STRIDE Control Map (capstone)]
+
+.301 OpenShift Security Modules: Advanced Enterprise & Zero-Trust
+* xref:advanced-INDEX.adoc[301 Labs Overview]
+* xref:301-01-platform-security-governance.adoc[301-01 - STRIDE PolicySet (RHACM)]
+* xref:301-02-gitops-policy-compliance.adoc[301-02 - GitOps UBI Python (Red Hat catalog)]
+* xref:301-03-multi-tenant-zero-trust-network.adoc[301-03 - AdminNetworkPolicy Zero-Trust]
+* xref:301-04-runtime-threat-detection.adoc[301-04 - RHACS Runtime Enforce]
+* xref:301-05-incident-response-forensics.adoc[301-05 - Splunk Audit and RHACS IR]
+* xref:301-06-supply-chain-integrity.adoc[301-06 - Catalog Image Provenance and Digest Admission]
+* xref:301-07-advanced-cryptography.adoc[301-07 - Encryption Inventory (etcd, TLS, Secrets)]
+* xref:301-08-zero-trust-workload-identity.adoc[301-08 - Zero-Trust Workload Identity, Federation & SPIFFE/SPIRE Concepts]
+
+.Advanced Cluster Security Modules
+* xref:acs-INDEX.adoc[RHACS Labs Overview]
+* xref:00-acs-setup-install-navigation.adoc[Setup and Navigation]
+* xref:01-acs-vulnerability-management.adoc[Vulnerability Management]
+* xref:02-acs-policy-and-risk.adoc[Policy and Risk]
+* xref:03-acs-cicd-and-automation.adoc[CI/CD Automation and Integration]
+* xref:04-acs-compliance.adoc[Compliance]
+* xref:05-acs-notifications-api.adoc[Notifications, API, and Integrations]
+* xref:06-acs-network-and-runtime.adoc[Network and Runtime Security]
+* xref:07-acs-installation.adoc[Installation]
+
+.Software Supply Chain Security Modules
+* xref:tssc-INDEX.adoc[TSSC Labs Overview]
+* xref:tssc-00-intro.adoc[Trusted Artifact Signer — Container Signing]
+* xref:tssc-01-git-signing.adoc[Git Commit Signing]
+* xref:tssc-02-trusted-profile-analyzer.adoc[Trusted Profile Analyzer]
+
+.OpenShift Virtualization Security Modules
+* xref:virt-INDEX.adoc[Virtualization Labs Overview]
+* xref:virt-00-scope-and-hco.adoc[Scope and HyperConverged]
+* xref:virt-01-feature-gates-and-trusted-config.adoc[Feature Gates and Trusted Config]
+* xref:virt-02-devices-ksm-permissions.adoc[Host Devices, KSM, and File Permissions]
+* xref:virt-03-virtualization-rbac.adoc[Migration, Exec, VNC, and Shared Types]
+* xref:virt-04-vm-configuration.adoc[Per-VM Devices and Memory Overcommit]
+* xref:virt-05-storage-isolation.adoc[DataVolume Cloning and Disk Isolation]
+* xref:virt-06-network-segmentation.adoc[VLAN, MAC Spoof, and MultiNetworkPolicy]
+* xref:virt-07-host-firmware-and-kernel.adoc[Host Firmware and Kernel]

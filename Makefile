@@ -1,56 +1,66 @@
-# Local Antora build/serve via Podman (matches .github/workflows/gh-pages.yml)
-#
-#   make build   # generate ./www
-#   make run     # serve ./www on http://localhost:8080
-#   make clean   # remove build output
+# OpenShift Security Roadshow — local Antora preview
+# Works with GNU Make 3.81 (macOS) and GNU Make 4.x (gmake)
 
-SHELL := /bin/bash
+.DEFAULT_GOAL := help
+.DELETE_ON_ERROR:
 
-PORT ?= 8080
-CONTAINER_NAME ?= ocp5-ea-showroom-www
-NODE_IMAGE ?= docker.io/library/node:24-bookworm-slim
-NGINX_IMAGE ?= docker.io/library/nginx:alpine
+CONTAINER_NAME     ?= showroom-httpd
+CONTAINER_IMAGE    ?= registry.access.redhat.com/ubi9/httpd-24:1-301
+PORT               ?= 8080
+WWW_DIR            ?= www
+PLAYBOOK           ?= site.yml
+SITE_URL           ?= http://localhost:$(PORT)/index.html
+CONTAINER_ENGINE   ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
 
-# SELinux volume labeling on Linux; omit on macOS (Podman machine)
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Linux)
-  VOLUME_SUFFIX := :Z
-else
-  VOLUME_SUFFIX :=
-endif
+.PHONY: help build clean serve stop reset
 
-.PHONY: build run stop clean help
+help: ## Show this help
+	@echo "OpenShift Security Roadshow"
+	@echo ""
+	@echo "Available targets:"
+	@grep -E '^[a-zA-Z0-9_-]+:.*##' $(MAKEFILE_LIST) | \
+		awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "The site will be available at: $(SITE_URL)"
+	@echo "Override any variable: make serve PORT=9090"
 
-help:
-	@echo "Targets:"
-	@echo "  make build  - Build the Antora site into ./www (Podman)"
-	@echo "  make run    - Serve ./www at http://localhost:$(PORT) (Podman/nginx)"
-	@echo "  make stop   - Stop the local preview container"
-	@echo "  make clean  - Remove ./www and .cache"
+build: clean ## Build the site using Antora
+	@echo "Building new site..."
+	npx antora --fetch $(PLAYBOOK) --stacktrace
+	@echo "Build process complete. Check the $(WWW_DIR) folder for the generated site."
+	@echo "To view the site locally, run: make serve"
 
-build:
-	@command -v podman >/dev/null || { echo "podman is required"; exit 1; }
-	podman run --rm \
-	  --name ocp5-ea-showroom-antora \
-	  -v "$(CURDIR):/work$(VOLUME_SUFFIX)" \
-	  -w /work \
-	  $(NODE_IMAGE) \
-	  bash -c 'npm install --global @antora/cli@3.1 @antora/site-generator@3.1 @andrew-jones/antora-tabs-extension && antora generate site.yml --stacktrace'
-	@echo "Build complete: $(CURDIR)/www"
+clean: ## Remove generated site files
+	@echo "Removing old site..."
+	rm -rf "$(WWW_DIR)"
+	mkdir -p "$(WWW_DIR)"
+	@echo "Old site removed"
 
-run: stop
-	@command -v podman >/dev/null || { echo "podman is required"; exit 1; }
-	@test -d www || $(MAKE) build
-	podman run --rm -d \
-	  --name $(CONTAINER_NAME) \
-	  -p $(PORT):80 \
-	  -v "$(CURDIR)/www:/usr/share/nginx/html:ro$(VOLUME_SUFFIX)" \
-	  $(NGINX_IMAGE) >/dev/null
-	@echo "Serving ./www at http://localhost:$(PORT)"
-	@echo "Stop with: make stop"
+serve: ## Start serving the site (podman or docker)
+	@if [ -z "$(CONTAINER_ENGINE)" ]; then \
+		echo "error: podman or docker is required to serve the site"; \
+		exit 1; \
+	fi
+	@echo "Starting serve process..."
+	-$(CONTAINER_ENGINE) rm -f $(CONTAINER_NAME) >/dev/null 2>&1
+	$(CONTAINER_ENGINE) run -d --rm --name $(CONTAINER_NAME) -p $(PORT):$(PORT) \
+		-v "$(CURDIR)/$(WWW_DIR):/var/www/html/:z" \
+		$(CONTAINER_IMAGE)
+	@echo "Serving lab content on $(SITE_URL)"
 
-stop:
-	-@podman rm -f $(CONTAINER_NAME) >/dev/null 2>&1 || true
+stop: ## Stop the serving container
+	@echo "Stopping serve process..."
+	@if [ -z "$(CONTAINER_ENGINE)" ]; then \
+		echo "Container engine not found; nothing to stop."; \
+		exit 0; \
+	fi
+	@$(CONTAINER_ENGINE) stop $(CONTAINER_NAME) 2>/dev/null || \
+		echo "Container $(CONTAINER_NAME) not running or does not exist"
+	@echo "Stopped serve process."
 
-clean: stop
-	rm -rf www .cache
+reset: ## Clean, build, and serve (full reset)
+	$(MAKE) --no-print-directory stop
+	$(MAKE) --no-print-directory build
+	$(MAKE) --no-print-directory serve
+	@echo ""
+	@echo "Reset complete! Site is available at $(SITE_URL)"

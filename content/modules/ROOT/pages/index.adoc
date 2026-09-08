@@ -1,106 +1,103 @@
 = {lab_name}
 
-include::partial$_attributes.adoc[]
+This course offers hands-on experience with Kubernetes-native security on Red Hat^(R)^ OpenShift Container Platform—covering platform foundations, Advanced Cluster Security (RHACS), and Trusted Software Supply Chain (TSSC). Each module ends with a practical *task* so you apply what you learned before moving on.
 
-== Introduction
+== How this Roadshow works
 
-Welcome to the *OpenShift 5 Early Access Program*. You have been given access
-to a fully provisioned OpenShift 5 cluster with several new and updated
-features pre-installed and configured.
+* *This page is home* — Credentials and console links live here. Use the home button anytime you get lost.
+* *Navigate with the table of contents* — Modules are in the left table of contents, or use *Next* at the bottom of each page.
+* *Use consoles in Showroom, or open them in a new tab* — Keep this guide open. Prefer the console tabs on the right of the lab UI. To open a link in a new browser tab: on a Mac, *<cmd> click*; on Windows/Linux, *<ctrl> click* or right-click → "Open in new tab."
+* *Use the bastion* — Run `oc`, `roxctl`, and `podman` on the RHEL bastion.
+* *Run the setup script* — To ensure you have the applications installed and configured, make sure to run the setup script from the bastion terminal tab.
+* *Pick a role* — For a tailored experience, start with the track that matches your desired role.
 
-As part of this EAP, you are being asked to evaluate these features, exercise
-the scenarios described in the program materials, and provide structured
-feedback to the product teams. Your hands-on testing and observations are
-critical to shaping the GA releases of these technologies.
+== Environment setup
 
-WARNING: This cluster is owned and operated by Red Hat. *Do not* enter any confidential, non-public, or personally identifiable information (PII) into this environment — including prompts, data, credentials, or any content you would not otherwise share publicly. For more information, refer to the https://www.redhat.com/en/about/all-policies-guidelines[Red Hat Policies and Guidelines^].
+From the bastion terminal tab, run the following commands to setup the lab environment.
 
-This environment covers four main feature areas:
-
-* *Agentic Troubleshooting* — Automated root-cause analysis and remediation of application issues triggered by alerts
-* *MCP Server* — Model Context Protocol servers for OpenShift and ACS, enabling AI agents to interact with cluster and security APIs
-* *MCP Gateway* — Part of Red Hat Connectivity Link, providing federated MCP access, team isolation, authentication, and policy enforcement
-* *Advanced Cluster Security (ACS) 5* — VM scanning, file activity monitoring, Lightspeed risk enrichment, ACS MCP server integration, and init container scanning
-
-== Credentials
-
-NOTE: Some passwords are not listed here for security reasons. Refer to the credentials given to you for the Early Access Program.
-
-[cols="1,1,1,1"]
-|===
-| *Service* | *Username* | *Password* | *Link*
-
-| OpenShift Console
-| `{openshift_cluster_admin_username}`
-| (see EAP credentials)
-| {openshift_cluster_console_url}[Console^]
-
-| ACS Central
-| `admin`
-| (see EAP credentials)
-| https://central-acs.{openshift_cluster_ingress_domain}[ACS Central^]
-
-| OpenShift GitOps (Argo CD)
-| `{gitops_user}`
-| (click "Log in via OpenShift")
-| https://openshift-gitops-server-openshift-gitops.{openshift_cluster_ingress_domain}[Argo CD^]
-
-| RHEL 9 VM (acs-virt namespace)
-| `{vm_user}`
-| (see EAP credentials)
-| {openshift_cluster_console_url}/k8s/ns/acs-virt/kubevirt.io{tilde}v1{tilde}VirtualMachine/rhel9-vm[Virtual Machine in OpenShift Console^]
-|===
-
-== Using This Environment
-
-Your environment is split into two panels:
-
-* *Left panel* — these instructions. Use the navigation on the left side to move between exercises and appendices.
-* *Right panel* — a terminal that is already logged in to your OpenShift cluster as `cluster-admin`. You can run `oc` commands directly here without any additional authentication.
-
-=== Running Commands
-
-Throughout these instructions, you will see command blocks with a small *play button* (▶) in the upper-left corner:
-
-[source,sh,role=execute]
+[source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc get pods -n openshift-lightspeed
+git clone https://github.com/mfosterrox/openshift-security-roadshow.git
+cd openshift-security-roadshow
+bash setup/lab-environment.sh \
+  --quay-user {quay_admin_username} \
+  --quay-password '{quay_admin_password}'
+source ~/.bashrc
 ----
 
-Click the *play button* to automatically execute the command in the terminal on the right — no copy/paste needed.
+TIP: Feel free to sign into the consoles while the lab environment script runs in the background.
 
-image::showroom-execute-button.png[Play button on command blocks,link=_images/showroom-execute-button.png,window=ea-images]
+== All lab components
 
-Some blocks (such as URLs, JSON configurations, or PromQL queries) show a *copy icon* instead — click it to copy the text to your clipboard for pasting elsewhere.
+Before you start a path, confirm you can open each Showroom tab (right side of the lab UI) and sign in. Use these credentials anytime you return to this homepage.
 
-TIP: You can also type commands directly into the terminal. The terminal supports standard shell features like command history (kbd:[Up] / kbd:[Down] arrows), tab completion (kbd:[Tab]), and kbd:[Ctrl+C] to cancel a running command.
+TIP: Using the Showroom allows you to move through the console tabs while you work through the labs.
 
-=== Accessing Consoles
+=== Red Hat^(R)^ OpenShift Container Platform (OCP)
 
-Above the terminal on the right side, you will see tabs for different consoles. Clicking a tab opens the corresponding console in a new browser tab:
+. Open the *OpenShift* tab (or go to `{openshift_cluster_console_url}`).
+. Sign in with the credentials below.
 
-* *Terminal* — the default view, already logged in to your cluster as `cluster-admin`
-* *OpenShift Console* — the OpenShift web console for UI-based exercises (viewing alerts, managing virtualization, reviewing ArgoCD applications, etc.)
-* *Red Hat Advanced Cluster Security* — the ACS Central console for vulnerability management, policy enforcement, and security monitoring
-* *OpenShift GitOps* — the Argo CD console for viewing application deployments and sync status. Click *Log in via OpenShift* and use the OpenShift credentials from the table above.
+[cols="1,1"]
+|===
+|Console URL| {openshift_cluster_console_url}
+|Username| {openshift_cluster_admin_username}
+|Password| {openshift_cluster_admin_password}
+|===
 
-Use the credentials from the table above to log in to each console.
+RHACM and OpenShift GitOps (ArgoCD) are available from the same OpenShift console (*Applications*, *Pipelines*, and GitOps in the left menu or cluster dropdown).
 
-=== Using Your Own Tools
+=== Red Hat^(R)^ Advanced Cluster Security (RHACS)
 
-If you prefer to use your own local tools (e.g., `oc` CLI from your laptop, IDE extensions, or AI clients like Claude Desktop or Cursor), you can obtain login credentials from the OpenShift console:
+. Open the *RHACS* tab to the right (or go to `{acs_route}[{acs_route}^]`).
+. Sign in with the credentials below.
 
-1. Click your username in the top-right corner of the OpenShift console
-2. Select *Copy login command*
-3. Use the displayed `oc login` command on your local machine
+[cols="1,1"]
+|===
+|Console URL| {acs_route}[{acs_route}^]
+|Username| {acs_portal_username}
+|Password| {acs_portal_password}
+|===
 
-You have full `cluster-admin` access, so you are free to explore beyond the guided exercises.
+=== Red Hat^(R)^ Quay
 
-CAUTION: This environment is managed by OpenShift GitOps (Argo CD). If you change configurations that ArgoCD manages, they will be automatically reverted within a few minutes. If you need to make persistent changes for testing, you can pause auto-sync on the relevant ArgoCD application first (see xref:byom.adoc[Appendix A] for an example).
+. Open the *Quay* tab (or go to `{quay_console_url}[{quay_console_url}^]`).
+. Sign in with the credentials below.
 
-== Modules
+[cols="1,1"]
+|===
+|Console URL| {quay_console_url}[{quay_console_url}^]
+|Username| {quay_admin_username}
+|Password| {quay_admin_password}
+|===
 
-* xref:agentic-troubleshooting.adoc[Agentic Troubleshooting]
-* xref:mcp-server.adoc[MCP Server]
-* xref:mcp-gateway.adoc[MCP Gateway]
-* xref:acs.adoc[Advanced Cluster Security (ACS) 5]
+=== Red Hat^(R)^ Enterprise Linux (RHEL) bastion
+
+Use the *Terminal* / bastion tab (or SSH) for CLI work (`oc`, `roxctl`, `podman`, `curl`, etc.).
+
+[cols="1,1"]
+|===
+|SSH Command| {bastion_ssh_command}
+|Password| {bastion_ssh_password}
+|===
+
+== Product specific deep-dives 
+
+Use these after (or alongside) the role track that owns the capability—especially DevSecOps, Platform Operator, and Security Architect.
+
+* xref:acs-INDEX.adoc[Advanced Cluster Security (RHACS)] — Setup, vulnerabilities, policy and risk, CI/CD gates, compliance, notifications and API, network and runtime, and installation.
+* xref:tssc-INDEX.adoc[Trusted Software Supply Chain (TSSC)] — Trusted Artifact Signer (container and git signing) and Trusted Profile Analyzer (SBOM analysis).
+* xref:virt-INDEX.adoc[OpenShift Virtualization Security] — HyperConverged feature gates, virt RBAC, VM and storage isolation, VM networking, and host firmware/kernel controls from the OpenShift Virtualization hardening guide.
+
+== Choose your role
+
+Start here. Open the track for your role, then follow the recommended sequence (Basic → Intermediate → Advanced).
+
+* xref:track-application-developer.adoc[Application Developer] — Build and ship secure workloads: least privilege, secrets, trusted images, and baseline pipeline hygiene.
+* xref:track-platform-operator.adoc[Platform Operator] — Operate and harden clusters: SCCs, quotas, network baselines, audit, compliance, and day-2 guardrails.
+* xref:track-devsecops-engineer.adoc[DevSecOps Engineer] — Embed security in delivery: CI/CD gates, signing, admission policy, runtime feedback, and supply chain controls.
+* xref:track-security-architect.adoc[Security Architect] — Design governance and zero-trust strategy across teams, clusters, identity, and exceptions.
+* xref:track-network-infrastructure.adoc[Network & Infrastructure Engineer] — Secure the data plane: segmentation, encryption in transit, mTLS patterns, and traffic-focused observability.
+
+Browse full catalogs by skill level: xref:basic-INDEX.adoc[101 Foundations], xref:intermediate-INDEX.adoc[201 Intermediate], xref:advanced-INDEX.adoc[301 Advanced].
+

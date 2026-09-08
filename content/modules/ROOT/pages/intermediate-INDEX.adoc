@@ -1,0 +1,91 @@
+= 201 Labs Overview
+:toc:
+:icons: font
+
+xref:index.adoc[← Back to HOME]
+
+== Overview
+
+These intermediate labs move from knowing defaults to integrating and adapting controls: custom RBAC/SCC, shift-left pipelines, external secrets, audit correlation, compliance tailoring, and admission governance. Finish with threat modeling so the control map can use every lab you already ran.
+
+Topics covered:
+
+* Advanced RBAC and service account hardening
+* Custom workload security controls (SCC/PSA, SELinux, seccomp)
+* Tighter isolation / restriction profiles
+* Advanced network segmentation and egress/ingress controls
+* CI/CD scanning and policy checks
+* Secure, reproducible images with signing/attestation
+* Secret lifecycle (rotation, externalization)
+* Audit/monitoring correlation
+* Automated compliance assessment and remediation
+* Admission and policy controllers
+* Practical threat modeling (capstone — maps the controls above)
+
+Audience: follow a xref:index.adoc#choose-your-role[role track] for the ordered subset your role owns.
+
+== Intermediate Labs Index
+
+[cols="2,3,2",options="header"]
+|===
+|Lab | Title | Roles
+
+|xref:201-01-custom-rbac.adoc[201-01]
+|Custom RBAC & ClusterRoles
+|Platform, DevSecOps, Architect
+
+|xref:201-02-workload-hardening.adoc[201-02]
+|Custom SCC, Seccomp, SELinux & User Namespaces
+|Platform, DevSecOps
+
+|xref:201-04-shift-left-pipeline.adoc[201-04]
+|CI/CD Scanning, Image Signing & Cosign/Sigstore
+|App Dev, DevSecOps
+
+|xref:201-05-vault-csi.adoc[201-05]
+|Secret Lifecycle Externalization (Vault, ESO, CSI)
+|App Dev, Platform, DevSecOps, Architect
+
+|xref:201-06-audit-monitoring-correlation.adoc[201-06]
+|Audit Log Correlation & Anomaly Detection
+|Platform, DevSecOps, Architect, Network
+
+|xref:201-07-compliance-tailoring.adoc[201-07]
+|Advanced Compliance Operator Usage & Tailoring
+|Platform, DevSecOps, Architect
+
+|xref:201-08-cert-manager-mtls.adoc[201-08] (+ xref:101-05-network-policy-basics.adoc[101-05] foundation)
+|Certificate Management & mTLS / segmentation bridge
+|Platform, Architect, Network
+
+|xref:201-09-sandboxed-containers-intro.adoc[201-09]
+|Sandboxed Containers & Workload Isolation
+|Platform, Architect (DevSecOps adjacent)
+
+|xref:201-10-admission-governance.adoc[201-10]
+|RHACM Policy Governance (DoD / NIST baseline)
+|Platform, DevSecOps, Architect, Network
+
+|xref:201-11-threat-modeling-control-mapping.adoc[201-11]
+|STRIDE control map (capstone → 301)
+|App Dev, DevSecOps, Architect
+|===
+
+== Related labs
+
+[cols="2,3,2,1",options="header"]
+|===
+|Lab | Title | Roles | Notes
+
+|xref:201-03-file-integrity-monitoring.adoc[201-03]
+|File Integrity Monitoring & Node Hardening
+|Platform
+|Platform hardening adjacency; use with Platform Operator track
+
+|xref:201-08-cert-manager-mtls.adoc[201-08]
+|Certificate Management & mTLS Basics
+|Network, Architect, Platform
+|Also listed above as the trust-fabric bridge
+|===
+
+Role abbreviations: App Dev = Application Developer; Platform = Platform Operator; DevSecOps = DevSecOps Engineer; Architect = Security Architect; Network = Network & Infrastructure Engineer.

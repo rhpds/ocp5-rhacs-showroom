@@ -1,0 +1,229 @@
+= Policy at the Front Door – RHACM Governance (DoD baseline)
+:role: Intermediate Admission Governance
+:skills: RHACM Policy, ConfigurationPolicy, NIST 800-53, DISA STIG, DoD CC SRG
+:labid: LAB-201-10
+:toc:
+:icons: font
+
+**Duration:** ~25 minutes
+
+== Overview
+Admission governance & policy layering. Enforce baseline safety gates before insecure workloads enter the cluster.
+
+Configure the cluster **from RHACM Policy objects**—not hand-applied YAML on every namespace, and not a one-off Gatekeeper Constraint. Start in `inform` (report drift), switch to `enforce` (create the missing objects), then prove restricted Pod Security still denies a privileged pod. That is the same inform → enforce loop as the https://github.com/rhpds/sovereign-cloud-showroom/blob/main/content/modules/ROOT/pages/module-01.adoc[sovereign-cloud RHACM policy exercise], mapped to a **DoD / NIST** baseline instead of GDPR.
+
+== Why it matters
+Insecure specs enter the cluster only once—at admission. Wiki checklists do not. RHACM turns government controls into versioned Policy CRs: you place them on a ClusterSet (this lab: `local-cluster`), watch violations, then enforce so every new cluster with the same labels gets the same namespace, NetworkPolicy, and PSA settings.
+
+DoD Cloud Computing SRG, DISA STIG for OpenShift, and NIST SP 800-53 all expect *configuration as an approved baseline*, not tribal knowledge. The Governance UI columns (`standards`, `categories`, `controls`) are how an ISSO traces a green cluster back to CM-6, AC-6, and SC-7.
+
+== What does it solve
+
+* Workloads that quietly revive root, privileged, or an open namespace
+* Policy drift between STIG spreadsheets and what the API accepts
+* Rebuilding the same `dod-workloads` namespace by hand on every cluster
+* Late discovery of unsafe objects already running in production
+
+== Your Mission
+Apply a compact DoD-shaped RHACM Policy, see it NonCompliant while `inform` is on, enforce it so the cluster *configures itself*, then show that admission (restricted PSA) still blocks a privileged pod. This is the fleet-side follow-up to digest pins in xref:201-04-shift-left-pipeline.adoc[201-04], registry allow-lists in xref:101-07-image-provenance-guardrails.adoc[101-07], and NetworkPolicy in xref:101-05-network-policy-basics.adoc[101-05].
+
+[cols="1,2,2",options="header"]
+|===
+|RHACM object | Maps to | Government control (this lab)
+
+|Namespace `dod-workloads` + `pod-security.kubernetes.io/enforce=restricted`
+|Least privilege / approved config
+|NIST **AC-6**, **CM-6**; DISA STIG restricted PSA; DoD CC SRG IL label `il2`
+
+|NetworkPolicy `default-deny-ingress`
+|Boundary protection
+|NIST **SC-7**; CIS 5.3.2 (same story as 101-05)
+
+|LimitRange on that namespace
+|Least functionality / bounded defaults
+|NIST **CM-7** / **CM-6**
+|===
+
+RHACM Policy annotations (`standards`, `categories`, `controls`) are what the Governance view shows. The https://github.com/stolostron/policy-collection[stolostron/policy-collection] `stable/` tree is the larger NIST catalog (including SCC); this lab is a small baseline you can read in one sitting.
+
+=== Prerequisites
+
+* Red Hat Advanced Cluster Management (or MCE with the governance policy add-on). CRD: `policies.policy.open-cluster-management.io`
+* A `ManagedCluster` (hub is usually `local-cluster`)
+* Cluster-admin on the hub
+
+Click each step only if you need a hint.
+
+=== Part A: Hub inventory and placement
+
+.Confirm RHACM Policy CRDs and local-cluster
+[%collapsible]
+====
+If this fails, install **Advanced Cluster Management for Kubernetes** from OperatorHub (or ask the platform owner). Do not paste Gatekeeper ConstraintTemplates in this lab.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get crd policies.policy.open-cluster-management.io
+oc get managedcluster
+oc get managedcluster local-cluster --show-labels 2>/dev/null || oc get managedcluster --show-labels
+oc get managedclusterset
+----
+
+TIP: CRD exists. At least one ManagedCluster. `local-cluster=true` is the usual hub label. A ManagedClusterSet (often `default`) is required so Placement can select clusters.
+====
+
+.Bind a ClusterSet into namespace policies
+[%collapsible]
+====
+Placement in a custom namespace selects **zero** clusters until a `ManagedClusterSetBinding` exists. The helper uses the first ClusterSet on the hub.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+cd ~/openshift-security-roadshow/setup/acm-lab
+chmod +x bind-clusterset.sh
+./bind-clusterset.sh
+----
+
+TIP: `managedclustersetbinding.cluster.open-cluster-management.io` created (or configured) in `policies`. Override the set with `MANAGED_CLUSTER_SET=default ./bind-clusterset.sh` if needed.
+====
+
+=== Part B: Inform (report drift, do not change the cluster yet)
+
+.Apply the DoD baseline Policy (inform)
+[%collapsible]
+====
+Same shape as the sovereign-cloud GDPR example: `Policy` + `Placement` + `PlacementBinding`. Remediation starts as **inform**—RHACM reports NonCompliant until the namespace, NetworkPolicy, and LimitRange exist. It does not create them yet.
+
+YAML lives in this roadshow repo (`setup/acm-lab/policy-dod-ocp-baseline.yaml`). You can also paste it under **Governance → Create policy** / Import YAML.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc apply -f ~/openshift-security-roadshow/setup/acm-lab/policy-dod-ocp-baseline.yaml
+----
+
+TIP: `policy.policy.open-cluster-management.io/policy-dod-ocp-baseline created` (and Placement / PlacementBinding).
+====
+
+.Read Policy status (expect NonCompliant)
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get policy,placement,placementbinding -n policies
+oc get policy policy-dod-ocp-baseline -n policies -o jsonpath='{.status.compliant}{"\n"}' ; echo
+oc get ns dod-workloads 2>/dev/null || echo "dod-workloads not created yet (inform does not remediate)"
+----
+
+TIP: `COMPLIANT` is `NonCompliant` (or empty for a few seconds). Namespace `dod-workloads` should **not** exist yet. Console: **Fleet Management → Governance → Policies**, filter namespace `policies`. Annotations show NIST / DISA / DoD CC SRG.
+====
+
+=== Part C: Enforce (configure the cluster from policy)
+
+.Switch the Policy to enforce
+[%collapsible]
+====
+Same action as the sovereign-cloud lab’s **Actions → Remediation → Enforce**. The hub tells the config-policy-controller to create missing objects.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc patch policy policy-dod-ocp-baseline -n policies --type merge \
+  -p '{"spec":{"remediationAction":"enforce"}}'
+----
+
+TIP: `policy.policy.open-cluster-management.io/policy-dod-ocp-baseline patched`. Wait 15–30 seconds.
+====
+
+.Confirm the cluster now has the baseline objects
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get policy policy-dod-ocp-baseline -n policies
+oc get ns dod-workloads --show-labels
+oc get networkpolicy,limitrange -n dod-workloads
+----
+
+TIP: Policy `Compliant`. Namespace labels include `pod-security.kubernetes.io/enforce=restricted` and `dod.cc-srg/impact-level=il2`. `default-deny-ingress` and `bounded-defaults` exist. New clusters in the same Placement would get the same three objects without a human applying them.
+====
+
+=== Part D: Admission still matches the baseline
+
+RHACM configured the namespace. OpenShift admission (PSA + SCC) is what denies the bad pod. You did not write Gatekeeper Rego.
+
+.Apply a privileged pod in dod-workloads (expect deny)
+[%collapsible]
+====
+`privileged: true` violates restricted PSA (AC-6). This is the “front door” check.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc apply -n dod-workloads -f - <<'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privileged-denied
+spec:
+  containers:
+  - name: app
+    image: registry.access.redhat.com/ubi9/ubi
+    securityContext:
+      privileged: true
+    command: ["sleep","5"]
+EOF
+----
+
+TIP: Admission rejects the pod (`Forbidden` / `violates PodSecurity` / `restricted:privileged`). The Policy stayed Compliant—the deny is the baseline working, not a failed enforce.
+====
+
+.Apply a root sleep pod (expect deny)
+[%collapsible]
+====
+UBI9 as root also fails restricted PSA (`runAsNonRoot`). Same control family as the old Gatekeeper `runAsNonRoot` constraint, now coming from the namespace the Policy created.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc apply -n dod-workloads -f - <<'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: root-denied
+spec:
+  containers:
+  - name: app
+    image: registry.access.redhat.com/ubi9/ubi
+    command: ["sleep","5"]
+EOF
+----
+
+TIP: Denied (`must set runAsNonRoot` / `restricted:allowPrivilegeEscalation != false`, depending on version). NetworkPolicy default-deny is already in the namespace (SC-7); tighten allows using xref:101-05-network-policy-basics.adoc[101-05].
+====
+
+== Debrief
+
+RHACM Policy is how you **configure** clusters to a government baseline: inform (audit), enforce (create), labels (which fleets). Admission (PSA/SCC) is still the API front door; ACM is how that door’s settings show up on the next cluster without a runbook.
+
+What “easy to enforce” means here:
+
+* One Policy CR with NIST/DISA/DoD annotations the Governance UI already understands
+* Placement by ClusterSet / `local-cluster` (swap labels for IL4, region, or classified vs unclassified later)
+* `inform` → `enforce` without rewriting the objects
+* https://github.com/stolostron/policy-collection[policy-collection] when you need the full NIST SCC / etcd / audit catalog—same API
+
+What breaks without this:
+
+* Policy-only-at-runtime → bad configs already scheduled
+* Hand-crafted namespaces per cluster → STIG drift
+* Gatekeeper-only labs on a fleet that is already standardized on RHACM → two sources of truth
+
+IMPORTANT: RHACM Policy + Placement + ConfigurationPolicy, progressive inform then enforce, and labeled exemptions with owners—not commented-out YAML.
+
+NOTE: pair fleet Policy with CI scanning so developers fail earlier. The STRIDE PolicySet (Quota, automount, default-deny) is xref:301-01-platform-security-governance.adoc[301-01]. GitOps of catalog Python is xref:301-02-gitops-policy-compliance.adoc[301-02].
+
+image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcTN6N2l3OXR0OXo4eGRkb3dpaHdocWRxZzQzN3A4OHQ3NTEycjFhaSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/C1AaD43G6rMlZjT628/giphy.gif[link=self, window=blank, width=100%, class="center"]
+
+== Cleanup
+
+Before moving to the next module, run the lab cleanup script. It removes the DoD Policy objects and `dod-workloads`. It does not uninstall RHACM.
+
+:lab-cleanup-module: 201-10
+include::partial$lab-cleanup.adoc[]

@@ -1,0 +1,258 @@
+= Default Secure Behavior & Why OpenShift Differs from Vanilla Kubernetes
+:labid: LAB-101-01
+:cis-summary: "Run containers as non-root and avoid privileged/low ports to enforce least privilege."
+:mitre-summary: "Prevents container-to-host escalation by enforcing non-root execution and avoiding privileged port binds."
+:audit-evidence: "Root-based httpd on port 80 fails; UBI httpd on 8080 runs with random non-root UID and accessible route."
+:cis-mitre-codes: '{"cisMapping":{"primary":["5.2.5","5.2.6"],"related":["5.2.1","5.2.10"]},"mitre":{"techniques":["T1611"],"tactics":["TA0004"],"mitigations":["M1026","M1048"]}}'
+:toc:
+:icons: font
+
+**Duration:** ~10 minutes
+
+== Overview
+OpenShift assumes many container images were built for permissive environments. By default it runs containers as non-root and blocks privileged ports such as 80. Images that already follow those rules—non-root user, listen on 8080 or higher—deploy cleanly. Images that expect root or port 80 fail until you fix them or accept a risky exception.
+
+For example, if you deploy a root-friendly public httpd image, it will fail under OpenShift defaults. If you then succeed with a UBI image on a high port and expose it with a Route, you will have a working service.
+
+== Why it matters
+OpenShift does not assume your image was hardened. It applies guardrails first: random non-root UID, no bind to privileged ports. An image that ran fine on a laptop as root on port 80 hits those controls and crashes. That is useful feedback before the workload reaches production with more privilege than it needs.
+
+Most incidents start from weak defaults, not glamorous exploits. Running non-root on high ports shrinks what an attacker can do after a compromise and makes it easier to show auditors that workloads follow least privilege.
+
+== What does it solve
+Common and guardrail-less assumptions break on a shared cluster.
+
+* "Root is fine"
+* "Port 80 is normal"
+* "Directories are owned by root"
+* "Any public image is good enough"
+
+OpenShift forces an explicit choice. Either rebuild for random UIDs and high ports, or document a temporary exception. This module shows both outcomes: Docker Hub `httpd` fails; UBI `httpd` succeeds without special SCCs.
+
+== Your Mission
+A teammate (or a new hire following a blog post) wants to stand up a quick web service. They grab the public Docker Hub `httpd` image—it worked on their laptop as *root* on *port 80*—and deploy it to the shared cluster. Your job is to show why that fails under OpenShift defaults, then restore a hardened path that still serves traffic without widening privilege.
+
+Click each step only if you need a hint.
+
+.Create project 101-01-httpd-demo
+[%collapsible]
+====
+Stay in this project for every command.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc new-project 101-01-httpd-demo
+----
+
+TIP: `Now using project "101-01-httpd-demo"`.
+====
+
+.Deploy the public Docker Hub httpd image
+[%collapsible]
+====
+This is how many people start on day one. Admission may accept it, but OpenShift defaults should stop it from running with root-like power.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc create deployment web --image=httpd
+----
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get pods -l app=web
+oc get pods -l app=web -o wide
+----
+
+NOTE: The pod should land in `CrashLoopBackOff/Error` with a rising restart count.
+====
+
+.Read web logs for the port 80 bind failure
+[%collapsible]
+====
+Collect evidence before anyone asks for `anyuid`. Logs are your first proof that the fail was intentional hardening, not a flaky image pull.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc logs -l app=web --tail=50 --all-containers=true
+----
+
+NOTE: Expected failure resembles the following.
+
+[source,text]
+----
+AH00558: httpd: Could not reliably determine the server's fully qualified domain name...
+(13)Permission denied: AH00072: make_sock: could not bind to address [::]:80
+(13)Permission denied: AH00072: make_sock: could not bind to address 0.0.0.0:80
+no listening sockets available, shutting down
+AH00015: Unable to open logs
+----
+
+TIP: CrashLoop with Permission denied on port 80.
+====
+
+.Get events and describe the web pod
+[%collapsible]
+====
+Confirm the same failure from events and pod detail.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get events --sort-by='.lastTimestamp' | tail -20
+----
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc describe pod -l app=web | tail -30
+----
+
+TIP: Privileged port 80, root-owned log paths, and an image that assumed UID 0. OpenShift injected a random non-root UID, so the process could neither bind nor write where it wanted.
+====
+
+.Read runAsUser from the web pod
+[%collapsible]
+====
+`oc create deployment` does not declare a `containerPort`, so do not look for port 80 in the pod spec. Prove the mismatch from the container security context.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get pod -l app=web -o jsonpath='Pod SC: {.items[0].spec.securityContext}{"\n"}'
+oc get pod -l app=web -o jsonpath='Container SC: {.items[0].spec.containers[0].securityContext}{"\n"}'
+----
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get pod -l app=web -o jsonpath='runAsUser: {.items[0].spec.containers[0].securityContext.runAsUser}{"\n"}'
+----
+
+TIP: `runAsUser` is a large non-zero UID (for example `1001210000`) with `runAsNonRoot: true`.
+====
+
+.Grep logs for the bind to port 80
+[%collapsible]
+====
+The process tried to bind port 80. That is the port evidence.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc logs -l app=web --tail=50 --all-containers=true | grep -E 'bind to address|:80|Permission denied' || true
+----
+
+NOTE: Do not "fix" this by granting extra SCC power -- that trains teams to bypass defaults instead of shipping an OpenShift-ready image.
+====
+
+.Set deployment/web to ubi9/httpd-24
+[%collapsible]
+====
+Replace the public Docker Hub image with a Red Hat UBI image built for non-root on port 8080. No SCC escalation.
+
+[cols="1,2",options="header"]
+|===
+|Defensive choice | Why it fits OpenShift defaults
+|Non-root user | Survives OpenShift's random UID; shrinks post-compromise power
+|High port (8080) | Removes the need for privileged binds and caps
+|Curated and supported | Known provenance instead of an unvetted public tag
+|===
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc set image deployment/web *=registry.access.redhat.com/ubi9/httpd-24
+----
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc rollout status deployment/web --timeout=120s
+----
+
+TIP: Rollout should complete successfully.
+====
+
+.Get web pods and logs after the UBI swap
+[%collapsible]
+====
+Confirm the hardened workload is actually up.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get pods -l app=web
+----
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc logs -l app=web --tail=15
+----
+
+TIP: Pod `Running`. Logs should not show a bind failure on port 80.
+====
+
+.Exec id in deploy/web
+[%collapsible]
+====
+Before publishing the app, confirm the running process is still not UID 0.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc exec deploy/web -- id
+oc exec deploy/web -- id -u
+----
+
+TIP: Expect a numeric UID such as `1000690000` (not `0`).
+====
+
+.Expose Service and Route for web on 8080
+[%collapsible]
+====
+`oc expose deployment` creates a Service only. You need a second `oc expose service` step to create the Route.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc expose deployment web --port=8080
+oc expose service/web
+----
+
+TIP: `oc get route web` should show a hostname.
+====
+
+.Get the web Route hostname and curl it
+[%collapsible]
+====
+Hit the Route and confirm the hardened image serves traffic. Use HTTP; this Route has no certificate.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get route web
+ROUTE=$(oc get route web -o jsonpath='{.spec.host}')
+echo "http://$ROUTE"
+----
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+curl -s -o /dev/null -w "%{http_code}" "http://$ROUTE/" && echo " OK"
+curl -s "http://$ROUTE/" | head -5
+----
+
+TIP: HTTP 200 and HTML. HTTPS will fail without a certificate.
+====
+
+== Debrief
+
+You just proved why “it works on my laptop” is a weak security standard—and how OpenShift defaults force a safer image instead. A root-friendly image on port 80 failed; a UBI image on a high port under a random non-root UID restored service without widening privilege.
+
+What breaks without this:
+
+* Root in the container → easier host breakout after compromise
+* Privileged port 80 → pressure for elevation or `anyuid`
+* Fixed UID ownership → teams reach for SCC exceptions instead of fixing the image
+* Unvetted public images → unknown CVEs and supply-chain risk
+
+NOTE: Restricted SCC defaults, UBI (or equivalent) bases, high ports, scanning/signing, digest pins, and tracked exceptions only when you must run as root.
+
+IMPORTANT: local Docker often allows root and port 80—OpenShift does not. Prefer fixing the image; treat `anyuid` as temporary debt with an owner and expiry.
+
+image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExa3R1YjV5eGt3MTQ2a2UxOGM0ZThzaTQwdXE3cHdmMGo3NXUzOHB0MiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/MrCYIN3x0SgdG/giphy.gif[link=self, window=blank, width=100%, class="center"]
+
+== Cleanup
+
+Before moving to the next module, run the lab cleanup script to reset transient resources from this module.
+
+:lab-cleanup-module: 101-01
+include::partial$lab-cleanup.adoc[]

@@ -1,0 +1,171 @@
+= Supply Chain Integrity for a Red Hat Python Image
+:role: Advanced Supply Chain Security
+:skills: Digest Pinning, Image Signatures, SBOM Evidence, Admission
+:labid: LAB-301-06
+:toc:
+:icons: font
+
+**Duration:** ~25 minutes
+
+== Overview
+xref:201-11-threat-modeling-control-mapping.adoc[201-11] Tampering at supply-chain depth. xref:201-04-shift-left-pipeline.adoc[201-04] already built FROM workshop `python-alpine-golden` and simulated cosign. This lab stays on the **Red Hat catalog Python image** (https://images.redhat.com/[images.redhat.com] / `ubi9/python-311`): inspect Red Hat signature metadata, treat ACS or `oc image info` as SBOM-adjacent evidence, and **deny tag-only Deployments** in a labeled namespace.
+
+Full Sigstore/TAS signing of *your* builds is xref:tssc-00-intro.adoc[TSSC-00]—do not install a second signing stack here unless TAS is already on the cluster.
+
+== Why it matters
+A GitOps deploy (xref:301-02-gitops-policy-compliance.adoc[301-02]) is only as strong as admission. If someone can still `oc create deploy --image=…:latest` in the same namespace, the digest pin was a suggestion.
+
+== What does it solve
+
+* Tag-mutable Deployments next to “we pin digests”
+* No evidence that the base image is a Red Hat catalog artifact
+* Cosign workshops that never gate the API
+* Inventing a second Tekton curriculum in 301
+
+== Your Mission
+Inspect the UBI Python image, apply a digest-only ValidatingAdmissionPolicy to a labeled namespace, prove `:latest` is denied and `@sha256:` is allowed.
+
+=== Prerequisites
+
+* Cluster-admin for ValidatingAdmissionPolicy
+* Pull access to `registry.access.redhat.com/ubi9/python-311`
+* Optional: RHACS image scan UI; optional: `cosign` / TAS from TSSC-00
+
+Click each step only if you need a hint.
+
+=== Part A: Provenance of the catalog image
+
+.Inspect UBI Python (digest + config)
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc image info registry.access.redhat.com/ubi9/python-311:latest --filter-by-os=linux/amd64
+----
+
+TIP: Record `Digest: sha256:…`. Catalog page: https://images.redhat.com/[images.redhat.com] → Python / ubi9. That digest is what 301-02 pinned.
+====
+
+.Optional: ACS image scan as the SBOM stand-in
+[%collapsible]
+====
+In Central: **Vulnerability Management → Images** (or **Workload CVEs**). Filter `python-311` or `301-02-python`.
+
+TIP: ACS lists components and CVEs. That is the bill of materials evidence this lab needs. Generating SPDX with Syft is optional and not required if the binary is not on the bastion.
+====
+
+.Optional: cosign/TAS if already installed
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+command -v cosign && cosign version || echo "cosign not on PATH — use TSSC-00 for signing your own images; Red Hat catalog signatures are registry/RPM metadata, not a cosign key you hold"
+----
+
+TIP: Do not expect `cosign verify` of `ubi9/python-311` with a workshop Rekor key. Your *application* images get TAS in TSSC-00.
+====
+
+=== Part B: Admit only digest-pinned Deployments
+
+.Label a namespace and apply the VAP
+[%collapsible]
+====
+Bindings match `digest-pin-enforce=true` only—not cluster-wide.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc new-project 301-06-supply || oc project 301-06-supply
+oc label ns 301-06-supply digest-pin-enforce=true --overwrite
+oc apply -f ~/openshift-security-roadshow/setup/supply-chain-lab/require-digest-vap.yaml
+----
+
+TIP: `validatingadmissionpolicy.admissionregistration.k8s.io/require-digest-deployments` created.
+====
+
+.Tag-only Deployment (expect deny)
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc apply -n 301-06-supply -f - <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tag-only
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tag-only
+  template:
+    metadata:
+      labels:
+        app: tag-only
+    spec:
+      containers:
+      - name: app
+        image: registry.access.redhat.com/ubi9/python-311:latest
+        command: ["sleep", "infinity"]
+EOF
+----
+
+TIP: Admission denies (`pin every container image to a digest`). Tampering control at the API.
+====
+
+.Digest-pinned Deployment (expect allow)
+[%collapsible]
+====
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+DIGEST=$(oc image info registry.access.redhat.com/ubi9/python-311:latest --filter-by-os=linux/amd64 | awk '/Digest:/ {print $2; exit}')
+echo "Using $DIGEST"
+oc apply -n 301-06-supply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pinned
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pinned
+  template:
+    metadata:
+      labels:
+        app: pinned
+    spec:
+      containers:
+      - name: app
+        image: registry.access.redhat.com/ubi9/python-311@${DIGEST}
+        command: ["sleep", "infinity"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          runAsNonRoot: true
+EOF
+----
+
+TIP: Deployment created. Same rule 301-02 followed in GitOps.
+====
+
+== Debrief
+
+Supply-chain integrity here is **catalog image + digest pin + admission**. Signing *your* builds remains TSSC-00 / 201-04. ACS deploy-time policies (xref:02-acs-policy-and-risk.adoc[ACS 02]) are the other admission door for CVEs and labels.
+
+What breaks without this:
+
+* GitOps pin in one namespace, `:latest` allowed next door
+* Cosign demo with no API gate → attackers skip the pipeline
+* Treating Docker Hub Python as “close enough” to UBI
+
+IMPORTANT: remove the VAP in cleanup so it does not linger on the shared cluster.
+
+image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbDR4amFzZ2ZiNGNkaTVwM3lscmxycDMzMnB4bTdwYWd0emlsOHJiYSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/qunFC4tNsyA8y9M36d/giphy.gif[link=self, window=blank, width=100%, class="center"]
+
+== Cleanup
+
+Deletes `301-06-supply` and the digest VAP/binding.
+
+:lab-cleanup-module: 301-06
+include::partial$lab-cleanup.adoc[]

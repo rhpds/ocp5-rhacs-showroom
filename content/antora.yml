@@ -1,12 +1,26 @@
 name: modules
-title: "OpenShift 5 Early Access"
-version: ~
+title: Red Hat OpenShift Security Roadshow
+version: master
 nav:
   - modules/ROOT/nav.adoc
 
 asciidoc:
   attributes:
     experimental: true
-    lab_name: "OpenShift 5 Early Access"
+    lab_name: Red Hat OpenShift Security Roadshow
     release-version: master
+    workshop_user_suffix: "1"
+    payment_gateway_namespace: payment-gateway-{workshop_user_suffix}
+    vulnerable_workload_namespace: vulnerable-workload-{workshop_user_suffix}
     page-pagination: true
+    # Aliases so roadshow modules resolve against OCP5 Showroom UserInfo
+    openshift_console_url: "{openshift_cluster_console_url}"
+    web_console_url: "{openshift_cluster_console_url}"
+    openshift_admin_user: "{openshift_cluster_admin_username}"
+    openshift_admin_password: "{openshift_cluster_admin_password}"
+    acs_route: "https://central-acs.{openshift_cluster_ingress_domain}"
+    acs_portal_username: admin
+    acs_portal_password: "(see environment credentials)"
+    page-links:
+    - url: https://redhat.com
+      text: Red Hat

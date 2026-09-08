@@ -1,0 +1,467 @@
+= Network and Runtime Security
+:toc:
+:sectnums:
+:icons: font
+
+== Module Goals
+
+* Review the Network Graph and listening endpoints
+* Create Network Policies that improve CIS compliance
+* Enforce a runtime policy that kills a pod when a package manager runs
+* Know where deeper ACS runtime hunting lives (xref:301-04-runtime-threat-detection.adoc[301-04])
+
+== Understanding the Network UI
+
+The Network UI is broken into two tabs: the Network Graph & the Listening Endpoints tab.
+
+=== The Network Graph
+
+The Network Graph in RHACS provides a visual representation of the network traffic and relationships between different components within a Kubernetes cluster. This feature is crucial for understanding and managing the network security of Kubernetes clusters, as endpoint detection is not enough with containers. In Kubernetes and OpenShift, you need visibility on exposed services.
+
+RHACS Network Graph helps you visualize network traffic by displaying the flow of network traffic between different pods, services, and namespaces within a Kubernetes cluster. The Network Graph also helps identify unusual or unexpected network traffic patterns. If there are unexpected connections or traffic flows between components that should not be communicating, these anomalies can be quickly spotted and investigated. By understanding the actual network traffic, security teams can create more precise network policies to restrict unnecessary communication paths and reduce the attack surface. The Network Policies can be generated at deploy-time or runtime.
+
+=== The Exposed Ports Dashboard
+
+The Exposed Ports Dashboard gives users a clear and organized view of all the services in their Kubernetes cluster that are exposed to external networks. 
+
+=== BONUS: The roxctl netpol CLI Command
+
+The `roxctl netpol` command in Red Hat Advanced Cluster Security (RHACS) for Kubernetes offers several advantages that enhance network security management within Kubernetes environments. This command is part of the `roxctl` CLI tool, which is designed to interact with RHACS. The `roxctl netpol` command can automatically generate Kubernetes network policies based on the OpenShift and Kubernetes assets. This can be done in deploy-time by developers OR operators to help accelerate network policy adoption.
+
+== Runtime policy enforcement
+
+RHACS monitors container processes and collects data to help create policies that block unwanted behavior. Runtime policies can include criteria from build-time and deploy-time but also account for process executions. For the *Runtime* stage, RHACS stops pods that match the policy; it does not scale the deployment down to zero.
+
+This is the first step in shifting left: after you block `apk` at runtime, you prevent the package manager from existing in the image (xref:02-acs-policy-and-risk.adoc[02] deploy-time, xref:03-acs-cicd-and-automation.adoc[03] build-time).
+
+=== Prevent execution of the package manager binary
+
+*Procedure*
+. On the left-hand side of the application, click the *Platform Configuration* tab and select *Policy Management*:
+
+image::04-policy-00.png[link=self, window=blank, width=100%, Policy Management Dashboard]
+
+[start=2]
+. Filter through the policies to find *Alpine Linux Package Manager Execution* or use the search bar to select *Policy*:
+
+image::04-policy-01.png[link=self, window=blank, width=100%, Policy Management Search]
+
+[start=3]
+. Once you have found the policy *Alpine Linux Package Manager Execution*, click on it to learn more:
+
+image::04-policy-02.png[link=self, window=blank, width=100%, Policy Management Details]
+
+[[runtime-enforce]]
+
+Package managers like apt, apk, and yum/dnf belong on hosts, not in running containers. Enforcing this policy through OpenShift (kill the pod) keeps cluster state consistent.
+
+=== Enable enforcement of the policy
+
+*Procedure*
+
+. Click the *Actions* button, then click *CLONE policy*. Then give it the name "Alpine Linux Package Manager Execution - Runtime":
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+Alpine Linux Package Manager Execution - Runtime
+----
+
+image::04-policy-03.png[link=self, window=blank, width=100%]
+
+[start=2]
+. Select *Policy Behavior -> Actions*:
+
+image::04-policy-04.png[link=self, window=blank, width=100%]
+
+[start=3]
+. Enable runtime enforcement by clicking the *inform and enforce* button:
+. Configure enforcement behavior by selecting *Enforce at Runtime*:
+
+image::04-policy-03.png[link=self, window=blank, width=100%, Enforce Runtime Policy]
+
+[start=5]
+. Click *Next*:
+. Review the changes, then click save:
+
+IMPORTANT: Make sure to save the policy changes! If you do not save the policy, the process will not be blocked!
+
+=== Testing the configured policy
+
+Use tmux to watch OpenShift events while you trigger the policy.
+
+IMPORTANT: Make sure that you are signed into the bastion host with OpenShift access when running the following commands.
+
+*Procedure*
+. In the terminal, start tmux with two panes:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+tmux new-session \; split-window -v \; attach
+----
+
+[start=2]
+. Next, run a watch on OpenShift events in the first shell pane:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get events -n patient-portal -w
+----
+
+[start=3]
+. Press `Ctrl+b` first, *and then press* o to switch to the next pane. (Hold ctrl+b, then press o):
+. Exec into the frontend application:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+POD=$(oc get pod -l app=frontend -n patient-portal -o jsonpath="{.items[0].metadata.name}")
+oc exec $POD -n patient-portal -i --tty -- /bin/bash
+----
+
+> If you see */home/fritz*, you've confirmed shell access to the frontend container.
+
+[start=5]
+. Run the apk package manager in this shell:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+apk update
+----
+
+*Expected:* Package manager starts, then the shell terminates with exit code 137. In the events pane, RHACS *Killing* the pod and a replacement pod is *Created*.
+
+NOTE: After a few seconds, the pod is deleted and recreated and your exec session ends. Type *exit*, press *Ctrl+c* to stop the watch, and exit tmux.
+
+Confirm the event in *Violations* (policy name, deployment, runtime stage, enforcement). UBI package-manager enforce is xref:301-04-runtime-threat-detection.adoc[301-04]; Splunk+ACS IR is xref:301-05-incident-response-forensics.adoc[301-05].
+
+== Hands-on with the RHACS Network UI
+
+=== CIS Compliance Reminder
+
+In this module, we will focus on the *backend* namespace. Also, hopefully, you remember the compliance section where we were told how we could become CIS-compliant by applying network policies. 
+
+Run the following two commands to remember which namespaces are currently compliant:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+cd ~/
+export TUTORIAL_HOME="$(pwd)/demo-apps"
+oc get --all-namespaces networkpolicies -o json | jq '[.items[] | select((.metadata.namespace | startswith("openshift") | not) and (.metadata.namespace | startswith("kube-") | not) and .metadata.namespace != "default") | .metadata.namespace] | unique'
+----
+
+
+*Sample output*
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+[
+ "medical",
+ "stackrox",
+ "vault"
+]
+----
+
+Now, let's aim to get the *backend* namespace on that list.
+
+=== The Network Graph UI
+
+*Procedure*
+
+. Start by heading to the Network -> Network Graph.
+
+image::ex-net-1.png[link=self, window=blank, width=100%]
+
+====
+The graph does not display any results by default. This is a performance choice as large environments will become unwieldy in a dashboard like this.
+====
+
+[start=2]
+. Use the filters at the top to select ONLY the *backend* namespace.
+
+image::ex-net-2.png[link=self, window=blank, width=100%]
+
+[start=3]
+. Review the legend at the bottom left of the page.
+
+====
+Notice how there is a namespace type labeled *Related namespace*. You should see two other namespaces related to the backend namespace. This is because there is network traffic between these three namespaces. 
+====
+
+image::ex-net-3.png[link=self, window=blank, width=100%]
+image::ex-net-6.png[link=self, window=blank, width=100%]
+
+You can also filter by "Active flows" or "Inactive flows." 
+
+image::ex-net-4.png[link=self, window=blank, width=100%]
+
+[start=4]
+. Click on the *Network policy generator* on the top right of the dashboard.
+
+image::ex-net-5.png[link=self, window=blank, width=100%]
+
+[start=5]
+. Click the *View active YAMLS* tab.
+
+image::ex-net-7.png[link=self, window=blank, width=100%]
+
+====
+TIP: You should see no active YAMLs in the namespace since we have not created any network policies in the backend namespace.
+====
+
+[start=6]
+. Click the *Simulate network policies* and click *Generate and simulate network policies*.
+
+image::ex-net-8.png[link=self, window=blank, width=100%]
+
+[start=7]
+. Click the *Compare* tab on the right side of the page: 
+
+image::ex-net-9.png[link=self, window=blank, width=100%]
+
+====
+This view is useful for making any changes to network policies. You will be able to visualize the changes in the UI.
+====
+
+We know the backend namespace needs some work. And while we can copy the simulated network policies from the UI, let's do it later from the roxctl UI.
+
+== Using the roxctl netpol CLI
+
+We're going to use the roxctl netpol command to generate network policies based on the *Backend* applications.
+
+First, let's take a look at the four applications and all of their associated services:
+
+. Run the following command. 
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+export TUTORIAL_HOME="$(pwd)/demo-apps"
+cat $TUTORIAL_HOME/kubernetes-manifests/medical-application/backend/everything.yml
+----
+
+*Sample output*
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+# Deployment named "varnish"
+# Listens on :8080
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: varnish
+.....
+----
+
+You can see the manifest contains EVERYTHING about the applications in the namespace.
+
+IMPORTANT: The netpol command only looks at the services and deployment manifests to generate network policies. This is why it is extremely important that the deployments and services are properly configured first. 
+
+[start=2]
+. Run the following command: 
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+roxctl netpol connectivity map $TUTORIAL_HOME/kubernetes-manifests/medical-application/backend/everything.yml
+----
+
+*Sample output*
+[.console-output]
+[source,bash,subs="+macros,+attributes"]
+----
+....
+backend/postgres[Deployment] => backend/api-server[Deployment] : All Connections
+backend/postgres[Deployment] => backend/backend-atlas[Deployment] : All Connections
+backend/postgres[Deployment] => backend/varnish[Deployment] : All Connections
+backend/varnish[Deployment] => 0.0.0.0-255.255.255.255 : All Connections
+backend/varnish[Deployment] => backend/api-server[Deployment] : All Connections
+backend/varnish[Deployment] => backend/backend-atlas[Deployment] : All Connections
+backend/varnish[Deployment] => backend/postgres[Deployment] : All Connections
+----
+
+This output is telling us that all connections are currently authorized into the backend namespace. The goal is to only allow the connections that are necessary for the applications to function. 
+
+[start=3]
+. Run the following command. This command will copy the network policy output to an "everything" file and will display what was added:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+roxctl netpol generate $TUTORIAL_HOME/kubernetes-manifests/medical-application/backend/everything.yml >> $TUTORIAL_HOME/kubernetes-manifests/medical-application/backend/everything.yml
+roxctl netpol generate $TUTORIAL_HOME/kubernetes-manifests/medical-application/backend/everything.yml
+----
+
+Now we have network policies! Time to put them to work.
+
+[start=4]
+. Apply the network policies with the following command:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc apply -f $TUTORIAL_HOME/kubernetes-manifests/medical-application/backend/everything.yml
+----
+
+*Sample output*
+[.console-output]
+[source,bash,subs="+macros,+attributes"]
+----
+networkpolicy.networking.k8s.io/api-server-netpol created
+networkpolicy.networking.k8s.io/backend-atlas-netpol created
+networkpolicy.networking.k8s.io/postgres-netpol created
+networkpolicy.networking.k8s.io/varnish-netpol created
+networkpolicy.networking.k8s.io/default-deny-in-namespace-backend created
+----
+
+[start=5]
+. And go and verify that everything is green in the dashboard:
+
+image::ex-net-20.png[link=self, window=blank, width=100%]
+
+[start=6]
+. Lastly, let's check the netpol connections output AND our compliance command:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+roxctl netpol connectivity map $TUTORIAL_HOME/kubernetes-manifests/medical-application/backend/everything.yml
+oc get --all-namespaces networkpolicies -o json | jq '[.items[] | select((.metadata.namespace | startswith("openshift") | not) and (.metadata.namespace | startswith("kube-") | not) and .metadata.namespace != "default") | .metadata.namespace] | unique'
+----
+
+*Sample output*
+[.console-output]
+[source,bash,subs="+macros,+attributes"]
+----
+INFO:   in file: /home/lab-user/demo-apps/kubernetes-manifests/medical-application/backend/everything.yml, skipping object with type: Secret
+...
+backend/varnish[Deployment] => backend/api-server[Deployment] : TCP 9001
+----
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+[lab-user@bastion ~]$ oc get --all-namespaces networkpolicies -o json | jq '[.items[] | select((.metadata.namespace | startswith("openshift") | not) and (.metadata.namespace | startswith("kube-") | not) and .metadata.namespace != "default") | .metadata.namespace] | unique'
+[
+ "backend",
+ "medical",
+ "stackrox",
+ "vault"
+]
+----
+
+And we see that there is only ONE external connection to the namespace. All other connections are shut down. 
+
+Use the 'roxctl netpol generate' command on the rest of the Kubernetes manifests in the $TUTORIAL_HOME/kubernetes-manifests/ folder. Apply these changes and view the updates in the Network Graph UI. 
+
+What is the CIS compliance standard percentage now? 
+
+== A Task to Complete on Your Own
+
+*LAST ONE*
+
+run the following commands to create a publically available applications. You task is to use the network graph and find the external IP address of the redhat.com loadbalancer.
+
+----
+git clone https://github.com/shaneboulden/tailspin-argocd-cd.git netcoreapp
+oc new-project tailspin
+oc apply -k netcoreapp/overlays/development
+sleep 20
+while true; do oc exec deploy/leaderboard -n tailspin -c ubi -- curl -s -L https://redhat.com > /dev/null; sleep 3; done
+----
+
+image::https://media.giphy.com/media/3ZP7udDbKKDS0/giphy.gif?cid=790b7611ag8xf2i0ectfchcasx9mo9vcym9l5v8gm96q7ub4&ep=v1_gifs_search&rid=giphy.gif&ct=g[link=self, window=blank, width=100%, class="center"]
+
+== Security Exercise: ACME Incident Response
+
+Morgan confirmed unexpected egress from `payment-gateway` to external IP `185.199.108.153`. Sarah must isolate the workload without killing the pod.
+
+include::partial$acme-incident-context.adoc[]
+
+=== Scenario
+
+[quote, Morgan, Infosec]
+Cut the egress now—but don't restart the pod. We still need the in-memory evidence.
+
+=== Your task
+
+include::partial$security-exercise-task-intro.adoc[]
+
+.Step 1 — Switch to your payment gateway namespace
+[%collapsible]
+====
+include::partial$payment-gateway-namespace.adoc[]
+====
+
+.Step 2 — Review external connections in Network Graph
+[%collapsible]
+====
+. In RHACS, open *Network Graph*.
+. Filter to namespace `payment-gateway-{workshop_user_suffix}` and deployment `payment-gateway`.
+. Click *External Entities* and confirm connections to the C2 IP address.
+
+image::fsi-security/rhacs-externalip.png[External connections in RHACS,link=self, window=blank, width=100%]
+====
+
+.Step 3 — Apply deny-all egress NetworkPolicy
+[%collapsible]
+====
+Apply a deny-all egress NetworkPolicy (break-glass during active incident):
+
+[source,yaml]
+----
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: payment-gateway-deny-egress
+  namespace: payment-gateway-{workshop_user_suffix}
+spec:
+  podSelector:
+    matchLabels:
+      app: payment-gateway
+  policyTypes:
+    - Egress
+  egress: []
+----
+
+Apply via the OpenShift console *Import YAML* or:
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: payment-gateway-deny-egress
+  namespace: payment-gateway-{workshop_user_suffix}
+spec:
+  podSelector:
+    matchLabels:
+      app: payment-gateway
+  policyTypes:
+    - Egress
+  egress: []
+EOF
+----
+====
+
+.Step 4 — Confirm egress is blocked
+[%collapsible]
+====
+image::fsi-security/apply-networkpolicy.png[Apply network policy,link=self, window=blank, width=100%]
+
+Return to the Network Graph and confirm egress traffic is blocked while the pod keeps running.
+====
+
+=== What you learned
+
+* RHACS Network Graph visualizes external connections critical during active incidents.
+* NetworkPolicy provides immediate egress isolation without destroying forensic evidence in the pod.
+* Network segmentation is a break-glass control complementary to audit and runtime detection.
+
+
+== Summary
+
+
+In this module, you enforced a runtime policy, worked the Network Graph, and used `roxctl netpol generate` to apply network policies.
+
+Next: xref:07-acs-installation.adoc[Installation].
+
+image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcTN6N2l3OXR0OXo4eGRkb3dpaHdocWRxZzQzN3A4OHQ3NTEycjFhaSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/C1AaD43G6rMlZjT628/giphy.gif[link=self, window=blank, width=100%, class="center"]
+
+== Cleanup
+
+Before moving to the next module, run the lab cleanup script to reset transient resources from this module.
+
+:lab-cleanup-module: 06
+include::partial$lab-cleanup.adoc[]

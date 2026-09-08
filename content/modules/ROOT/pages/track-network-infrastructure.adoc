@@ -1,0 +1,56 @@
+= Role track: Network & Infrastructure Engineer
+:toc:
+:icons: font
+
+xref:index.adoc[← Back to HOME]
+
+== Role overview
+
+Specialize in data-plane security: segmentation strategy, encryption patterns, service-to-service trust, identity-aware routing, and traffic anomaly foundations.
+
+Core responsibilities (framework):
+
+* Advanced network segmentation, ingress, and egress boundaries
+* Encryption for data in transit and at rest (as it intersects the network fabric)
+* Monitor and help mitigate anomalous or denial-style traffic
+* Multi-cluster posture from the network perspective
+* Runtime workload / service identity trust integration
+* Service-to-service trust fabric (mTLS layering, certificate lifecycle)
+
+Not owning: compliance scanning automation, supply-chain gates, or organization-wide artifact provenance (Platform, DevSecOps, Architect).
+
+== Recommended sequence
+
+=== Basic
+
+. xref:101-01-default-secure-behavior.adoc[101-01 — Default Secure Behavior]
+. xref:101-02-projects-namespaces-boundaries.adoc[101-02 — Projects & Namespaces]
+. xref:101-04-scc-resource-guardrails.adoc[101-04 — SCC & Resource Guardrails]
+. xref:101-05-network-policy-basics.adoc[101-05 — NetworkPolicy Basics]
+. xref:101-08-etcd-encryption-control-plane.adoc[101-08 — Etcd Encryption & Control Plane]
+. xref:101-09-audit-exec-events.adoc[101-09 — Audit Logging & Exec Events]
+. xref:101-12-enforcing-tls-routes.adoc[101-12 — Enforce TLS on Routes]
+
+=== Intermediate
+
+. xref:101-05-network-policy-basics.adoc[101-05 — NetworkPolicy Basics] and xref:201-08-cert-manager-mtls.adoc[201-08 — Certificate Management & mTLS]
+. xref:201-06-audit-monitoring-correlation.adoc[201-06 — Audit Correlation & Anomaly Detection]
+. xref:201-10-admission-governance.adoc[201-10 — RHACM Policy Governance (DoD / NIST)]
+
+=== Advanced
+
+. xref:301-03-multi-tenant-zero-trust-network.adoc[301-03 — AdminNetworkPolicy]
+. xref:301-07-advanced-cryptography.adoc[301-07 — Encryption Inventory]
+. xref:301-08-zero-trust-workload-identity.adoc[301-08 — Zero-Trust Workload Identity]
+
+== Related modules
+
+* xref:06-acs-network-and-runtime.adoc[RHACS — Network and Runtime Security] for visualization and enforcement patterns after the 101/201 network labs
+* xref:virt-INDEX.adoc[OpenShift Virtualization Security] — especially xref:virt-06-network-segmentation.adoc[virt-06] (VLAN, MAC spoof filtering, MultiNetworkPolicy) and xref:virt-07-host-firmware-and-kernel.adoc[virt-07] (nested virt and CPU mitigations)
+
+== Catalogs
+
+* xref:basic-INDEX.adoc[101 Labs Overview]
+* xref:intermediate-INDEX.adoc[201 Labs Overview]
+* xref:advanced-INDEX.adoc[301 Labs Overview]
+* xref:virt-INDEX.adoc[OpenShift Virtualization Security]

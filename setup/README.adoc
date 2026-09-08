@@ -1,0 +1,135 @@
+= ACME Incident Workshop — Cluster Setup
+
+Run these scripts as *cluster-admin* before delivering the OpenShift Security Roadshow ACS modules with end-of-module incident exercises.
+
+== Prerequisites
+
+* OpenShift cluster with RHACS (StackRox) installed in the `stackrox` namespace
+* OpenShift Lightspeed installed (for MCP ↔ OLSConfig wiring; LLM secrets optional)
+* `oc` CLI logged in as cluster-admin
+* `jq`, `curl`, `openssl`, and `envsubst` (from `gettext`) available
+
+== One-time cluster configuration
+
+[source,bash]
+----
+./setup/cluster-prerequisites.sh
+----
+
+This configures ACME incident prerequisites, then runs `setup/rhacs-configure.sh`:
+
+*ACME extras*
+
+* `node-log-viewer` ClusterRole for audit log queries
+* Web Terminal operator subscription
+* RHACS collector external IP visibility
+* CRIU checkpoint RBAC for forensic exercises
+* Extended audit log retention
+
+*RHACS demo configure* (roadshow-native port of rhacs-demo basic-setup 01–08 + add-ons)
+
+* Verify/align RHACS (console plugin, route TLS, channel)
+* Collector `ROX_NON_AGGREGATED_NETWORKS` for non-RFC1918 CIDRs
+* Compliance Operator + daily `acs-catch-all` schedule + on-demand Coverage scan (RHACS v2; classic V1 APIs were removed in 4.11)
+* Central API settings, metrics, base-image registration
+* RHACS 4.11 TP flags + Attach-to-Pod policy check
+* Monitoring stack (COO / Perses / RHACS Monitoring auth)
+* StackRox MCP server + Lightspeed `OLSConfig` MCPServer wiring
+* Optional Lightspeed LLM defaults when credentials/env vars are set
+
+RHACS configure alone (skip ACME extras):
+
+[source,bash]
+----
+./setup/rhacs-configure.sh
+# Optional: --skip-monitoring --skip-mcp --skip-lightspeed --skip-compliance
+----
+
+Optional Lightspeed LLM credentials before configure:
+
+[source,bash]
+----
+export LIGHTSPEED_DEFAULT_PROVIDER=Anthropic
+export LIGHTSPEED_DEFAULT_MODEL=claude-sonnet-4-20250514
+# or: LIGHTSPEED_BACKEND=bam LIGHTSPEED_BAM_URL=https://... ANTHROPIC_API_KEY=...
+./setup/cluster-prerequisites.sh
+----
+
+== Deploy per-attendee environments
+
+[source,bash]
+----
+# Default: 30 attendee environments (payment-gateway-1 .. payment-gateway-30)
+./setup/deploy-incident-env.sh
+
+# Or specify attendee count:
+ATTENDEE_COUNT=10 ./setup/deploy-incident-env.sh
+----
+
+This creates for each attendee suffix `{N}`:
+
+* `payment-gateway-{N}` — compromised httpd pod with simulated `exfil.sh` beacon
+* `vulnerable-workload-{N}` — Socket.IO application for CVE discussion exercises
+
+Attendees use the Showroom attribute `{workshop_user_suffix}` matching their assigned number.
+
+== Attendee lab environment (bastion)
+
+Attendees clone the roadshow repository, then run `setup/lab-environment.sh`. That script runs `rhacs-configure.sh` (RHACS settings, compliance, monitoring, MCP, Lightspeed helpers), then CLI token setup, demo-apps, and Quay images:
+
+[source,bash]
+----
+git clone https://github.com/mfosterrox/openshift-security-roadshow.git
+cd openshift-security-roadshow
+bash setup/lab-environment.sh --quay-user QUAYADMIN --quay-password 'password'
+bash setup/lab-environment.sh --deploy-skupper-only
+----
+
+Use `--skip-rhacs-configure` if an instructor already ran configure and attendees should only refresh CLI/apps/images.
+
+Attendees record module completion by running `setup/lab-cleanup.sh` at the end of each module (documented as a routine cleanup step). Each successful cleanup writes a marker line to `~/.acs-roadshow/progress` on the bastion for instructor verification / gameify scoring:
+
+[source,text]
+----
+Module 00 done
+Module 101-01 done
+----
+
+Supported module ids include ACS (`00`–`10`), OpenShift security tracks (`101-01`, `201-06`, `301-08`, etc.), and `tssc-00`–`tssc-02`.
+
+[source,bash]
+----
+cat ~/.acs-roadshow/progress
+----
+
+Instructors can score many bastions from a CSV of SSH credentials with the helper under `gameify/` (see `gameify/README.md`):
+
+[source,bash]
+----
+cd gameify
+python3 -m pip install -r requirements.txt
+python3 main.py --csv bastions.csv
+# optional subset (default scores the full catalog):
+python3 main.py --csv bastions.csv --modules 101-01,101-02,00
+----
+
+== Optional cluster theming
+
+To brand the console as ACME Financial Services, apply console customization from the upstream workshop:
+https://github.com/jmhbnz/workshops/tree/main/data/security-new[security-new README]
+
+== Verify deployment
+
+[source,bash]
+----
+oc get pods -n payment-gateway-1
+oc get pods -n vulnerable-workload-1
+oc exec -n payment-gateway-1 payment-gateway --container httpd -- ls /tmp/.hidden_toolkit/
+
+# RHACS add-ons
+oc get pods -n stackrox-mcp
+oc get monitoringstack -A
+oc get olsconfig cluster -o yaml | head
+----
+
+The last incident command should show `exfil.sh` if weaponization succeeded.

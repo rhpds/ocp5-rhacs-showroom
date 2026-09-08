@@ -1,0 +1,317 @@
+= Write Your Own Keycard – Custom RBAC in Action
+:role: Intermediate Platform Security
+:skills: Custom RBAC, Least Privilege Design, Scoped Identities, Service Account Hardening
+:mitre: T1078 (Valid Accounts), TA0004 (Privilege Escalation), T1552 (Credential Access)
+:compliance: NIST 800-53 AC-6, ISO 27001 A.9, SOC 2 CC6, PCI DSS 7
+:labid: LAB-201-01
+
+**Duration:** ~20 minutes
+
+== Overview
+By the end you’ll be able to design and apply a narrowly scoped Role that grants only the handful of permissions an application maintainer truly needs, verify what works, prove what is denied, and explain how that shrinks incident blast radius.
+
+Create a minimal custom Role and RoleBinding, prove allowed versus denied verbs, and state the least-privilege intent in plain language.
+
+== Why it matters
+Imagine an office where every employee’s badge opens every room—including finance, HR, and the server closet. 
+
+Nobody intends abuse, but one lost badge means a long night of worrying what was accessed. Built‑in broad roles (`edit`, `admin`) are those master badges. Custom RBAC is like cutting a key that only opens the supply cabinet your role requires. When (not if) an account is phished or a token is leaked, tightly scoped permissions turn a potential headline into a routine ticket. Auditors also smile when intent is obvious: “This identity may only adjust configuration.”
+
+== What does it solve
+Most real security incidents are ordinary credentials used in the wrong places. Over-broad roles quietly enable:
+
+* Unapproved pod deployments (persistence footholds)
+* Reading secrets far outside an app’s scope (data leakage)
+* Creating new RoleBindings to escalate (privilege stacking)
+* Difficult audit narratives (“Why did this CI user delete a Secret?”)
+
+Crafting a custom Role removes silent “just in case” powers. It converts vague responsibility (“Dev team rights”) into precise intent (“May adjust non-sensitive app configuration values and rotate one secret”). That precision speeds investigations and compliance reviews.
+
+== Your Mission
+In xref:101-03-rbac-basics.adoc[101-03] you saw what namespace `admin` (and even `edit`) actually unlocks: Secret theft, a self-forged RoleBinding, and a foothold Deployment. Built-in roles are the right starting ladder—they are still broader than many day-to-day jobs. An app maintainer who only needs to flip a ConfigMap flag and rotate one Secret does not need to create pods or mint more RoleBindings.
+
+Your job is to cut a *custom* Role for that job and prove it is not a master badge:
+
+* Allow only `get`/`list`/`update`/`patch` on ConfigMaps and Secrets—enough to read and rotate, not to wipe the Secret.
+* Bind that Role to a human (`devuser`) and show the allowed path works (`oc auth can-i` plus a real `oc patch`).
+* Show the dangerous verbs stay denied: create pods, create RoleBindings, delete the Secret. Try the creates/deletes so a `can-i` of `no` is not the only evidence.
+* Repeat the allow check for a dedicated ServiceAccount (how CI and app pods should authenticate), then turn off default token automount so a pod that does not call the API does not carry a token.
+
+When you finish, you should be able to say in one sentence what this identity may do—and what an attacker with that leaked token still cannot do.
+
+Click each step only if you need a hint.
+
+.Create project 201-01-c-rbac-lab
+[%collapsible]
+====
+Stay in this project for every later command.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc new-project 201-01-c-rbac-lab
+----
+
+TIP: `Now using project "201-01-c-rbac-lab"`.
+====
+
+.Create Role config-secret-updater
+[%collapsible]
+====
+Grant `get`, `list`, `update`, and `patch` on ConfigMaps and Secrets. Include `patch` so `oc patch` and modern controllers work.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc create role config-secret-updater \
+  --verb=get --verb=list --verb=update --verb=patch \
+  --resource=configmaps,secrets
+----
+
+TIP: `role.rbac.authorization.k8s.io/config-secret-updater created`.
+====
+
+.Create RoleBinding updater-binding for user devuser
+[%collapsible]
+====
+Bind the Role to the demo user. Do not bind `edit` or `admin`.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc create rolebinding updater-binding \
+  --role=config-secret-updater --user=devuser
+----
+
+TIP: `rolebinding.rbac.authorization.k8s.io/updater-binding created`.
+====
+
+.Create ConfigMap app-config
+[%collapsible]
+====
+Seed a ConfigMap so you have something allowed to patch.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc create configmap app-config --from-literal=flag=on
+----
+
+TIP: `configmap/app-config created`.
+====
+
+.Create Secret db-creds
+[%collapsible]
+====
+Seed a Secret you will rotate (update/patch) but must not be able to delete.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc create secret generic db-creds --from-literal=password=Initial123!
+----
+
+TIP: `secret/db-creds created`.
+====
+
+.Check whether devuser can list ConfigMaps
+[%collapsible]
+====
+This verb is on the Role. Impersonate `devuser`.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc auth can-i list configmaps --as devuser
+----
+
+TIP: Result is `yes`.
+====
+
+.Check whether devuser can update secret/db-creds
+[%collapsible]
+====
+Rotation is an update, not a delete.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc auth can-i update secret/db-creds --as devuser
+----
+
+TIP: Result is `yes`.
+====
+
+.Patch ConfigMap app-config as devuser
+[%collapsible]
+====
+Prove the allowed path with a real write, not only `can-i`.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc patch configmap app-config -p '{"data":{"flag":"off"}}' --type=merge --as devuser
+----
+
+TIP: `configmap/app-config patched`.
+====
+
+.Patch Secret db-creds as devuser
+[%collapsible]
+====
+Rotate the password in place. `stringData` avoids hand-rolled base64.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc patch secret db-creds -p '{"stringData":{"password":"Rotated456!"}}' --type=merge --as devuser
+----
+
+TIP: `secret/db-creds patched`.
+====
+
+.Check whether devuser can create pods
+[%collapsible]
+====
+Pod create is how an attacker plants a foothold. This Role must not allow it.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc auth can-i create pods --as devuser
+----
+
+TIP: Result is `no`.
+====
+
+.Try oc run as devuser
+[%collapsible]
+====
+Confirm admission/RBAC actually blocks the create, not just `can-i`.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc run test --image=registry.access.redhat.com/ubi9/ubi --as devuser || echo DENIED
+----
+
+TIP: The create fails and `DENIED` prints.
+====
+
+.Check whether devuser can create RoleBindings
+[%collapsible]
+====
+RoleBinding create is the persistence path from xref:101-03-rbac-basics.adoc[101-03].
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc auth can-i create rolebinding --as devuser
+----
+
+TIP: Result is `no`.
+====
+
+.Try creating RoleBinding bogus as devuser
+[%collapsible]
+====
+Prove they cannot mint a second binding to `view` (or anything else).
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc create rolebinding bogus --clusterrole=view --user=devuser --as devuser || echo DENIED
+----
+
+TIP: The create fails and `DENIED` prints.
+====
+
+.Check whether devuser can delete secret/db-creds
+[%collapsible]
+====
+Rotation needs update/patch. Delete is extra blast radius—leave it off the Role.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc auth can-i delete secret/db-creds --as devuser
+----
+
+TIP: Result is `no`.
+====
+
+.Try deleting Secret db-creds as devuser
+[%collapsible]
+====
+Confirm the Secret survives.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc delete secret db-creds --as devuser || echo DENIED
+----
+
+TIP: Delete fails, `DENIED` prints, and `db-creds` still exists.
+====
+
+.Create ServiceAccount app-sa
+[%collapsible]
+====
+Automation should use a dedicated SA, not the default SA and not a human user.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc create sa app-sa
+----
+
+TIP: `serviceaccount/app-sa created`.
+====
+
+.Bind config-secret-updater to app-sa
+[%collapsible]
+====
+Same Role, different subject. Scope the binding to this project’s SA.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc create rolebinding sa-updater \
+  --role=config-secret-updater \
+  --serviceaccount=201-01-c-rbac-lab:app-sa
+----
+
+TIP: `rolebinding.rbac.authorization.k8s.io/sa-updater created`.
+====
+
+.Check whether app-sa can patch ConfigMap app-config
+[%collapsible]
+====
+Impersonate the SA the same way a compromised pod would.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc auth can-i patch configmap/app-config \
+  --as system:serviceaccount:201-01-c-rbac-lab:app-sa
+----
+
+TIP: Result is `yes`.
+====
+
+.Disable automountServiceAccountToken on app-sa
+[%collapsible]
+====
+If a pod does not need the API, do not mount a token by default.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc patch sa app-sa -p '{"automountServiceAccountToken":false}'
+----
+
+TIP: `serviceaccount/app-sa patched`. Pods that need the API must opt in.
+====
+
+== Debrief
+
+Custom Roles shrink blast radius: losing a closet key hurts less than losing a master key—precise verbs beat broad `edit`/`admin` for sensitive paths.
+
+What breaks without this:
+
+* Broad namespaced roles → pod create persistence, Secret sprawl, RBAC self-escalation
+* ClusterRole for namespace objects → accidental cluster reach
+
+IMPORTANT: minimal Roles, separated ServiceAccounts, disable unused automount, `oc auth can-i` matrices, and RHACS/wildcard reviews.
+
+NOTE: include `patch` when updates need it; avoid “just in case” `delete`; prefer Role over ClusterRole for namespace-scoped work.
+
+image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbnY0NDA0ZnJqNXh6cGNqeHNxZGd5Zm5qMnlpOHhrbm1hY2pwcG5ydSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/p18ohAgD3H60LSoI1C/giphy.gif[link=self, window=blank, width=100%, class="center"]
+
+== Cleanup
+
+Before moving to the next module, run the lab cleanup script to reset transient resources from this module.
+
+:lab-cleanup-module: 201-01
+include::partial$lab-cleanup.adoc[]

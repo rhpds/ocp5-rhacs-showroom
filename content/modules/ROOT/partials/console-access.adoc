@@ -1,0 +1,22 @@
+Use the consoles and credentials from xref:index.adoc[Home] for this exercise.
+
+[cols="1,1"]
+|===
+|OpenShift console
+|{openshift_cluster_console_url}
+
+|OpenShift username
+|{openshift_cluster_admin_username}
+
+|OpenShift password
+|{openshift_cluster_admin_password}
+
+|RHACS console
+|{acs_route}
+
+|RHACS username
+|{acs_portal_username}
+
+|RHACS password
+|{acs_portal_password}
+|===
