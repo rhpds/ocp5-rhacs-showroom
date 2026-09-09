@@ -200,10 +200,11 @@ Run the remaining guest commands in this procedure from the VM console, not from
 [source,sh,role="copypaste"]
 ----
 command -v roxagent
-sudo journalctl -u roxagent.service --no-pager -n 20
+sudo systemctl is-active roxagent-serve.service
+sudo journalctl -u roxagent-serve.service --no-pager -n 20
 ----
 +
-`command -v` should print the path of the `roxagent` binary. The journal should show the service starting (`Started StackRox VM Agent (native).`), scanning packages, and reporting results — for example `Sent message with index report containing 491 packages to host` followed by `Deactivated successfully`. A warning about RPM epoch matching is expected and can be safely ignored.
+`command -v` should print `/usr/local/bin/roxagent`. `roxagent-serve` must be `active` (this is pull mode: the agent listens on VSOCK port 818 so Sensor can request inventory). The journal should show the serve unit starting and an initial package scan. A warning about RPM epoch matching is expected and can be safely ignored.
 
 . In ACS Central, open *Vulnerability Management > Results > Virtual Machines*.
 +
@@ -228,11 +229,13 @@ In this optional path you deploy a second VirtualMachine from a declarative GitO
 
 IMPORTANT: Schedule the VM on a *worker* node.
 
-. Speed up Sensor VM scraping for this demo. Set the poll interval to `1m` so a new VM appears in ACS shortly after `roxagent` is listening (the default can take about an hour). This only controls how often Sensor asks listening VMs for their current report; it does not change guest-side package rescans.
+. Sensor is already configured with `ROX_VIRTUAL_MACHINES_SCRAPER_POLL_INTERVAL=1m` so a new VM appears in ACS shortly after `roxagent` is listening (the product default can take about an hour). This only controls how often Sensor asks listening VMs for their current report; it does not change guest-side package rescans.
++
+If you need to confirm the setting:
 +
 [source,sh,subs="attributes",role=execute]
 ----
-oc set env deploy/sensor -n {acs_namespace} ROX_VIRTUAL_MACHINES_SCRAPER_POLL_INTERVAL=1m
+oc set env deploy/sensor -n {acs_namespace} --list | grep ROX_VIRTUAL_MACHINES
 ----
 
 . Create the cloud-init Secret for the VM. This userdata:
