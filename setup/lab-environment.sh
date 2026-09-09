@@ -148,6 +148,11 @@ if [[ -z "${QUAY_USER}" || -z "${QUAY_PASSWORD}" ]]; then
   usage
   exit 1
 fi
+if [[ "${QUAY_USER}" == *'{'* || "${QUAY_PASSWORD}" == *'{'* ]]; then
+  echo "Error: --quay-user / --quay-password still contain Showroom placeholders." >&2
+  echo "Use the values from the credentials table (username is usually admin), not {quay_admin_username}." >&2
+  exit 1
+fi
 
 # Count top-level lab steps (cluster RHACS/Compliance/apps come from GitOps)
 TOTAL=0
@@ -200,7 +205,39 @@ do_cli_vars() {
   persist_var ROX_API_TOKEN "${ROX_API_TOKEN}"
 }
 
+ensure_roxctl() {
+  if command -v roxctl >/dev/null 2>&1; then
+    return 0
+  fi
+  local host dest tmp
+  host="$(rox_central_host "${ROX_CENTRAL_ADDRESS:-}")"
+  if [[ -z "${host}" ]]; then
+    echo "Error: ROX_CENTRAL_ADDRESS is unset; cannot download roxctl." >&2
+    return 1
+  fi
+  dest="${HOME}/.local/bin"
+  mkdir -p "${dest}"
+  tmp="$(mktemp)"
+  echo "roxctl not found; downloading CLI from Central..."
+  if curl -fsSk -L -o "${tmp}" "https://${host}/api/cli/download/roxctl-linux-amd64" \
+    || curl -fsSk -L -o "${tmp}" "https://${host}/api/cli/download/roxctl-linux"; then
+    chmod +x "${tmp}"
+    mv "${tmp}" "${dest}/roxctl"
+  else
+    rm -f "${tmp}"
+    echo "Error: could not download roxctl from https://${host}/api/cli/download/." >&2
+    return 1
+  fi
+  export PATH="${dest}:${PATH}"
+  if ! grep -qE '(^|:)\$HOME/\.local/bin|^export PATH="\$HOME/\.local/bin' "${HOME}/.bashrc" 2>/dev/null; then
+    printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "${HOME}/.bashrc"
+  fi
+  hash -r 2>/dev/null || true
+  command -v roxctl >/dev/null 2>&1
+}
+
 do_verify_api() {
+  ensure_roxctl || return 1
   roxctl --insecure-skip-tls-verify -e "${ROX_CENTRAL_ADDRESS}:443" central whoami
   curl -ksS -H "Authorization: Bearer ${ROX_API_TOKEN}" \
     "https://${ROX_CENTRAL_ADDRESS}/v1/auth/status" | jq -r '.userId // .user // "ok"' >/dev/null
@@ -275,6 +312,26 @@ ensure_podman() {
   command -v podman >/dev/null 2>&1
 }
 
+wait_for_quay() {
+  local url="$1"
+  local code="" i
+  echo "Waiting for Quay registry at ${url}..."
+  for i in $(seq 1 90); do
+    code="$(curl -sk -o /dev/null -w '%{http_code}' "https://${url}/v2/" || true)"
+    if [[ "${code}" == "401" || "${code}" == "200" ]]; then
+      echo "Quay is ready (HTTP ${code})"
+      return 0
+    fi
+    echo "Attempt ${i}/90: HTTP ${code:-000}"
+    sleep 10
+  done
+  echo "Error: Quay at ${url} never became ready (last HTTP ${code:-000})." >&2
+  echo "The registry pods are not serving yet. On the bastion run:" >&2
+  echo "  oc -n quay get quayregistry registry -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason} {.message}{\"\\n\"}{end}'" >&2
+  echo "  oc -n quay get deploy,pods" >&2
+  return 1
+}
+
 do_quay_login() {
   ensure_podman || return 1
   QUAY_URL="$(detect_quay_url)" || {
@@ -284,6 +341,7 @@ do_quay_login() {
   persist_var QUAY_USER "${QUAY_USER}"
   persist_var QUAY_URL "${QUAY_URL}"
   echo "Using Quay at ${QUAY_URL}"
+  wait_for_quay "${QUAY_URL}" || return 1
   podman login "${QUAY_URL}" -u "${QUAY_USER}" -p "${QUAY_PASSWORD}"
 }
 
