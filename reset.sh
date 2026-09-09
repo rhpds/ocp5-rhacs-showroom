@@ -118,7 +118,7 @@ echo ""
 echo "--- Resetting ACS exercise state ---"
 
 # Before You Begin: Delete ACS ConsoleLink (AI may name it differently)
-for cl in $(oc get consolelink -o json 2>/dev/null | jq -r '.items[] | select(.spec.href | test("central-rhacs-operator")) | .metadata.name'); do
+for cl in $(oc get consolelink -o json 2>/dev/null | jq -r '.items[] | select(.spec.href | test("central-reencrypt-stackrox|central-rhacs-operator")) | .metadata.name'); do
   oc delete consolelink "$cl" --ignore-not-found 2>/dev/null || true
 done
 echo "  Deleted ACS ConsoleLink(s)"

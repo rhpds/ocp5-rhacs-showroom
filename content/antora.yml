@@ -10,22 +10,12 @@ asciidoc:
     lab_name: Red Hat OpenShift Security Roadshow
     release-version: master
     workshop_user_suffix: "1"
-    payment_gateway_namespace: payment-gateway-{workshop_user_suffix}
-    vulnerable_workload_namespace: vulnerable-workload-{workshop_user_suffix}
     page-pagination: true
-    # Aliases so roadshow modules resolve against OCP5 Showroom UserInfo
-    openshift_console_url: "{openshift_cluster_console_url}"
-    web_console_url: "{openshift_cluster_console_url}"
-    openshift_admin_user: "{openshift_cluster_admin_username}"
-    openshift_admin_password: "{openshift_cluster_admin_password}"
-    acs_route: "https://central-reencrypt-stackrox.{openshift_cluster_ingress_domain}"
-    acs_portal_username: "{openshift_cluster_admin_username}"
-    acs_portal_password: "{common_password}"
-    openshift_gitops_url: "https://openshift-gitops-server-openshift-gitops.{openshift_cluster_ingress_domain}"
-    quay_console_url: "https://quay.{openshift_cluster_ingress_domain}"
-    quay_url: "quay.{openshift_cluster_ingress_domain}"
+    # Cluster URLs and credentials are injected at RHDP runtime from
+    # ocp5_rhacs agnosticd_user_info. Do not compose them here with
+    # {other_attribute} — Antora does not interpolate YAML attribute values.
+    # Static local-preview fallbacks (overridden by UserInfo on RHDP):
     quay_admin_username: admin
-    quay_admin_password: "{common_password}"
     quay_user: admin
     student_username: student
     cosign_version: v2.4.3

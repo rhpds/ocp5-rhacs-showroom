@@ -3,6 +3,8 @@
 :sectnums:
 :icons: font
 
+include::partial$_attributes.adoc[]
+
 == Module Goals
 * Set up the Compliance Operator
 * Understand the Compliance dashboard

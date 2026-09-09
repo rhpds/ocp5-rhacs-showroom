@@ -3,6 +3,8 @@
 :sectnums:
 :icons: font
 
+include::partial$_attributes.adoc[]
+
 == Module Goals
 
 * Access the OpenShift, RHACS, and Quay consoles used throughout the roadshow

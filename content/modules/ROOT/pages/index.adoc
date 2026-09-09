@@ -1,5 +1,7 @@
 = {lab_name}
 
+include::partial$_attributes.adoc[]
+
 This course offers hands-on experience with Kubernetes-native security on Red Hat^(R)^ OpenShift Container Platform—covering platform foundations, Advanced Cluster Security (RHACS), and Trusted Software Supply Chain (TSSC). Each module ends with a practical *task* so you apply what you learned before moving on.
 
 == How this Roadshow works

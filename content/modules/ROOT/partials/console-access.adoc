@@ -1,3 +1,5 @@
+include::partial$_attributes.adoc[]
+
 Use the consoles and credentials from xref:index.adoc[Home] for this exercise.
 
 [cols="1,1"]

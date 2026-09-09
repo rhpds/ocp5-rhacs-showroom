@@ -32,7 +32,7 @@ Each of these features is covered in more detail in the following sections. Part
 
 | ACS Central
 | `admin`
-| https://central-rhacs-operator.{openshift_cluster_ingress_domain}[ACS Central^]
+| {acs_route}[ACS Central^]
 |===
 
 * In the OpenShift Console, open the OpenShift Lightspeed dialog (the icon at the bottom right of the interface). Ask Lightspeed to create a shortcut to the ACS console:
@@ -402,7 +402,7 @@ Open a matching violation and review the runtime detail (file path, process cont
 +
 [source,bash,role="execute",subs="+attributes"]
 ----
-CENTRAL="https://central-rhacs-operator.{openshift_cluster_ingress_domain}"
+CENTRAL="{acs_route}"
 ACS_PASS=$(oc get secret central-admin-password -n rhacs-operator -o jsonpath='{.data.password}' | base64 -d)
 curl -sk -u "admin:${ACS_PASS}" -G "${CENTRAL}/v1/alerts/summary/groups" \
   --data-urlencode 'query=Policy:"Deployment File Activity"' | jq .
@@ -432,7 +432,7 @@ IMPORTANT: Plain `oc debug node` shells are classified as *deployment* events. T
 +
 [source,bash,role="execute",subs="+attributes"]
 ----
-CENTRAL="https://central-rhacs-operator.{openshift_cluster_ingress_domain}"
+CENTRAL="{acs_route}"
 ACS_PASS=$(oc get secret central-admin-password -n rhacs-operator -o jsonpath='{.data.password}' | base64 -d)
 curl -sk -u "admin:${ACS_PASS}" -G "${CENTRAL}/v1/alerts/summary/groups" \
   --data-urlencode 'query=Policy:"Node File Activity"' | jq .
@@ -568,7 +568,7 @@ Use this path if you want to connect Claude Code, Cursor, or Claude Desktop the 
 +
 [source,bash,role="execute",subs="+attributes"]
 ----
-CENTRAL="https://central-rhacs-operator.{openshift_cluster_ingress_domain}"
+CENTRAL="{acs_route}"
 ACS_PASS=$(oc get secret central-admin-password -n rhacs-operator -o jsonpath='{.data.password}' | base64 -d)
 curl -sk -u "admin:${ACS_PASS}" \
   -X POST "${CENTRAL}/v1/apitokens/generate" \
@@ -850,13 +850,13 @@ First, generate an API token and set the required environment variables:
 
 [source,bash,role="execute",subs="+attributes"]
 ----
-CENTRAL="https://central-rhacs-operator.{openshift_cluster_ingress_domain}"
+CENTRAL="{acs_route}"
 ACS_PASS=$(oc get secret central-admin-password -n rhacs-operator -o jsonpath='{.data.password}' | base64 -d)
 export ROX_API_TOKEN=$(curl -sk -u "admin:${ACS_PASS}" \
   -X POST "${CENTRAL}/v1/apitokens/generate" \
   -H "Content-Type: application/json" \
   -d '{"name":"skip-init-eval","roles":["Admin"]}' | jq -r .token)
-export ROX_ENDPOINT="central-rhacs-operator.{openshift_cluster_ingress_domain}:443"
+export ROX_ENDPOINT="{acs_host}:443"
 ----
 
 Then run the script from the `ea5-components` directory you cloned earlier:

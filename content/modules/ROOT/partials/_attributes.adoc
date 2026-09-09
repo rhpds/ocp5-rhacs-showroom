@@ -6,16 +6,29 @@
 // Common credentials
 :common_password: {common_password}
 
+// Console aliases (OCP5 UserInfo names + roadshow module names)
+:openshift_console_url: {openshift_cluster_console_url}
+:web_console_url: {openshift_cluster_console_url}
+:openshift_admin_user: {openshift_cluster_admin_username}
+:openshift_admin_password: {openshift_cluster_admin_password}
+
 // GitOps
 :gitops_user: {openshift_gitops_user}
 :gitops_password: {openshift_gitops_password}
+:openshift_gitops_url: https://openshift-gitops-server-openshift-gitops.{openshift_cluster_ingress_domain}
 
-// ACS
+// ACS — reencrypt route host must match GitOps routeHost
 :acs_namespace: rhacs-operator
+:acs_host: central-reencrypt-stackrox.{openshift_cluster_ingress_domain}
+:acs_route: https://central-reencrypt-stackrox.{openshift_cluster_ingress_domain}
+:acs_portal_username: admin
+:acs_portal_password: {common_password}
+
+// Quay
+:quay_url: quay.{openshift_cluster_ingress_domain}
+:quay_console_url: https://quay.{openshift_cluster_ingress_domain}
+:quay_admin_password: {common_password}
 
 // VM
 :vm_user: cloud-user
 :vm_password: {common_password}
-
-// Images directory
-:imagesdir: ../assets/images

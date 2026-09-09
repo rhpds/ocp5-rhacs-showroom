@@ -84,7 +84,7 @@ detect_rhacs_namespace() {
 rox_central_route_host() {
   local ns="${1}"
   local route host
-  for route in central central-reencrypt; do
+  for route in central-reencrypt central; do
     host="$(oc -n "${ns}" get route "${route}" -o jsonpath='{.spec.host}' 2>/dev/null || true)"
     if [[ -n "${host}" ]]; then
       printf '%s' "${host}"

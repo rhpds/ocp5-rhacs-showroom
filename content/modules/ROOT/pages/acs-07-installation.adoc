@@ -3,6 +3,8 @@
 :sectnums:
 :icons: font
 
+include::partial$_attributes.adoc[]
+
 == Module goals
 .Goals
 - Deploy RHACS Cloud Service Central Instance
