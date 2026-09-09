@@ -5,7 +5,7 @@ Instructors score attendee progress by reading completion markers written when e
 Markers live in `~/.acs-roadshow/progress` as one line per module:
 
 ```text
-Module 00 done
+Module acs-00 done
 Module 101-01 done
 ```
 
@@ -33,7 +33,7 @@ See [bastions.example.csv](bastions.example.csv).
 
 ## Usage
 
-Score **all** roadshow modules by default (ACS `00`–`10`, `101-*`, `201-*`, `301-*`, `tssc-*`) across every row in a CSV:
+Score **all** roadshow modules by default (ACS `acs-00`–`acs-07`, `101-*`, `201-*`, `301-*`, Lightwell `tssc-01`–`tssc-18`) across every row in a CSV:
 
 ```bash
 python3 main.py --csv bastions.csv
@@ -44,7 +44,7 @@ Score a custom subset (for example a role-track event):
 ```bash
 python3 main.py --csv bastions.csv --modules 101-01,101-02,101-03
 # ACS-only:
-python3 main.py --csv bastions.csv --modules 00,01,02,03,04,05,06,07
+python3 main.py --csv bastions.csv --modules acs-00,acs-01,acs-02,acs-03,acs-04,acs-05,acs-06,acs-07
 ```
 
 Quick single-host test:

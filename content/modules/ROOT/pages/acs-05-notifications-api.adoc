@@ -75,7 +75,7 @@ NOTE: For Microsoft Teams, use *Notifier Integrations → Microsoft Teams* with 
 
 == Configure notifications
 
-Attach the notifier to a policy you already have. This lab reuses *No bash allowed* from xref:02-acs-policy-and-risk.adoc[02 Policy and Risk].
+Attach the notifier to a policy you already have. This lab reuses *No bash allowed* from xref:acs-02-policy-and-risk.adoc[02 Policy and Risk].
 
 *Procedure*
 
@@ -97,7 +97,7 @@ image::08-not-2.png[link=self, window=blank, width=100%]
 . Go to Policy behavior - actions. There should be your slack-alerts (and teams-alerts, if you added Teams) notifier options available:
 . Click the desired notifier(s) and save the policy:
 
-IMPORTANT: Run the following command if you have not created the policy in xref:02-acs-policy-and-risk.adoc[02]:
+IMPORTANT: Run the following command if you have not created the policy in xref:acs-02-policy-and-risk.adoc[02]:
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
@@ -257,7 +257,7 @@ oc exec -n payment-gateway-{workshop_user_suffix} -it pod/payment-gateway -- /bi
 
 == Summary
 
-You wired a notifier, attached it to a policy, and called the Central API. Next: xref:06-acs-network-and-runtime.adoc[Network and Runtime Security].
+You wired a notifier, attached it to a policy, and called the Central API. Next: xref:acs-06-network-and-runtime.adoc[Network and Runtime Security].
 
 image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcjJmczc4MmswYmk1cnhvZ254ZXBiZ2M3bGJzbDV5eDQ3OGlqNWdwdyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/QSSA5Bd56W25ytLIwz/giphy.gif[link=self, window=blank, width=100%, class="center"]
 
@@ -265,5 +265,5 @@ image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcjJmczc4MmswYmk1cnhvZ254
 
 Before moving to the next module, run the lab cleanup script to reset transient resources from this module.
 
-:lab-cleanup-module: 05
+:lab-cleanup-module: acs-05
 include::partial$lab-cleanup.adoc[]

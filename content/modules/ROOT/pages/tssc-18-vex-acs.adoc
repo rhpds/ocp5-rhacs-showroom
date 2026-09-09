@@ -1,0 +1,173 @@
+= 7.2 VEX blast radius + ACS
+:source-highlighter: rouge
+:toc:
+:toclevels: 2
+
+*C+:* Pull Lightwell *GAV-bound* CycloneDX + VEX for the Track 2 pin from Nexus, ingest it into TPA, and write a blast-radius report: that advisory is remediated *via the Lightwell pin*, not still-open upstream. Hummingbird / Red Hat CSAF is an *OS-layer callout* — not the Check. Live CSAF importer stays off.
+
+ACS (`acs-image-check`) must not be the soft-skip stub. ACS is *not* the admission gate (that was xref:tssc-15-gitops-admission.adoc[6.1]).
+
+== How this serves TSSC
+
+TSSC continuous compliance is: the SoR says the library CVE is remediated *because you pinned Lightwell*, and the pipeline ACS check is actually on. 7.2 is the observation of GAV-bound Lightwell Network metadata (OSV `LW-DEMO-0002` + Maven classifier CDX) versus OS-layer Hummingbird CSAF. Consultants over-claim when they quote RHEL CSAF for a library CVE.
+
+You learn Nexus download + TPA `/api/v3/sbom` and `/api/v3/advisory`, plus blast-radius tokens (`via-lightwell-pin`), because scanners and TPA only recognize the pin if that metadata is ingested. ACS `fail-on-skipped: true` proves the control is not a stub.
+
+Lightwell Clearinghouse Premier member advisories ingest the same way. The report would still say via-Lightwell-pin (member version), never via-upstream and never via-Hummingbird-CSAF. Public OSV/VEX on this Check is the *post-disclosure* Network state. During a Premier embargo, that advisory would stay member-private (off public scanner feeds) until disclosure; ACS can still scan the image.
+
+== Learning objectives
+
+By the end of this module, you will be able to:
+
+* Observe TSSC’s continuous-compliance control: TPA shows the Track 2 GAV as remediated via the Lightwell pin, and `acs-image-check` is not skipped
+* Download CDX from Nexus and the scored OSV (`LW-DEMO-0002`), ingest them, and report id + status + GAV + “via Lightwell”
+* Contrast library VEX (Network post-disclosure, and Premier member advisories, including embargoed metadata that is not yet public) with OS-layer Hummingbird CSAF
+* Show `acs-image-check` as `passed` or `failed`, not `skipped`
+
+== Layer map: library VEX vs OS CSAF
+
+// VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/53
+image::vex-library-vs-os-layer.png[Library Lightwell GAV VEX versus OS-layer Hummingbird CSAF,width=700,link=self,window=blank]
+
+Consultants over-claim when they quote RHEL/Hummingbird CSAF for a *library* CVE. The scored layer is the `.rhlw-*` GAV you pinned in xref:tssc-04-remediated-pin.adoc[2.2].
+
+// VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/111
+image::tssc-artifact-trust-chain.png[End-state trust chain: Hummingbird digest, Lightwell GAV, signed app, TPA VEX,width=700,link=self,window=blank]
+
+== Delivery note
+
+*Customers* get VEX that travels with the remediated GAV. After disclosure that VEX is public (this Check). During a Premier embargo it stays in the member set. *You* pull the public Network files from the enterprise proxy (Nexus) and put them in the SoR. *Red Hat* CSAF is a different layer.
+
+== Discover the scored VEX (not the spring-core sample)
+
+[source,bash,role=execute]
+----
+oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
+  -o jsonpath='id={.data.scored_vex_id}{"\n"}gav={.data.scored_vex_gav}{"\n"}cdx={.data.scored_vex_maven_cdx}{"\n"}vex={.data.scored_vex_maven_vex}{"\n"}osv={.data.scored_vex_osv}{"\n"}csaf={.data.live_csaf_gate}{"\n"}'
+oc -n trusted-profile-analyzer get configmap rhtpa-ingestion-info \
+  -o jsonpath='{.data.upload_hint}{"\n"}{.data.os_layer_callout}{"\n"}'
+----
+
+* *Scored:* `LW-DEMO-0002` / `org.apache.commons:commons-lang3` / `3.14.0.rhlw-00001`
+
+== Worked example (not the Check)
+
+Spring-core / `LW-DEMO-0001` and “fixed upstream.” If the blast-radius ConfigMap uses these tokens, the Check fails.
+
+[source,text]
+----
+# Worked example ONLY — different advisory, different GAV, wrong remediation.
+vulnerability_id: LW-DEMO-0001
+gav: org.springframework:spring-core:5.3.18.rhlw-00003
+status: fixed
+remediation: via-upstream
+----
+
+== Your change: download, ingest, report, ACS on
+
+. Download Maven classifier `cdx` from the userinfo URL (Nexus Remediated) and POST it to TPA `/api/v3/sbom`. The companion `-vex.json` classifier is **OpenVEX** — TPA does not accept OpenVEX as an SBOM or as `/api/v3/advisory` (that path is CSAF, CVE, or OSV only). Ingest the scored **OSV** document instead (`scored_vex_osv` / `LW-DEMO-0002.json`). Do not scrape CSAF. Do not POST OpenVEX to `/api/v3/sbom`.
+
+. Upload the CycloneDX file to `/api/v3/sbom` and the OSV file to `/api/v3/advisory` (same SoR as 7.1). Provision does *not* pre-ingest them. Keep `live_csaf_gate=false`.
+
+[source,bash,role=execute]
+----
+CDX_URL="$(oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo -o jsonpath='{.data.scored_vex_maven_cdx}')"
+OSV_URL="$(oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo -o jsonpath='{.data.scored_vex_osv}')"
+curl -fsSL -o ~/commons-lang3-cdx.json "${CDX_URL}"
+curl -fsSL -o ~/LW-DEMO-0002.json "${OSV_URL}"
+export OIDC_ISSUER="$(oc -n sso get configmap demo-userinfo-keycloak -o jsonpath='{.data.oidc_issuer}')"
+export RHTPA_URL="$(oc -n trusted-profile-analyzer get configmap rhtpa-ingestion-info -o jsonpath='{.data.server_url}')"
+export TPA_USER="$(oc -n sso get configmap demo-userinfo-keycloak -o jsonpath='{.data.workshop_username}')"
+: "${TPA_PASS:=$(oc -n sso get configmap demo-userinfo-keycloak -o jsonpath='{.data.workshop_password}')}"
+export CLI_SECRET="$(oc -n trusted-profile-analyzer get secret tpa-realm-cli-clients -o jsonpath='{.data.cli}' | base64 -d)"
+TOKEN="$(curl -sk -X POST "${OIDC_ISSUER}/protocol/openid-connect/token" \
+  -d grant_type=password -d client_id=cli -d client_secret="${CLI_SECRET}" \
+  -d username="${TPA_USER}" -d password="${TPA_PASS}" -d scope=openid \
+  | jq -r .access_token)"
+curl -sk -X POST -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @"${HOME}/commons-lang3-cdx.json" \
+  -w '\nCDX HTTP %{http_code}\n' \
+  "${RHTPA_URL%/}/api/v3/sbom"
+curl -sk -X POST -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @"${HOME}/LW-DEMO-0002.json" \
+  -w '\nOSV HTTP %{http_code}\n' \
+  "${RHTPA_URL%/}/api/v3/advisory"
+----
+
+// VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/57
+image::tpa-gav-vex-ingested.png[TPA UI after ingesting GAV-bound VEX for LW-DEMO-0002,width=700,link=self,window=blank]
+
+. Write ConfigMap `stub-18-blast-radius` (extract, fill, write back). Placeholders fail. Allowed tokens (the Check grades these):
+
+[source,text]
+----
+vulnerability_id: REPLACE_ME_VEX_ID
+gav: REPLACE_ME_GAV
+status: REPLACE_ME_STATUS
+remediation: REPLACE_ME_VIA
+----
+
+Fill with `LW-DEMO-0002`, the remediated GAV (include `3.14.0.rhlw-00001`), status `fixed` (or `not_affected` if the VEX statement uses that), and remediation `via-lightwell-pin`. Do *not* claim the upstream `3.14.0` is fixed. Do *not* use `LW-DEMO-0001`.
+
+.Extract the incomplete seed, then write it back after you fill the keys
+[source,bash,role=execute]
+----
+oc -n lightwell-repo get configmap stub-18-blast-radius \
+  -o jsonpath='{.data.blast-radius\.txt}' > ~/track-7-2-blast-radius.txt
+# edit ~/track-7-2-blast-radius.txt, then:
+oc -n lightwell-repo create configmap stub-18-blast-radius \
+  --from-file=blast-radius.txt=$HOME/track-7-2-blast-radius.txt \
+  --dry-run=client -o yaml | oc apply -f -
+----
+
+. ACS: confirm Job `rhacs-ci-token-mint` in `stackrox` is Complete. That Job mints Secret `rhacs-ci-secrets` and copies it into your build namespace (`student_build_namespace`) so `acs-image-check` can mount it. Provision also registers the in-cluster registry with Central — do not add an image integration by hand. On the learner Pipeline, pass `fail-on-skipped: "true"` on `acs-image-check` (seeded default is soft-skip). Re-run if the last TaskRun was `skipped`. Expect `passed` or `failed` — both prove the control is *on*. Do not screenshot Central as this Check.
+
+== Check: report tokens + ACS not skipped
+
+[source,bash,role=execute]
+----
+BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
+grep -E 'REPLACE_ME' ~/track-7-2-blast-radius.txt && echo 'STILL HAS PLACEHOLDERS' || echo 'placeholders gone'
+grep -E 'LW-DEMO-0002|3.14.0.rhlw-00001|via-lightwell-pin' ~/track-7-2-blast-radius.txt
+oc -n lightwell-repo get configmap stub-18-blast-radius \
+  -o jsonpath='{.data.blast-radius\.txt}' | grep -E 'LW-DEMO-0002|3.14.0.rhlw-00001|via-lightwell-pin'
+oc -n stackrox get job rhacs-ci-token-mint
+oc -n "${BUILD_NS}" get secret rhacs-ci-secrets
+oc -n "${BUILD_NS}" get tr -l tekton.dev/pipelineTask=acs-image-check
+----
+
+Pass when: Nexus GAV files were ingested; the report has the scored id + GAV + via-Lightwell token and no `REPLACE_ME`; `acs-image-check` is not `skipped`; CSAF importer is still off.
+
+:report-name: report-18-vex-acs
+:report-key: vex_layer
+:report-token: gav-bound
+include::partial$validate-job-report.adoc[]
+
+:validate-job: validate-18-vex-acs
+:validate-job-template: job-18.yaml
+include::partial$validate-job-rerun.adoc[]
+
+== Official documentation
+
+* link:{docs-rhtpa-url}[Trusted Profile Analyzer overview^] (SBOM and advisory ingest)
+* link:{docs-rhacs-url}[Evaluate security risks in Advanced Cluster Security^]
+* link:{docs-lwn-choose-repo-url}[Lightwell Network Validated vs Remediated^]
+* link:{docs-lwn-lifecycle-url}[Patch delivery lifecycle^] (this Check is public Disclosure / OSV / VEX)
+* link:{lightwell-product-url}[Lightwell Network and Clearinghouse Premier^]
+
+== Callouts (not Checks)
+
+* Hummingbird / RHEL CSAF = OS layer. Do not score it.
+* PyPI VEX/SPDX is the same “metadata travels with the pin” idea (`+rhlw.*` on `requirements.txt`). This Check is the Maven GAV from Track 2.
+* Artifactory can host the same GAV-bound CDX/VEX classifiers beside the Maven GAV (local/generic or the remote cache). It is not installed on this claim; this Check downloads from Nexus Remediated.
+
+== Key takeaways
+
+* TSSC metadata travels with the `.rhlw-*` GAV consultants pin in a PoV (Lightwell Network post-disclosure; Premier member versions use the same ingest, embargoed until disclosure).
+* Wrong-layer VEX is how consultants over-claim.
+* ACS on is a pipeline control, not the 6.1 admission gate.
+
+:lab-cleanup-module: tssc-18
+include::partial$lab-cleanup.adoc[]

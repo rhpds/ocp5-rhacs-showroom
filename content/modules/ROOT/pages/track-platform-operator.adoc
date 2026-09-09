@@ -55,7 +55,7 @@ For deeper segmentation, also use NetworkPolicy foundations in 101-05 and coordi
 == Product deep-dives
 
 * xref:acs-INDEX.adoc[RHACS] — platform vulnerability, compliance, and policy operations
-* xref:tssc-INDEX.adoc[TSSC] — when supporting signing infrastructure consumers
+* xref:tssc-INDEX.adoc[Lightwell TSSC] — when supporting signing infrastructure consumers
 * xref:virt-INDEX.adoc[OpenShift Virtualization Security] — HCO feature gates, virt-handler files, virt RBAC, VM/storage isolation, and host kernel/firmware audits
 
 == Catalogs

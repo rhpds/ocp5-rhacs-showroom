@@ -270,7 +270,7 @@ Layer the runtime controls instead of stuffing everything into the SCC:
 * *Capabilities:* `requiredDropCapabilities: ["ALL"]`, then add back only what the process has proven it needs.
 * *seccomp:* pin `runtime/default` at minimum; use the xref:101-10-security-compliance-addons.adoc[Security Profiles Operator] when you need a recorded, workload-specific profile.
 * *SELinux:* keep `MustRunAs` (MCS labels). Do not relax to `RunAsAny` to silence a volume-permission failure.
-* *Drift:* RHACS (xref:06-acs-network-and-runtime.adoc[runtime policies]) should flag new `capabilities.add`, `privileged`, host mounts, and SCC annotation changes so a cluster-admin create does not silently bypass the exception you just designed.
+* *Drift:* RHACS (xref:acs-06-network-and-runtime.adoc[runtime policies]) should flag new `capabilities.add`, `privileged`, host mounts, and SCC annotation changes so a cluster-admin create does not silently bypass the exception you just designed.
 ====
 
 [NOTE]

@@ -1,0 +1,180 @@
+= 1.1 Verify Hummingbird
+:source-highlighter: rouge
+:toc:
+:toclevels: 2
+
+Track 1 starts on a *published* Project Hummingbird / Red Hat Hardened Images runtime — not a Universal Base Image (UBI) you already trust from muscle memory, and not an image this cluster mirrored for you.
+
+In this module you discover the workshop pin from cluster userinfo, complete the incomplete ConfigMap snippet (placeholders fail the Check), and run `cosign verify` against that *published* digest. You do *not* run `oc-mirror` yet. That is xref:tssc-02-hummingbird-mirror.adoc[1.2].
+
+This claim is *not* the Hummingbird factory (Fedora / Konflux on the inside). Consultants consume a signed catalog image.
+
+== How this serves TSSC
+
+TSSC requires a *named, signed runtime input*. If the base is unsigned UBI from memory, every later signature, SBOM, and admission decision sits on an unproven foundation. 1.1 is the observation that Red Hat Hardened Images (`hi/openjdk`) carry a Red Hat key you can verify *before* the image enters the cluster.
+
+You learn the *configuration* of that verify (`--key`, digest pin, not `:latest`) because customers will ask you to write the same snippet against *their* catalog pin. Getting the key URL or the digest wrong is how a PoV “uses Hummingbird” without a supply chain.
+
+Lightwell Network and Lightwell Clearinghouse Premier do *not* replace this step. They remediate *application* libraries. Hummingbird is the OS/runtime layer. Premier member-specific GAVs still need a verified base; they never become a substitute `FROM`.
+
+== Learning objectives
+
+By the end of this module, you will be able to:
+
+* Observe TSSC’s trusted-runtime control: a published Hardened Images digest that `cosign verify` accepts against the Red Hat key
+* Discover the scored pull spec from ConfigMap userinfo (do not invent a tag from memory)
+* Complete the verify snippet so no `REPLACE_ME_*` remains, then run it against the *published* digest you recorded
+* Explain that Lightwell (Network or Clearinghouse Premier) is the library layer, not this base; the catalog index may list other architectures (this Check is amd64 only)
+
+== Why verify before you mirror
+
+UBI is a general-purpose base. Red Hat Hardened Images (`registry.access.redhat.com/hi/…`) are a *minimal, signed* runtime: smaller attack surface, no package manager in the image, built for production constraints.
+
+A PoV that “uses Hummingbird” but never checks the signature is a story, not a supply chain. 1.1 proves the *published* coordinate. 1.2 copies that trust into the cluster dest. Track 3 is when application `FROM` switches — not here.
+
+// VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/49
+image::hummingbird-published-vs-dest.png[Published Hummingbird digest versus internal dest digest after learner oc-mirror,width=700,link=self,window=blank]
+
+[NOTE]
+====
+A Hummingbird Python runtime uses the same verify story (`hi/python` or the pin your catalog names). This Check is the Java `hi/openjdk` pin from userinfo.
+====
+
+== Delivery note
+
+*Customers* subscribe to Hardened Images and pin digests in their catalogs. *Red Hat* operates the factory and signing keys. *You* (this lab) consume the published pin, verify it, then mirror — you do not rebuild `openjdk` from source.
+
+== Prerequisites
+
+* Showroom terminal. `cosign` is already on `PATH` (copied in-cluster). Do *not* curl `github.com` for CLIs.
+* ConfigMaps `demo-userinfo-lightwell-repo` (namespace `lightwell-repo`) and `demo-userinfo-showroom` (namespace `showroom`).
+
+.Confirm the lab CLIs
+[source,bash,role=execute]
+----
+command -v cosign
+command -v oc-mirror
+oc -n showroom get configmap demo-userinfo-showroom \
+  -o jsonpath='{.data.lab_clis}{"\n"}{.data.do_not_curl_github}{"\n"}'
+----
+
+== Discover the published pin
+
+Do *not* paste a digest from chat, a slide, or this page’s narrative. The live pin is userinfo.
+
+.Read the source pull spec (what you verify in 1.1 and pin in 1.2)
+[source,bash,role=execute]
+----
+oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
+  -o jsonpath='{.data.hummingbird_source_pullspec}{"\n"}'
+----
+
+.Record the amd64 manifest digest (callout — the Check does not inspect architectures)
+[source,bash,role=execute]
+----
+oc -n showroom get configmap demo-userinfo-showroom \
+  -o jsonpath='{.data.hummingbird_amd64_manifest}{"\n"}{.data.hummingbird_source_registry}{"\n"}'
+----
+
+Keep both values. The pull spec’s `@sha256:…` is the *index* (it may list more than amd64). `hummingbird_amd64_manifest` is the platform digest this workshop scores. Dual-arch hands-on is out of this lab.
+
+== Worked example (not the Check)
+
+The following verifies a *different* image with a *non-Red Hat* key URL. If your Check uses this block unchanged, it fails.
+
+[source,bash]
+----
+# Worked example ONLY — ubi-minimal + a key that is not Red Hat Hardened Images.
+cosign verify \
+  --key https://example.invalid/not-redhat-hardened-images.pub \
+  --insecure-ignore-tlog \
+  registry.access.redhat.com/ubi9/ubi-minimal:latest
+----
+
+== Your change: complete the verify ConfigMap
+
+The scored object is ConfigMap `stub-01-hummingbird-verify` in `lightwell-repo` (not a file you invent only in Showroom home). Extract it, replace every `REPLACE_ME_*` with values you discovered (pull spec from userinfo; key URL from the Hardened Images verify documentation below), then write it back. Leave a placeholder and the Check fails. Do not copy the ubi-minimal worked example.
+
+.Extract the incomplete seed
+[source,bash,role=execute]
+----
+oc -n lightwell-repo get configmap stub-01-hummingbird-verify \
+  -o jsonpath='{.data.published-verify\.sh}' > ~/track-1-1-published-verify.sh
+----
+
+The seed looks like this (placeholders fail):
+
+[source,bash]
+----
+#!/usr/bin/env bash
+set -euo pipefail
+# Scored snippet — not paste-identical to the worked example.
+export HUMMINGBIRD_PUBLISHED='REPLACE_ME_HUMMINGBIRD_PULLSPEC'
+cosign verify \
+  --key REPLACE_ME_COSIGN_KEY \
+  --insecure-ignore-tlog \
+  "${HUMMINGBIRD_PUBLISHED}"
+----
+
+Red Hat documents key-based verify for Hardened Images (not in-cluster RHTAS Fulcio — that is Track 5, on *your* app image). On non-RHEL hosts the published pattern is:
+
+* `--key https://security.access.redhat.com/data/63405576.txt`
+* `--insecure-ignore-tlog`
+
+That host is Red Hat’s key distribution, not `github.com`. If the fetch is blocked on a locked-down claim, stop and tell an instructor — do not invent a Fulcio identity for this Check.
+
+See link:{docs-hardened-images-url}[Verify the integrity of Red Hat Hardened Images^] (key-based `cosign verify`, including `--key https://security.access.redhat.com/data/63405576.txt`).
+
+.Write the snippet back to the ConfigMap (after you filled the placeholders)
+[source,bash,role=execute]
+----
+chmod +x ~/track-1-1-published-verify.sh
+oc -n lightwell-repo create configmap stub-01-hummingbird-verify \
+  --from-file=published-verify.sh=$HOME/track-1-1-published-verify.sh \
+  --dry-run=client -o yaml | oc apply -f -
+grep -E 'REPLACE_ME' ~/track-1-1-published-verify.sh && echo 'STILL HAS PLACEHOLDERS' || echo 'placeholders gone'
+----
+
+== Check: published `cosign verify`
+
+.Run your snippet — expect a successful verify for the *published* `hi/openjdk` pin
+[source,bash,role=execute]
+----
+~/track-1-1-published-verify.sh
+----
+
+:report-name: report-01-hummingbird-verify
+:report-key: consume_published
+:report-token: consume-published
+include::partial$validate-job-report.adoc[]
+
+:validate-job: validate-01-hummingbird-verify
+:validate-job-template: job-01.yaml
+include::partial$validate-job-rerun.adoc[]
+
+Honor system: later modules still open if you skip this. The Validate Job grades the ConfigMap (no `REPLACE_ME`, digest matches userinfo) — not a screenshot of this terminal.
+
+Do *not*:
+
+* Pre-mirror or start Job `oc-mirror-learner` (that is 1.2)
+* Change the application `Dockerfile` `FROM` (Track 3)
+* Treat in-cluster RHTAS issuer/subject as this Check (those sign *your* app in Track 5)
+
+== Callout: multi-arch
+
+The catalog index for this pin may list arm64 alongside amd64. This cluster and this Check are amd64. You recorded `hummingbird_amd64_manifest` so you can say that in a customer conversation without running a second architecture in the lab.
+
+== Official documentation
+
+* link:{docs-hardened-images-url}[Verify the integrity of Red Hat Hardened Images^]
+* link:{lightwell-product-url}[Lightwell^] (Network and Clearinghouse Premier; complementary to Hardened Images, not a replacement)
+
+== Key takeaways
+
+* TSSC starts with a signed published runtime. Consultants consume Hummingbird; they do not rebuild the factory.
+* Verify the *published* digest before you mirror. 1.2 is a separate Check on the *internal* digest.
+* Lightwell Network / Clearinghouse Premier remediate libraries. They are not this `FROM`.
+* `cosign` was already on `PATH`. You did not download it from GitHub.
+
+:lab-cleanup-module: tssc-01
+include::partial$lab-cleanup.adoc[]

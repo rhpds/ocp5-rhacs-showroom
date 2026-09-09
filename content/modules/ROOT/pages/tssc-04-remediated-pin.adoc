@@ -1,0 +1,196 @@
+= 2.2 Remediated pin
+:source-highlighter: rouge
+:toc:
+:toclevels: 2
+
+2.1 proved Maven can see Lightwell through Nexus. Remediated artifacts are *exact-version* backports on the same upstream line (`3.14.0.rhlw-00001`), not “upgrade to latest”.
+
+In this module you read a Lightwell OSV `fixed` event, then change the *default* Maven property on ConfigMap `stub-04-remediated-pin`. Activating a profile that already contains the pin, without changing default, fails the Check. You commit this pin to learner-owned Gitea in Track 3 — not here.
+
+== How this serves TSSC
+
+TSSC’s answer to “the scanner is red but we cannot upgrade” is an *exact pin* that still matches the certified baseline. 2.2 is the observation that Lightwell Network Remediated names that pin in OSV (`fixed` → `.rhlw-*`), not in a slide.
+
+You learn to change the *default* Maven property because unused profiles hide the affected GAV in production trees. Track 7 VEX is bound to *this* GAV. If default stays `3.14.0`, the SoR will still show the CVE as open.
+
+Lightwell Clearinghouse Premier can remediate *member-specific* versions that are not in the public Network catalog. The TSSC control is identical: pin the exact version from the enterprise proxy, never bump to a newer upstream line. This lab’s scored GAV is the Network sample `3.14.0.rhlw-00001`, named by a *public* OSV `fixed` event.
+
+That public OSV is the *post-disclosure* end of the link:{docs-lwn-lifecycle-url}[patch delivery lifecycle^]. An *embargo* is the window *before* that disclosure: Premier members may already have the `.rhlw-*` GAV in the private proxy while public OSV/VEX do not exist yet. You would still pin from the proxy (this Check’s mechanic). You would not wait for a public advisory, and you would not invent a qualifier. There is no embargo artifact on this claim.
+
+== Learning objectives
+
+By the end of this module, you will be able to:
+
+* Observe TSSC’s exact-version remediation control: OSV `fixed` maps to a Lightwell Network `.rhlw-*` GAV, not to “latest”
+* Change the default `<commons.lang3.version>` (not only an unused profile) and show `mvn dependency:tree` resolving that GAV from Nexus Remediated
+* State that Clearinghouse Premier member-specific versions pin the same way, including during embargo (GAV in the proxy before public OSV)
+* Call out the Python PEP 440 `+rhlw.*` analogue
+
+== OSV `fixed` → `.rhlw-*` pin
+
+Production Lightwell OSV ids look like `RHLW-YYYY-NNNN`. This workshop uses deterministic `LW-DEMO-*` records.
+
+* *Worked example (not the Check):* `LW-DEMO-0001` / `org.springframework:spring-core` / `5.3.18.rhlw-00003`
+* *Scored:* `LW-DEMO-0002` / `org.apache.commons:commons-lang3` / `3.14.0.rhlw-00001`
+
+Upstream `3.14.0` stays affected. The Lightwell pin is the `fixed` event. Track 7 VEX is bound to *this* GAV.
+
+// VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/59
+image::osv-fixed-to-rhlw-pin.png[OSV fixed event mapped to a Maven default .rhlw pin,width=700,link=self,window=blank]
+
+== Delivery note
+
+*Customers* pin what the remediated GAV names. After disclosure, that name is in OSV `fixed`. *During a Premier embargo*, the name is in the private proxy first. *You* do not invent a qualifier. *Red Hat* publishes the remediated GAV; consultants do not rebuild `commons-lang3` from source in the PoV.
+
+== Discover the scored OSV (do not use the spring-core sample as the pin)
+
+.Userinfo keys for the Track 2 / Track 7 GAV
+[source,bash,role=execute]
+----
+oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
+  -o jsonpath='id={.data.scored_vex_id}{"\n"}gav={.data.scored_vex_gav}{"\n"}base={.data.scored_vex_base_version}{"\n"}'
+----
+
+.Scored OSV JSON — read `affected[].ranges[].events[].fixed`
+[source,bash,role=execute]
+----
+oc -n lightwell-repo get configmap lightwell-repo-seed \
+  -o jsonpath='{.data.LW-DEMO-0002\.json}'
+----
+
+.Worked example OSV (different GAV — pasting its `fixed` into your pom still fails)
+[source,bash,role=execute]
+----
+oc -n lightwell-repo get configmap lightwell-sample-osv \
+  -o jsonpath='{.data.LW-DEMO-0001\.json}'
+----
+
+Reuse 2.1 settings and a writable local repo:
+
+[source,bash,role=execute]
+----
+export MVN_LOCAL='-Dmaven.repo.local=/tmp/m2'
+test -f ~/track-2-1-settings.xml && echo '2.1 settings present' || echo 'complete 2.1 first'
+----
+
+== Worked example (not the Check)
+
+Spring-core / `LW-DEMO-0001`. If the default property on `stub-04-remediated-pin` is this pin, the Check fails.
+
+[source,xml]
+----
+<!-- Worked example ONLY — different GAV. Do not use as the default commons.lang3.version. -->
+<properties>
+  <commons.lang3.version>5.3.18.rhlw-00003</commons.lang3.version>
+</properties>
+----
+
+== Your change: complete the pin ConfigMap
+
+The scored object is ConfigMap `stub-04-remediated-pin` in `lightwell-repo`. Extract it to `~/track-2-2/pom.xml`. The stub’s *default* property is the affected upstream line. Change *only* that default to the `fixed` version from `LW-DEMO-0002`, then write the ConfigMap back. Do not rely on a profile id that already embeds the pin.
+
+.Extract the incomplete seed
+[source,bash,role=execute]
+----
+mkdir -p ~/track-2-2
+oc -n lightwell-repo get configmap stub-04-remediated-pin \
+  -o jsonpath='{.data.pom\.xml}' > ~/track-2-2/pom.xml
+----
+
+The seed looks like this (default `3.14.0` fails):
+
+[source,xml]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.redhat.lightwell.workshop</groupId>
+  <artifactId>track-2-2-pin</artifactId>
+  <version>0.0.1</version>
+  <properties>
+    <!-- Stub: affected upstream. Your change: OSV fixed from LW-DEMO-0002. -->
+    <commons.lang3.version>3.14.0</commons.lang3.version>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>${commons.lang3.version}</version>
+    </dependency>
+  </dependencies>
+</project>
+----
+
+Worked example pin (wrong GAV):
+
+[source,xml]
+----
+<!-- Worked example ONLY — spring-core, not the Check. -->
+<commons.lang3.version>5.3.18.rhlw-00003</commons.lang3.version>
+----
+
+.Write the pom back to the ConfigMap (after you replace `3.14.0` with the LW-DEMO-0002 fixed version)
+[source,bash,role=execute]
+----
+oc -n lightwell-repo create configmap stub-04-remediated-pin \
+  --from-file=pom.xml=$HOME/track-2-2/pom.xml \
+  --dry-run=client -o yaml | oc apply -f -
+grep commons.lang3.version ~/track-2-2/pom.xml
+----
+
+== Check: dependency tree shows `.rhlw-*` from Nexus
+
+Use the *remediated* profile from 2.1 settings so the GAV comes from Nexus, not Central.
+
+[source,bash,role=execute]
+----
+mvn -s ~/track-2-1-settings.xml ${MVN_LOCAL} -f ~/track-2-2/pom.xml \
+  -Plightwell-remediated dependency:tree
+----
+
+You should see `org.apache.commons:commons-lang3:jar:3.14.0.rhlw-00001` and a download path on your Nexus host. A tree that still shows plain `3.14.0`, `3.18.0`, or `5.3.18.rhlw-00003`, fails.
+
+:report-name: report-04-remediated-pin
+:report-key: pin_kind
+:report-token: exact-version
+include::partial$validate-job-report.adoc[]
+
+:validate-job: validate-04-remediated-pin
+:validate-job-template: job-04.yaml
+include::partial$validate-job-rerun.adoc[]
+
+Honor system: Track 3 still opens. The Validate Job grades the ConfigMap default property. The `~/track-2-2/pom.xml` copy is for `mvn -f`.
+
+Do *not*:
+
+* Commit to `workshop-templates` or GitHub
+* Treat a `lightwell-remediated-pins` profile as sufficient if default is still `3.14.0`
+* Bump `commons-lang3` to `3.18.0` (or any newer upstream). That is not Lightwell remediation.
+* Ingest VEX into TPA here (Track 7)
+
+== Callout: Python `+rhlw.*`
+
+The same exact-version idea on PyPI is a PEP 440 local version on `requirements.txt`, for example `lw-workshop-pypi==1.0.0+rhlw.00001`.
+
+== Callout: Artifactory and `.rhlw-*`
+
+The remediated GAV is the same coordinate on Artifactory. The *remote* must allow the `.rhlw-*` version suffix, and Maven still resolves it from the customer virtual — not from Central. This Check is the ConfigMap pom against Nexus Remediated.
+
+== Official documentation
+
+* link:{docs-lwn-choose-repo-url}[Choose the right repository^] (Validated vs Remediated, `.rhlw-0000X` suffix)
+* link:{docs-lwn-java-url}[Configure your Java build tool^] (Remediated profile you activate here)
+* link:{docs-lwn-lifecycle-url}[Patch delivery lifecycle^] (this Check is the public Disclosure / OSV step)
+* link:{lightwell-product-url}[Lightwell Network and Clearinghouse Premier^]
+
+== Key takeaways
+
+* TSSC remediates with an exact pin, not “latest”. That is Lightwell Network Remediated.
+* This Check uses public OSV. A Premier embargo is the same pin from the private proxy *before* that OSV exists.
+* Track 7 VEX is bound to this GAV (post-disclosure on this claim).
+* The scored pom lives in ConfigMap `stub-04-remediated-pin` until Track 3 owns git.
+
+:lab-cleanup-module: tssc-04
+include::partial$lab-cleanup.adoc[]

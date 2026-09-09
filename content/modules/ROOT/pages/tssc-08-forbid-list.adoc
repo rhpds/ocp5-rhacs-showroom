@@ -1,0 +1,127 @@
+= 4.1 Source forbid-list
+:source-highlighter: rouge
+:toc:
+:toclevels: 2
+
+Hermetic starts in *source*. Active build files must not fetch from the public internet: no leftover `curl` of random hosts, no Maven Central as the Lightwell remote, no `registry.access.redhat.com` / `registry.redhat.io` on the *active* Dockerfile `FROM` lines.
+
+xref:tssc-06-bind-base-deps.adoc[3.2] already pointed the *runtime* stage at dest Hummingbird. The *build* stage is still UBI on a public registry. 4.3 will deny that pull. While egress is still open, import a JDK builder into the internal registry and retarget the build `FROM`.
+
+This is not the prefetch Check (xref:tssc-09-prefetch.adoc[4.2]) and not the NetworkPolicy Check (xref:tssc-10-build-networkpolicy.adoc[4.3]).
+
+== How this serves TSSC
+
+TSSC hermetic production starts in git, not in a firewall ticket. 4.1 is the observation that Lightwell Network GAVs and dest Hummingbird only enter the image if active `Dockerfile` / `settings.xml` have no public fallback. A Central remote would bypass the proxy you configured in 2.1 the moment prefetch or NetworkPolicy is skipped.
+
+You learn the forbid patterns (`FROM` public registry, `curl`, public Maven index) and the internal ImageStream retarget because 4.3 will make those fetches fail for real. Keep `Dockerfile.known-bad` as the negative fixture 4.4 still uses.
+
+Lightwell Clearinghouse Premier does not add a public index. Member-specific GAVs must resolve from the *same* in-cluster Nexus service URL you point Maven at here.
+
+// VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/112
+image::forbid-list-public-vs-internal.png[Public FROM and Maven Central versus internal ImageStreams and Nexus so Lightwell GAVs stay inside the trust boundary,width=700,link=self,window=blank]
+
+== Learning objectives
+
+By the end of this module, you will be able to:
+
+* Observe TSSC’s hermetic-source control: active build files pull only internal ImageStreams and the enterprise Lightwell proxy
+* List the scored forbid patterns (`FROM` public registry, `curl` to the internet, public Maven index) and edit the files the BuildConfig actually uses until none remain
+* Keep a known-bad Dockerfile as a negative fixture
+* Explain that Network and Clearinghouse Premier artifacts must use `nexus_internal_url`, not Maven Central
+
+== Seeded violations
+
+Clone the learner app if needed (`student_repo_url`). Inspect:
+
+[source,bash,role=execute]
+----
+cd /tmp/spring-boot-lw-poc
+grep -nE 'FROM |curl |repo.maven.apache.org|registry.access.redhat.com|registry.redhat.io' Dockerfile settings.xml pom.xml || true
+----
+
+Expect at least: build-stage `FROM` UBI on `registry.access.redhat.com`, and `repo.maven.apache.org` in `settings.xml`.
+
+== Delivery note
+
+*Customers* enforce hermetic *source* policies (Konflux “no network in the Containerfile”). *You* grep and fix git. The cluster NetworkPolicy is a later gate.
+
+== Worked example (not the Check)
+
+[source,dockerfile]
+----
+# Worked example ONLY — different public host. Do not use as the active Dockerfile.
+FROM docker.io/library/eclipse-temurin:21-jdk
+RUN curl -fsSL https://example.invalid/install.sh | sh
+----
+
+== Your change: strip forbidden fetches; both FROM lines internal
+
+. While `build-egress` is still too open, import a JDK *builder* into `lw-poc-build` (do not invent a Hummingbird builder digest — use the UBI JDK stream already on the seed, copied *into* the internal registry). Import dest Hummingbird the same way — 3.2's runtime `FROM` is the Nexus Docker **Route**, which 4.3 blocks:
+
+[source,bash,role=execute]
+----
+BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
+oc -n "${BUILD_NS}" import-image openjdk-21-builder \
+  --from=registry.access.redhat.com/ubi9/openjdk-21:1.21 \
+  --confirm
+DEST="$(oc -n lightwell-repo logs job/oc-mirror-learner -c copy-signatures | grep '^DEST_PULLSPEC=' | cut -d= -f2-)"
+echo "DEST=${DEST}"
+oc -n "${BUILD_NS}" import-image hummingbird-openjdk \
+  --from="${DEST}" --confirm --insecure=true
+oc -n "${BUILD_NS}" get istag hummingbird-openjdk:latest \
+  -o jsonpath='{.image.dockerImageReference}{"\n"}'
+----
+
+. Point the Dockerfile *build* `FROM` at ImageStream `openjdk-21-builder` (internal registry). Point *runtime* `FROM` at ImageStream `hummingbird-openjdk` using the dest digest from 1.2 / 3.2 (`image-registry.openshift-image-registry.svc:5000/${BUILD_NS}/hummingbird-openjdk@sha256:…`). Do not leave `dest_registry_host` (the Nexus Docker Route) on an active `FROM` line. No `registry.access.redhat.com` on active `FROM` lines.
+
+. In `settings.xml`, remove `repo.maven.apache.org` from the Lightwell profiles. Point remotes at the *in-cluster* Nexus service (`nexus_internal_url` from userinfo — `http://nexus.lightwell-repo.svc:8081`), not the HTTPS Route. Add a `<mirror>` with `mirrorOf` `*` (or `external:*`) whose URL is `${nexus_internal_url}/repository/maven-public/`. Seeded `maven-public` includes Validated + Remediated so `.rhlw-*` pins resolve. 4.3 will block the Nexus Route from `lw-poc-build`; the service URL keeps working.
+
+. If `Dockerfile.known-bad` is missing from your clone, copy it from the seed (public `FROM` / `curl`). The template repo already includes it. Do *not* set it as the BuildConfig Dockerfile. 4.4 still uses that file as a negative.
+
+[source,bash,role=execute]
+----
+cd /tmp/spring-boot-lw-poc
+git add Dockerfile settings.xml Dockerfile.known-bad
+git commit -m "Forbid-list: internal FROM and Nexus-only Maven remotes"
+git push origin HEAD
+----
+
+== Check: scan of active files
+
+[source,bash,role=execute]
+----
+cd /tmp/spring-boot-lw-poc
+git show HEAD:Dockerfile | grep -E '^FROM '
+git show HEAD:settings.xml | grep -E 'repo.maven.apache.org|lightwell-repo' || true
+test -f Dockerfile.known-bad && echo 'known-bad fixture present'
+----
+
+Pass when active `Dockerfile` / `settings.xml` have no public `FROM`, no dest-registry Route, no Central, no `curl` installers — and `Dockerfile.known-bad` still exists. Both `FROM` lines use the internal registry.
+
+:report-name: report-08-forbid-list
+:report-key: hermetic_starts
+:report-token: source
+include::partial$validate-job-report.adoc[]
+
+:validate-job: validate-08-forbid-list
+:validate-job-template: job-08.yaml
+include::partial$validate-job-rerun.adoc[]
+
+Honor system: 4.2 still opens.
+
+== Callout: pip forbid-list
+
+On a pip app the same grep is `pypi.org` / public `index-url` in `requirements.txt` and `pip.conf`, not Maven Central. This Check is `Dockerfile` + `settings.xml`.
+
+== Official documentation
+
+* link:{docs-lwn-java-url}[Lightwell Network Java repository^] (the remotes that must remain after Central is gone)
+* xref:appendix-konflux-mapping.adoc[Konflux mapping] (hermetic source policies → this Check)
+
+== Key takeaways
+
+* TSSC hermetic starts in source, before NP and prefetch.
+* Lightwell Network / Clearinghouse Premier GAVs stay on the internal Nexus service. Mapping: Konflux hermetic source policies → this Check. Product names: xref:appendix-konflux-mapping.adoc[Konflux mapping].
+
+:lab-cleanup-module: tssc-08
+include::partial$lab-cleanup.adoc[]

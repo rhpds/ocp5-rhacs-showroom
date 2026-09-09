@@ -291,7 +291,7 @@ There are two ways to enforce deploy-time policies in RHACS:
 * With listen and enforce options enabled, RHACS rejects deployments that violate the policy using the admission controller.
 * When the admission controller is disabled, RHACS scales pod replicas to zero for deployments that violate the policy.
 
-Runtime process enforcement (for example, blocking `apk` in a running pod) is xref:06-acs-network-and-runtime.adoc[06 Network and Runtime Security]. Build-time gates with `roxctl image check` are xref:03-acs-cicd-and-automation.adoc[03 CI/CD].
+Runtime process enforcement (for example, blocking `apk` in a running pod) is xref:acs-06-network-and-runtime.adoc[06 Network and Runtime Security]. Build-time gates with `roxctl image check` are xref:acs-03-cicd-and-automation.adoc[03 CI/CD].
 
 === Prevent the Alpine Linux Package Manager in the Frontend Image from Being Deployed
 
@@ -498,7 +498,7 @@ Great job!
 
 RHACS does not simply surface vulnerabilities. You learned the various risk priority justifications RHACS provides, filtered and searched through these vulnerabilities, and enforced a deploy-time policy against the frontend image.
 
-Have fun with xref:03-acs-cicd-and-automation.adoc[CI/CD]!
+Have fun with xref:acs-03-cicd-and-automation.adoc[CI/CD]!
 
 image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbDR4amFzZ2ZiNGNkaTVwM3lscmxycDMzMnB4bTdwYWd0emlsOHJiYSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/qunFC4tNsyA8y9M36d/giphy.gif[link=self, window=blank, width=100%, class="center"]
 
@@ -506,5 +506,5 @@ image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbDR4amFzZ2ZiNGNkaTVwM3ls
 
 Before moving to the next module, run the lab cleanup script to reset transient resources from this module.
 
-:lab-cleanup-module: 02
+:lab-cleanup-module: acs-02
 include::partial$lab-cleanup.adoc[]

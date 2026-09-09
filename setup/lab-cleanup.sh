@@ -17,7 +17,7 @@ usage() {
   cat <<'EOF'
 Usage: lab-cleanup.sh --module MODULE
 
-MODULE examples: 00-07 (ACS), 101-01, 201-06, 301-08, tssc-00, virt-00
+MODULE examples: acs-00, 101-01, 201-06, 301-08, tssc-01, virt-00
 EOF
 }
 
@@ -35,7 +35,7 @@ if [[ -z "${MODULE}" ]]; then
   exit 1
 fi
 
-if [[ ! "${MODULE}" =~ ^(0[0-7]|101-[0-9]{2}|201-[0-9]{2}|301-[0-9]{2}|tssc-0[0-2]|virt-0[0-7])$ ]]; then
+if [[ ! "${MODULE}" =~ ^(0[0-7]|acs-0[0-7]|101-[0-9]{2}|201-[0-9]{2}|301-[0-9]{2}|tssc-0[0-9]|tssc-1[0-8]|module-0[1-9]|module-1[0-8]|virt-0[0-7])$ ]]; then
   echo "Error: unsupported module id '${MODULE}'" >&2
   usage
   exit 1
@@ -76,15 +76,15 @@ delete_projects() {
 echo "==> Cleaning up module ${MODULE} resources..."
 
 case "${MODULE}" in
-  00)
+  00|acs-00)
     rm -f /tmp/frontend-build.log /tmp/quay-push.log /tmp/rhacs-risk-notes.txt 2>/dev/null || true
     echo "Removed temporary image build logs and RHACS navigation scratch files."
     ;;
-  01)
+  01|acs-01)
     rm -f /tmp/vuln-report-*.txt 2>/dev/null || true
     echo "Removed temporary vulnerability report files."
     ;;
-  02)
+  02|acs-02)
     rm -f /tmp/process-baseline-notes.txt 2>/dev/null || true
     echo "Removed process discovery scratch files."
     if [[ -n "${ROX_API_TOKEN:-}" && -n "${ROX_CENTRAL_ADDRESS:-}" ]]; then
@@ -110,20 +110,20 @@ case "${MODULE}" in
       echo "Redeployed Skupper demo application."
     fi
     ;;
-  03)
+  03|acs-03)
     rm -f /tmp/audit-search-*.json 2>/dev/null || true
     echo "Removed temporary audit log query files."
     ;;
-  04)
+  04|acs-04)
     rm -f /tmp/compliance-notes.txt 2>/dev/null || true
     echo "Removed compliance review scratch files."
     ;;
-  05)
+  05|acs-05)
     rm -f /tmp/notification-test.log /tmp/api-response-*.json 2>/dev/null || true
     unset CLUSTER_ID 2>/dev/null || true
     echo "Removed notification and API scratch files."
     ;;
-  06)
+  06|acs-06)
     rm -f /tmp/netpol-*.yaml 2>/dev/null || true
     echo "Removed temporary network policy drafts."
     if [[ -n "${ROX_API_TOKEN:-}" && -n "${ROX_CENTRAL_ADDRESS:-}" ]]; then
@@ -145,7 +145,7 @@ case "${MODULE}" in
       echo "ROX_API_TOKEN / ROX_CENTRAL_ADDRESS not set; skipped runtime policy cleanup."
     fi
     ;;
-  07)
+  07|acs-07)
     rm -f /tmp/checkpointctl /tmp/checkpoint-payment-gateway_* 2>/dev/null || true
     echo "Removed CRIU checkpoint scratch files from /tmp."
     ;;
@@ -302,7 +302,7 @@ case "${MODULE}" in
     bash "${SCRIPT_DIR}/ztwim-lab/configure-ztwim-postgresql-lab.sh" cleanup
     rm -f /tmp/lab-301-08.txt /tmp/lab-scratch-* 2>/dev/null || true
     ;;
-  tssc-00|tssc-01|tssc-02)
+  tssc-00|tssc-0[1-9]|tssc-1[0-8]|module-0[1-9]|module-1[0-8])
     rm -f "/tmp/lab-${MODULE}.txt" /tmp/lab-scratch-* 2>/dev/null || true
     echo "Removed temporary lab files for module ${MODULE}."
     ;;

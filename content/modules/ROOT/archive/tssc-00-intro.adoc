@@ -1,3 +1,6 @@
+// Archived from pages/ when Lightwell TSSC (module-01..18) replaced this track.
+// Not in nav. Restore: copy to pages/ and add nav/xrefs.
+
 = Trusted Artifact Signer — Container Signing
 :toc:
 :sectnums:
@@ -30,7 +33,7 @@ IMPORTANT: Run the following command to ensure the environment is up to date:
 curl -fsSL https://raw.githubusercontent.com/redhat-tssc-tmm/security-roadshow/main/cosign_gitsign_installer.sh | bash
 ----
 
-This module uses the Quay image from xref:00-acs-setup-install-navigation.adoc#build-a-container-image[Build a container image]. Re-run that section if `$QUAY_USER` or `$QUAY_URL` are unset.
+This module uses the Quay image from xref:acs-00-setup-install-navigation.adoc#build-a-container-image[Build a container image]. Re-run that section if `$QUAY_USER` or `$QUAY_URL` are unset.
 
 [[setting-up-the-environment-variables]]
 === Setting up the environment variables

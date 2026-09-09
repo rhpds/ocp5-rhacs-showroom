@@ -8,7 +8,7 @@
 **Duration:** ~25 minutes
 
 == Overview
-xref:201-11-threat-modeling-control-mapping.adoc[201-11] Elevation of privilege / Tampering at *runtime*: a pod that was admitted can still run `dnf`, a shell gadget, or a packager. xref:06-acs-network-and-runtime.adoc[ACS 06] already killed Alpine `apk` on the patient-portal frontend. This lab does the same job for a **Red Hat UBI** workload: clone **Red Hat Package Manager Execution**, set **Inform and enforce** at **Runtime**, and prove RHACS **kills the pod** when `dnf`/`yum`/`microdnf` runs.
+xref:201-11-threat-modeling-control-mapping.adoc[201-11] Elevation of privilege / Tampering at *runtime*: a pod that was admitted can still run `dnf`, a shell gadget, or a packager. xref:acs-06-network-and-runtime.adoc[acs-06] already killed Alpine `apk` on the patient-portal frontend. This lab does the same job for a **Red Hat UBI** workload: clone **Red Hat Package Manager Execution**, set **Inform and enforce** at **Runtime**, and prove RHACS **kills the pod** when `dnf`/`yum`/`microdnf` runs.
 
 The sensor is the ACS Collector. The response is OpenShift killing the pod so cluster state stays consistent.
 
@@ -26,7 +26,7 @@ Deploy a UBI probe (and reuse xref:301-02-gitops-policy-compliance.adoc[301-02] 
 
 === Prerequisites
 
-* RHACS Central reachable (xref:00-acs-setup-install-navigation.adoc[ACS 00])
+* RHACS Central reachable (xref:acs-00-setup-install-navigation.adoc[acs-00])
 * Cluster-admin or permission to exec in the lab namespace
 * Collector running on worker nodes
 
@@ -56,7 +56,7 @@ TIP: Probe `Running`. Open the Central URL for Policy Management.
 ====
 In RHACS: **Platform Configuration → Policy Management**. Search **Red Hat Package Manager Execution** (criteria include `yum` / `dnf` / `rpm` / `microdnf`).
 
-If you already cloned the Alpine policy in ACS 06, leave it. This clone is the UBI equivalent.
+If you already cloned the Alpine policy in acs-06, leave it. This clone is the UBI equivalent.
 
 TIP: Open the policy and confirm it is **Runtime** capable and currently **Inform** (or disabled). You will clone, not edit the default.
 ====
@@ -79,7 +79,7 @@ Then **Policy Behavior → Actions**:
 
 Save the policy.
 
-TIP: Same click path as xref:06-acs-network-and-runtime.adoc#runtime-enforce[ACS 06 runtime enforce], different policy name.
+TIP: Same click path as xref:acs-06-network-and-runtime.adoc#runtime-enforce[acs-06 runtime enforce], different policy name.
 ====
 
 === Part C: Trigger the kill
@@ -116,7 +116,7 @@ TIP: If 301-02 is up, you now have a digest-pinned Python service *and* a UBI pr
 
 == Debrief
 
-RHACS runtime enforce **blocks the violating action** by killing the pod. That is EoP/Tampering at runtime, not a new detection product. Build-time is removing the packager from the image (xref:101-11-rebuilding-images.adoc[101-11], xref:201-04-shift-left-pipeline.adoc[201-04]). Deploy-time is xref:02-acs-policy-and-risk.adoc[ACS 02].
+RHACS runtime enforce **blocks the violating action** by killing the pod. That is EoP/Tampering at runtime, not a new detection product. Build-time is removing the packager from the image (xref:101-11-rebuilding-images.adoc[101-11], xref:201-04-shift-left-pipeline.adoc[201-04]). Deploy-time is xref:acs-02-policy-and-risk.adoc[acs-02].
 
 What breaks without this:
 

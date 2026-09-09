@@ -64,7 +64,7 @@ Runtime detection engineering is owned by xref:track-devsecops-engineer.adoc[Dev
 == Product deep-dives
 
 * xref:acs-INDEX.adoc[RHACS] — runtime, policy, and compliance architecture context
-* xref:tssc-INDEX.adoc[TSSC] — supply-chain provenance stack
+* xref:tssc-INDEX.adoc[Lightwell TSSC] — supply-chain provenance stack
 * xref:virt-INDEX.adoc[OpenShift Virtualization Security] — control map for CNV: least functionality on HCO, virt RBAC, storage isolation, and VM network segmentation
 
 == Catalogs

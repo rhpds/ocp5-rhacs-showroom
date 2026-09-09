@@ -1,0 +1,155 @@
+= 3.2 Bind base and deps in source
+:source-highlighter: rouge
+:toc:
+:toclevels: 2
+
+The seeded `Dockerfile` is *UBI OpenJDK 21* (wrong product for this PoV). `lightwell-pins.properties` is *stale on purpose* for 3.3. Your job in 3.2 is to commit, on `lw-student/spring-boot-lw-poc`:
+
+* Runtime `FROM` → the *mirrored* Hummingbird digest you recorded in xref:tssc-02-hummingbird-mirror.adoc[1.2]
+* Default Maven pin → the Track 2 remediated GAV (`3.14.0.rhlw-00001` from `LW-DEMO-0002`)
+
+Do *not* hand-edit `lightwell-pins.properties` (that file is the 3.3 bot Check). Do *not* copy a sample `FROM` from Showroom.
+
+== How this serves TSSC
+
+TSSC is only as strong as the pins in *source*. 3.2 is the observation that the dest Hummingbird digest (Track 1) and the Lightwell Network Remediated GAV (Track 2) are now the application’s declared inputs. Everything later (hermetic build, SBOM, VEX) reads these files.
+
+You learn to bind the *internal* digest and the *default* pom property because a UBI `FROM` or an unused profile would rebuild the untrusted seed. Customers pin digests in git, not `:latest`.
+
+Lightwell Clearinghouse Premier member-specific versions would replace the default GAV the same way. They still sit next to the dest Hummingbird `FROM`. Do not hand-edit `lightwell-pins.properties`; that is how 3.3 proves the bot, including a future Premier bump.
+
+== Learning objectives
+
+By the end of this module, you will be able to:
+
+* Observe TSSC’s bind-inputs control: source declares dest Hummingbird `FROM` and the Lightwell Network default pin together
+* Replace runtime `FROM` UBI with the dest Hummingbird digest pin (not the published 1.1 host, not `:latest`)
+* Put the Lightwell pin on the *default* `pom.xml` property in the learner repo; leave the pins file for Renovate
+* Explain that Clearinghouse Premier remediations would be the same default-property change once the GAV exists in the proxy
+
+== Why seed is UBI
+
+If the template already `FROM` Hummingbird, Track 3 is a screenshot. Consultants must bind the *internal* digest they mirrored — the same trust boundary as 1.2.
+
+// VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/49
+image::hummingbird-published-vs-dest.png[Published Hummingbird versus dest digest used in Dockerfile FROM,width=700,link=self,window=blank]
+
+== Delivery note
+
+*Customers* pin base images in git (digest, not `:latest`). *You* use dest registry coordinates, not `registry.access.redhat.com` on the runtime stage.
+
+== Clone the learner app remote
+
+[source,bash,role=execute]
+----
+export STUDENT_USER=student
+: "${STUDENT_PASS:=$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_password}')}"
+: "${REPO_URL:=$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_repo_url}')}"
+rm -rf /tmp/spring-boot-lw-poc
+git clone "${REPO_URL}" /tmp/spring-boot-lw-poc
+cd /tmp/spring-boot-lw-poc
+git remote -v
+grep -n FROM Dockerfile
+grep commons.lang3.version pom.xml | head -20
+cat lightwell-pins.properties
+----
+
+Expect runtime `FROM` `ubi9/openjdk-21-runtime` and a default `commons.lang3.version` of `3.14.0` (affected upstream). `3.18.0` (or any newer Central line) is the wrong fix. The pin is not yet `3.14.0.rhlw-00001`. Pins file should still show `3.14.0.rhlw-00000` and an all-zero Hummingbird digest.
+
+.Dest host (runtime FROM registry). `dest_registry_repo` is the Nexus Docker *repository name* (`hummingbird-mirror`), not the image path. Dest image path is `hi/openjdk`. Prefer the `DEST_PULLSPEC=` line from the 1.2 `copy-signatures` Job log.
+[source,bash,role=execute]
+----
+oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
+  -o jsonpath='dest={.data.dest_registry_host}{"\n"}internal={.data.dest_registry_internal_host}{"\n"}'
+echo 'Dest image path is hi/openjdk — not dest_registry_repo (hummingbird-mirror).'
+echo '3.2 uses dest_registry_host (Route). 4.1 retargets runtime FROM to an internal ImageStream so 4.4 still works after 4.3.'
+oc -n lightwell-repo logs job/oc-mirror-learner -c copy-signatures | grep '^DEST_PULLSPEC=' || true
+----
+
+== Worked example (not the Check)
+
+[source,dockerfile]
+----
+# Worked example ONLY — fake registry. Pasting this as FROM still fails.
+FROM registry.example.invalid/not-hummingbird:latest
+----
+
+== Your change: runtime FROM + default pin
+
+. Change *only* the runtime stage `FROM` (leave the `AS build` UBI line). Use dest host + path `hi/openjdk` + the *internal* digest from 1.2 (or paste `DEST_PULLSPEC`). Do *not* put `dest_registry_repo` (`hummingbird-mirror`) in the image path. Do not reuse the published `registry.access.redhat.com` pin from 1.1, and not `:latest`.
+
+. Change the *default* `<commons.lang3.version>` in `pom.xml` to the Track 2 pin (`3.14.0.rhlw-00001`). Do not stop at a profile that is never activated. You already practiced this on ConfigMap `stub-04-remediated-pin`; this commit is the scored git copy.
+
+. Do *not* edit `lightwell-pins.properties`.
+
+.If `git commit` reports unknown author identity, or `git push` cannot read a username (Showroom has no TTY for HTTPS auth)
+[source,bash,role=execute]
+----
+cd /tmp/spring-boot-lw-poc
+git config user.name student
+git config user.email student@workshop.local
+: "${STUDENT_USER:=$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_username}')}"
+: "${STUDENT_PASS:=$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_password}')}"
+hostpath="$(git remote get-url origin)"
+hostpath="${hostpath#https://}"
+hostpath="${hostpath#http://}"
+git remote set-url origin "https://${STUDENT_USER}:${STUDENT_PASS}@${hostpath}"
+----
+
+A later Showroom restart stores the same author and Gitea credentials in `~/.gitconfig` so later modules can keep `git commit` / `git push origin HEAD` as written.
+
+[source,bash,role=execute]
+----
+cd /tmp/spring-boot-lw-poc
+git add Dockerfile pom.xml
+git status
+git diff --cached
+git commit -m "Bind dest Hummingbird runtime and Lightwell default pin"
+git push origin HEAD
+----
+
+== Check: committed files on the learner remote
+
+[source,bash,role=execute]
+----
+cd /tmp/spring-boot-lw-poc
+git fetch
+git show HEAD:Dockerfile | grep -E '^FROM '
+git show HEAD:pom.xml | grep -A1 commons.lang3.version | head -20
+git show HEAD:lightwell-pins.properties
+----
+
+Pass when:
+
+* Runtime `FROM` is dest registry + `hi/openjdk` + digest (not `hummingbird-mirror`, not `ubi9/openjdk-21-runtime`, not the worked-example host)
+* Default pom property is `3.14.0.rhlw-00001`
+* `lightwell-pins.properties` is still stale (bot work)
+
+:report-name: report-06-bind-base-deps
+:report-key: runtime_from
+:report-token: dest-digest
+include::partial$validate-job-report.adoc[]
+
+:validate-job: validate-06-bind-base-deps
+:validate-job-template: job-06.yaml
+include::partial$validate-job-rerun.adoc[]
+
+Honor system: 3.3 still opens. Still-UBI runtime `FROM` fails this Check.
+
+== Callout: Python runtime `FROM`
+
+A Python app binds the same way: runtime `FROM` the *dest* Hummingbird Python digest (not `ubi9/python-*` on a public registry). The pin still comes from 1.2. This Check is the Java OpenJDK Dockerfile.
+
+== Official documentation
+
+* link:{docs-hardened-images-url}[Red Hat Hardened Images^] (the dest digest you bind)
+* link:{docs-lwn-java-url}[Configure your Java build tool^] (the GAV you bind)
+
+== Key takeaways
+
+* TSSC source of truth is the learner repo: dest Hummingbird plus Lightwell Network pin.
+* Clearinghouse Premier would change the same default property, not a side file.
+* 3.3 still requires a *bot* PR on the pins file.
+
+:lab-cleanup-module: tssc-06
+include::partial$lab-cleanup.adoc[]

@@ -370,7 +370,7 @@ Kubernetes Secrets and digest pins are still not signatures. Stronger supply-cha
 * xref:101-11-rebuilding-images.adoc[101-11] — rebuild on UBI so the image itself is OpenShift-ready
 * xref:201-10-admission-governance.adoc[201-10] — RHACM Policy (NIST / DISA / DoD CC SRG baseline) beyond a single CEL allow-list
 * xref:301-06-supply-chain-integrity.adoc[301-06] — signing, SBOM, and end-to-end provenance
-* xref:tssc-01-git-signing.adoc[TSSC git signing] — signed commits and trusted artifacts
+* xref:tssc-12-sign-keyless.adoc[Lightwell 5.1 keyless signing] — signed images and trusted artifacts
 
 NOTE: mirror public images into a registry you control; treat `:latest` as a demo habit, not production practice. Remove the ValidatingAdmissionPolicy objects in cleanup so they do not linger on the shared cluster.
 

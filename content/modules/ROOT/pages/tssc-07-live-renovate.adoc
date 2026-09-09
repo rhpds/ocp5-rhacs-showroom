@@ -1,0 +1,128 @@
+= 3.3 Live Renovate
+:source-highlighter: rouge
+:toc:
+:toclevels: 2
+
+A live Renovate CronJob must open a pull request on `lw-student/spring-boot-lw-poc` that updates stale `lightwell-pins.properties`. You *review and merge* that PR. A hand-edited commit, or copying the worked example, fails the Check.
+
+MintMaker is the name customers use for this bot in client engagements. This cluster does *not* install hosted Konflux MintMaker. Full term map: xref:appendix-konflux-mapping.adoc[Appendix: Konflux mapping].
+
+== How this serves TSSC
+
+TSSC cannot depend on a human noticing a new Lightwell version. 3.3 is the observation that pin refresh is a *bot PR against enterprise git*. You merge like a developer. A student-authored commit on the pins file is not that control.
+
+You learn to recognize `renovate-bot` as author and to wait for the CronJob because that is the PoV talking point: Network (and later Premier) remediations arrive as PRs, not as a paste into `pom.xml`.
+
+Lightwell Network catalog bumps (`.rhlw-00000` → `.rhlw-00001`, dest Hummingbird digest) are what this bot is seeded to see. Lightwell Clearinghouse Premier member-specific versions would appear the same way once Nexus (or Artifactory) has metadata the bot can read. During a Premier *embargo*, merge the pin; do not paste the CVE or advisory text into a public PR description.
+
+== Learning objectives
+
+By the end of this module, you will be able to:
+
+* Observe TSSC’s continuous-pin control: a merged PR from `renovate-bot` updates Lightwell and Hummingbird pins, not a hand-edit
+* Identify a PR authored by `renovate-bot` (not `student`) whose files include `lightwell-pins.properties`
+* Map “MintMaker” in a client engagement to this in-cluster bot, and say that Clearinghouse Premier remediations would use the same PR path
+
+== Why a bot PR
+
+Consultants do not babysit Maven pins by hand. Renovate (or MintMaker on hosted Konflux) opens PRs against *enterprise git* when a vetted version exists. Here the git is Gitea; learners never use `github.com` for this Check.
+
+Stale seed (do not “fix” these yourself). The bot opens *one* grouped PR that moves *both* lines:
+
+* `commons-lang3=3.14.0.rhlw-00000` → remediated `3.14.0.rhlw-00001` in Nexus
+* `hummingbird-digest` all-zero → dest digest after 1.2
+
+Merging only the Maven bump used to leave a second digest PR unmergeable on the same file. Do not hand-edit the leftover line.
+
+The CronJob retries about every 20 minutes.
+
+== Delivery note
+
+*Customers* run Renovate or MintMaker against their GitHub/GitLab. *Red Hat* does not operate that bot in this claim beyond the workshop CronJob. *You* merge like a developer on a PoV.
+
+== Confirm the bot is on the claim
+
+The chart is *default-off*. If the CronJob is missing, the claim did not enable `components.renovate` — tell an instructor; do not fake a PR.
+
+[source,bash,role=execute]
+----
+oc -n renovate get cronjob
+oc -n renovate get configmap demo-userinfo-renovate -o yaml
+oc -n renovate get configmap renovate-docs \
+  -o jsonpath='{.data.example-renovate-pr\.md}'
+----
+
+== Worked example (not the Check)
+
+A hand commit by `student` on `pom.xml` / Jackson. If that is what landed on `main`, the Check fails.
+
+[source,bash]
+----
+# Worked example ONLY — wrong author, wrong file. Do not commit this as the Check.
+git commit --author='student <student@example.invalid>' \
+  -m 'Bump jackson-databind' pom.xml
+----
+
+== Your change: merge the renovate-bot PR
+
+. In Gitea, open `lw-student/spring-boot-lw-poc` → *Pull Requests*.
+. The scored PR author is `renovate-bot`. Files must include `lightwell-pins.properties`. Both seed values (`rhlw-00000` and the all-zero digest) should move in that one PR.
+. Review, then merge on Gitea (do not `git commit` the same hunk as `student`).
+
+// VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/55
+image::gitea-renovate-bot-pr.png[Gitea pull request authored by renovate-bot on lightwell-pins.properties,width=700,link=self,window=blank]
+
+If no PR yet: wait for the next CronJob; check Job logs in namespace `renovate`. Maven bump should appear once Nexus remotes are up. Dest Docker bump needs 1.2. Retry. Do *not* push a student commit that edits the pins file.
+
+.After merge, refresh the clone
+[source,bash,role=execute]
+----
+cd /tmp/spring-boot-lw-poc
+git fetch origin
+git checkout main
+git pull --ff-only origin main
+git log -1 --format='%an %ae %s'
+cat lightwell-pins.properties
+----
+
+== Check: merged commit is the bot
+
+Pass when:
+
+* Latest merge (or the merge commit) author is `renovate-bot`, not `student`
+* `lightwell-pins.properties` moved off `rhlw-00000` / all-zero digest
+* You did not recreate that diff as a hand commit
+
+:report-name: report-07-live-renovate
+:report-key: who_changed_pins
+:report-token: renovate-bot
+include::partial$validate-job-report.adoc[]
+
+:validate-job: validate-07-live-renovate
+:validate-job-template: job-07.yaml
+include::partial$validate-job-rerun.adoc[]
+
+Honor system: Track 4 still opens. The Validate Job still rejects a seeded or student-authored pin bump.
+
+== Callout: pip pins
+
+Renovate on a PyPI app watches `requirements.txt` (or `pyproject.toml`) for `+rhlw.*` bumps the same way this Check watches `lightwell-pins.properties`. This Check is the Maven pins file on Gitea.
+
+== Callout: Artifactory datasources
+
+At a customer, Renovate (or MintMaker) often reads Maven metadata from Artifactory remotes/virtuals instead of in-cluster Nexus. The Check is still a `renovate-bot` PR on Gitea against this claim’s Nexus.
+
+== Official documentation
+
+* link:{docs-lwn-java-url}[Lightwell Network Java repository^] (the metadata Renovate reads through Nexus)
+* xref:appendix-konflux-mapping.adoc[Konflux mapping] (MintMaker → this CronJob)
+
+== Key takeaways
+
+* TSSC pin refresh is a bot PR on enterprise git (Gitea here; no `github.com` for learners).
+* Lightwell Network catalog bumps are this Check. Clearinghouse Premier member versions would use the same bot against the same proxy.
+* During embargo, merge the pin; do not paste the advisory into the PR body.
+* Binding `FROM` / pom default was 3.2; this Check is *who* changed the pins file.
+
+:lab-cleanup-module: tssc-07
+include::partial$lab-cleanup.adoc[]

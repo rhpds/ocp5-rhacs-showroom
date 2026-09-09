@@ -10,7 +10,7 @@
 == Overview
 xref:201-11-threat-modeling-control-mapping.adoc[201-11] Tampering at supply-chain depth. xref:201-04-shift-left-pipeline.adoc[201-04] already built FROM workshop `python-alpine-golden` and simulated cosign. This lab stays on the **Red Hat catalog Python image** (https://images.redhat.com/[images.redhat.com] / `ubi9/python-311`): inspect Red Hat signature metadata, treat ACS or `oc image info` as SBOM-adjacent evidence, and **deny tag-only Deployments** in a labeled namespace.
 
-Full Sigstore/TAS signing of *your* builds is xref:tssc-00-intro.adoc[TSSC-00]—do not install a second signing stack here unless TAS is already on the cluster.
+Full Sigstore/TAS signing of *your* builds is xref:tssc-12-sign-keyless.adoc[Lightwell 5.1]—do not install a second signing stack here unless TAS is already on the cluster.
 
 == Why it matters
 A GitOps deploy (xref:301-02-gitops-policy-compliance.adoc[301-02]) is only as strong as admission. If someone can still `oc create deploy --image=…:latest` in the same namespace, the digest pin was a suggestion.
@@ -151,7 +151,7 @@ TIP: Deployment created. Same rule 301-02 followed in GitOps.
 
 == Debrief
 
-Supply-chain integrity here is **catalog image + digest pin + admission**. Signing *your* builds remains TSSC-00 / 201-04. ACS deploy-time policies (xref:02-acs-policy-and-risk.adoc[ACS 02]) are the other admission door for CVEs and labels.
+Supply-chain integrity here is **catalog image + digest pin + admission**. Signing *your* builds remains TSSC-00 / 201-04. ACS deploy-time policies (xref:acs-02-policy-and-risk.adoc[acs-02]) are the other admission door for CVEs and labels.
 
 What breaks without this:
 

@@ -65,7 +65,7 @@ File Integrity Operator is **one** integrity step: AIDE on the *node* (kubelet c
 |A workload executed or wrote something the policy did not expect (package manager, crypto miner dropper, write to a sensitive path)
 |===
 
-Hands-on ACS runtime enforcement is xref:06-acs-network-and-runtime.adoc[ACS 06] (kill a pod that runs a package manager). Deeper hunting is xref:301-04-runtime-threat-detection.adoc[301-04]. This module stays on the node/FIO side.
+Hands-on ACS runtime enforcement is xref:acs-06-network-and-runtime.adoc[acs-06] (kill a pod that runs a package manager). Deeper hunting is xref:301-04-runtime-threat-detection.adoc[301-04]. This module stays on the node/FIO side.
 
 == What does it solve
 
@@ -332,7 +332,7 @@ What breaks without this:
 
 [IMPORTANT]
 ====
-Run File Integrity Operator on the nodes you care about (clear AIDE paths, alert into the same channel as other platform events, pair with node-hardening baselines). Add RHACS runtime policies for *pod* file and process activity—xref:06-acs-network-and-runtime.adoc[ACS 06] is the first enforcement lab. Compliance evidence for 11.5.2 / SI-7 is stronger when you can show both the node baseline and the workload runtime feed.
+Run File Integrity Operator on the nodes you care about (clear AIDE paths, alert into the same channel as other platform events, pair with node-hardening baselines). Add RHACS runtime policies for *pod* file and process activity—xref:acs-06-network-and-runtime.adoc[acs-06] is the first enforcement lab. Compliance evidence for 11.5.2 / SI-7 is stronger when you can show both the node baseline and the workload runtime feed.
 ====
 
 [NOTE]

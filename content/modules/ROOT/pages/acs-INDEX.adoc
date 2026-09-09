@@ -18,14 +18,14 @@ Audience and prerequisites:
 
 == Recommended Sequence
 
-. xref:00-acs-setup-install-navigation.adoc[Setup and Navigation]
-. xref:01-acs-vulnerability-management.adoc[Vulnerability Management]
-. xref:02-acs-policy-and-risk.adoc[Policy and Risk]
-. xref:03-acs-cicd-and-automation.adoc[CI/CD Automation and Integration]
-. xref:04-acs-compliance.adoc[Compliance]
-. xref:05-acs-notifications-api.adoc[Notifications, API, and Integrations]
-. xref:06-acs-network-and-runtime.adoc[Network and Runtime Security]
-. xref:07-acs-installation.adoc[Installation]
+. xref:acs-00-setup-install-navigation.adoc[Setup and Navigation]
+. xref:acs-01-vulnerability-management.adoc[Vulnerability Management]
+. xref:acs-02-policy-and-risk.adoc[Policy and Risk]
+. xref:acs-03-cicd-and-automation.adoc[CI/CD Automation and Integration]
+. xref:acs-04-compliance.adoc[Compliance]
+. xref:acs-05-notifications-api.adoc[Notifications, API, and Integrations]
+. xref:acs-06-network-and-runtime.adoc[Network and Runtime Security]
+. xref:acs-07-installation.adoc[Installation]
 . xref:acs.adoc[ACS 5 Capabilities]
 
 == RHACS Labs Index
@@ -34,35 +34,35 @@ Audience and prerequisites:
 |===
 |Lab | Title | Focus
 
-|xref:00-acs-setup-install-navigation.adoc[00]
+|xref:acs-00-setup-install-navigation.adoc[acs-00]
 |Setup and Navigation
 |Environment, consoles, dashboard, and search
 
-|xref:01-acs-vulnerability-management.adoc[01]
+|xref:acs-01-vulnerability-management.adoc[acs-01]
 |Vulnerability Management
 |CVE findings, prioritization, and reporting
 
-|xref:02-acs-policy-and-risk.adoc[02]
+|xref:acs-02-policy-and-risk.adoc[acs-02]
 |Policy and Risk
 |Risk scoring, filters, and deploy-time enforcement
 
-|xref:03-acs-cicd-and-automation.adoc[03]
+|xref:acs-03-cicd-and-automation.adoc[acs-03]
 |CI/CD and Automation
 |Pipeline gates and build-time checks
 
-|xref:04-acs-compliance.adoc[04]
+|xref:acs-04-compliance.adoc[acs-04]
 |Compliance
 |Compliance standards and assessment results
 
-|xref:05-acs-notifications-api.adoc[05]
+|xref:acs-05-notifications-api.adoc[acs-05]
 |Notifications, API, and Integrations
 |Notifiers, webhooks, and Central API
 
-|xref:06-acs-network-and-runtime.adoc[06]
+|xref:acs-06-network-and-runtime.adoc[acs-06]
 |Network and Runtime Security
 |Network graph, netpol, and runtime enforcement
 
-|xref:07-acs-installation.adoc[07]
+|xref:acs-07-installation.adoc[acs-07]
 |Installation and RHACS Cloud Service
 |Deployment options and RHACS Cloud Service
 

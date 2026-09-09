@@ -60,7 +60,7 @@ Core responsibilities (framework):
 Take these after Intermediate supply-chain labs (201-04 / 201-10) or alongside Advanced runtime and supply-chain labs:
 
 * xref:acs-INDEX.adoc[RHACS] — policy, CI/CD gates, runtime, and compliance workflows
-* xref:tssc-INDEX.adoc[TSSC] — Trusted Artifact Signer and Trusted Profile Analyzer
+* xref:tssc-INDEX.adoc[Lightwell TSSC] — Hummingbird through signed production containers, TPA, and ACS
 
 == Catalogs
 

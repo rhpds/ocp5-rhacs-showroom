@@ -1,3 +1,6 @@
+// Archived from pages/ when Lightwell TSSC (module-01..18) replaced this track.
+// Not in nav. Restore: copy to pages/ and add nav/xrefs.
+
 = Git Commit Signing with Trusted Artifact Signer
 :toc:
 :sectnums:
@@ -5,7 +8,7 @@
 
 == Prerequisites
 
-. Clone the workshop apps repo: xref:00-acs-setup-install-navigation.adoc#deploy-the-workshop-apps[Deploy the Workshop Applications]
+. Clone the workshop apps repo: xref:acs-00-setup-install-navigation.adoc#deploy-the-workshop-apps[Deploy the Workshop Applications]
 . Complete xref:tssc-00-intro.adoc[Container Signing setup] (environment variables + `cosign initialize`) unless already done.
 
 == Setting up gitsign

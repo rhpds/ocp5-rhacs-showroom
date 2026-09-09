@@ -20,3 +20,17 @@ tabs:
     url: 'https://central-reencrypt-stackrox.${DOMAIN}'
   - name: OpenShift GitOps
     url: 'https://openshift-gitops-server-openshift-gitops.${DOMAIN}'
+  - name: SSO (Keycloak)
+    url: 'https://sso.${DOMAIN}/realms/tpa/account/'
+    external: true
+  - name: RHTPA
+    url: 'https://server-trusted-profile-analyzer.${DOMAIN}'
+  - name: Nexus
+    url: 'https://nexus-lightwell-repo.${DOMAIN}'
+    external: true
+  - name: Gitea
+    url: 'https://gitea.${DOMAIN}'
+    external: true
+  - name: Developer Hub
+    url: 'https://backstage-developer-hub-rhdh.${DOMAIN}'
+    external: true

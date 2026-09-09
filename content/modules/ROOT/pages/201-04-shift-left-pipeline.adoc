@@ -30,7 +30,7 @@ Build a Tekton path FROM `python-alpine-golden` that refuses unscanned or unsign
 * OpenShift Pipelines (Tekton) Operator installed
 * Cosign installed locally, or simulate signing in the pipeline tasks
 * Lab setup already ran (`source ~/.bashrc` or `source ~/.acs-roadshow/env`): `QUAY_URL`, `QUAY_USER`, and the golden image `${QUAY_URL}/${QUAY_USER}/python-alpine-golden:0.1`
-* The `python-alpine-golden` repository is **public** in Quay (same Settings path as `frontend` in xref:00-acs-setup-install-navigation.adoc#navigating-the-registry[00-acs]) so the cluster can import it
+* The `python-alpine-golden` repository is **public** in Quay (same Settings path as `frontend` in xref:acs-00-setup-install-navigation.adoc#navigating-the-registry[acs-00]) so the cluster can import it
 
 Click each step only if you need a hint.
 

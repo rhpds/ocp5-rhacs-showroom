@@ -440,12 +440,12 @@ image::01-acs-nav.png[link=self, window=blank, width=100%, Navigation Menu]
 The left-hand navigation menu provides access to each of the security use cases, as well as product configuration to integrate RHACS with your existing tooling:
 
 - *Dashboard:* Summary view of your environment
-- *Network Graph:* Network flows, listening endpoints, and policy simulation — xref:06-acs-network-and-runtime.adoc[06 Network and Runtime Security]
-- *Violations:* Policy violation events and enforcement status — xref:06-acs-network-and-runtime.adoc[06]
-- *Compliance:* CIS, PCI-DSS, and STIG coverage — xref:04-acs-compliance.adoc[04 Compliance]
-- *Vulnerability Management:* Workload, platform, and node CVE views — xref:01-acs-vulnerability-management.adoc[01 Vulnerability Management]
-- *Configuration Management:* Misconfiguration and standards reporting — xref:02-acs-policy-and-risk.adoc[02 Policy and Risk]
-- *Risk:* Prioritized workloads — xref:02-acs-policy-and-risk.adoc[02 Policy and Risk]
+- *Network Graph:* Network flows, listening endpoints, and policy simulation — xref:acs-06-network-and-runtime.adoc[06 Network and Runtime Security]
+- *Violations:* Policy violation events and enforcement status — xref:acs-06-network-and-runtime.adoc[acs-06]
+- *Compliance:* CIS, PCI-DSS, and STIG coverage — xref:acs-04-compliance.adoc[04 Compliance]
+- *Vulnerability Management:* Workload, platform, and node CVE views — xref:acs-01-vulnerability-management.adoc[01 Vulnerability Management]
+- *Configuration Management:* Misconfiguration and standards reporting — xref:acs-02-policy-and-risk.adoc[02 Policy and Risk]
+- *Risk:* Prioritized workloads — xref:acs-02-policy-and-risk.adoc[02 Policy and Risk]
 - *Platform Configuration:* Clusters, policies, collections, integrations, access control, and system settings
 
 === Dashboard
@@ -510,7 +510,7 @@ Group deployments into collections and attach policies, reporting, or compliance
 
 image::01-pc-4.png[link=self, window=blank, width=100%]
 
-Connect image registries, notifiers, backup targets, cloud sources, and API tokens. You will configure notifiers and API tokens in xref:05-acs-notifications-api.adoc[05 Notifications, API, and Integrations].
+Connect image registries, notifiers, backup targets, cloud sources, and API tokens. You will configure notifiers and API tokens in xref:acs-05-notifications-api.adoc[05 Notifications, API, and Integrations].
 
 ==== Access Control
 
@@ -586,7 +586,7 @@ Deployment:payment-gateway Namespace:payment-gateway-{workshop_user_suffix}
 
 == Summary
 
-Setup is done and you can navigate the RHACS console. Next: xref:01-acs-vulnerability-management.adoc[Vulnerability Management].
+Setup is done and you can navigate the RHACS console. Next: xref:acs-01-vulnerability-management.adoc[Vulnerability Management].
 
 image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbnY0NDA0ZnJqNXh6cGNqeHNxZGd5Zm5qMnlpOHhrbm1hY2pwcG5ydSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/p18ohAgD3H60LSoI1C/giphy.gif[link=self, window=blank, width=100%, class="center"]
 
@@ -594,5 +594,5 @@ image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbnY0NDA0ZnJqNXh6cGNqeHNx
 
 Before moving to the next module, run the lab cleanup script to reset transient resources from this module.
 
-:lab-cleanup-module: 00
+:lab-cleanup-module: acs-00
 include::partial$lab-cleanup.adoc[]

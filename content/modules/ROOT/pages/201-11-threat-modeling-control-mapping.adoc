@@ -124,7 +124,7 @@ One threat → one *control* → one *delivery mechanism*. Wikis do not scale; t
 
 |RHACS runtime enforce
 |Kill the pod when a violating process runs
-|xref:06-acs-network-and-runtime.adoc[ACS 06], xref:301-04-runtime-threat-detection.adoc[301-04]
+|xref:acs-06-network-and-runtime.adoc[acs-06], xref:301-04-runtime-threat-detection.adoc[301-04]
 
 |SIEM (Splunk) + ACS
 |Audit identity joined to runtime process

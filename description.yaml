@@ -8,8 +8,8 @@ The OpenShift Security Roadshow is a hands-on lab for field and technical teams 
 * 101 — *Foundations* — OpenShift secure-by-default posture
 * 201 — *Intermediate* — Hardening and shift-left
 * 301 — *Advanced* — Enterprise and zero trust
-* *RHACS (modules 00–07)* — Full application lifecycle with Advanced Cluster Security
-* *Lightwell* — Project Lightwell (trusted software supply chain)
+* *RHACS (acs-00–acs-07)* — Full application lifecycle with Advanced Cluster Security
+* *Lightwell TSSC (tssc-01–tssc-18)* — Hummingbird, Lightwell remediations, hermetic build, keyless signing, GitOps admission, TPA, and ACS
 
 == Lab Guide
 
@@ -24,6 +24,8 @@ Follow the interactive lab guide in the Showroom environment. All of the modules
 * Red Hat Quay 3.16 
 * Red Hat Trusted Artifact Signer
 * Red Hat Trusted Profile Analyzer
+* Red Hat OpenShift Pipelines
+* Lightwell Network
 
 == Support
 

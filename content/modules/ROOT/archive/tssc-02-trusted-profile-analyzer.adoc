@@ -1,3 +1,6 @@
+// Archived from pages/ when Lightwell TSSC (module-01..18) replaced this track.
+// Not in nav. Restore: copy to pages/ and add nav/xrefs.
+
 = Trusted Profile Analyzer
 :toc:
 :sectnums:

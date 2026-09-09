@@ -1,0 +1,141 @@
+= 5.3 Disconnected verify
+:source-highlighter: rouge
+:toc:
+:toclevels: 2
+
+xref:tssc-12-sign-keyless.adoc[5.1] already signed the *app* digest keylessly with RHTAS. This Check is a *second* signature on *that same digest*: you generate a cosign key pair on Showroom, `cosign sign --key`, then `cosign verify --key`. Do not treat keyless-only as Track 5 done.
+
+This cluster stays *networked*. You are practicing the disconnected *procedure* (keys you can carry), not a physical air-gap. Mirrored TUF for keyless verifiers, and a simulated media drop, live in xref:appendix-disconnected-playbook.adoc[Appendix: disconnected transfer].
+
+== How this serves TSSC
+
+TSSC must still verify when Fulcio is unreachable. 5.3 is the observation that a key-based signature you control travels with the digest. Native ImagePolicy in 6.1 cannot hold the 5.1 SA URI; CRI-O admission uses *this* `cosign.pub`.
+
+You learn `generate-key-pair`, `--tlog-upload=false`, and publishing the PEM to ConfigMap `lab-cosign-pubkey` because that is the plant procedure. Do not claim this cluster is a diode.
+
+Lightwell Network and Clearinghouse Premier artifacts may already have their own signatures. This Check is the *app* image for admission. Premier does not replace the key pair.
+
+== Learning objectives
+
+By the end of this module, you will be able to:
+
+* Observe TSSC’s disconnected-verify control: a second, key-based signature on the same app digest, while the claim stays on the network
+* Generate a cosign key pair under `~/lab-trust`, attach `cosign sign --key` without a Rekor tlog, and `cosign verify --key`
+* Publish `cosign.pub` to ConfigMap `lab-cosign-pubkey` so Track 6.1 can render ImagePolicy
+* Explain that Lightwell (Network or Premier) library signatures are a different layer
+
+== Why a second signature
+
+Keyless (5.1) needs Fulcio at *sign* time and a TUF root at *verify* time. Customers who cannot reach Fulcio still need a public key they control. You add that signature here. Native `ImagePolicy` `signedEmail` cannot hold the 5.1 Kubernetes SA URI, so xref:tssc-15-gitops-admission.adoc[6.1] CRI-O admission uses *this* `cosign.pub`. Keep the keyless signature on the image; do not strip it.
+
+The two-column picture is on xref:tssc-12-sign-keyless.adoc[5.1 Keyless vs keys].
+
+== Delivery note
+
+*Customers* in a disconnected plant verify with keys (and a mirrored TUF root for *keyless* artifacts). *You* generate the pair on this terminal and sign the digest you already built. *Red Hat* does not operate a data diode on RHDP.
+
+== Discover the 5.1 digest
+
+`cosign` is already on Showroom `PATH`. Private keys never go in Git or a screenshot.
+
+[source,bash,role=execute]
+----
+BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
+IMAGE="image-registry.openshift-image-registry.svc:5000/${BUILD_NS}/spring-boot-lw-poc:latest"
+oc -n "${BUILD_NS}" get istag spring-boot-lw-poc:latest \
+  -o jsonpath='{.image.dockerImageReference}{"\n"}'
+ls ~/lab-trust 2>/dev/null || echo 'lab-trust empty (expected before your change)'
+----
+
+== Worked example (not the Check)
+
+[source,bash]
+----
+# Worked example ONLY — different directory and key name. Do not use as the Check.
+mkdir -p ~/example-not-lab-trust
+# COSIGN_PASSWORD="" cosign generate-key-pair  (would write demo.pub here)
+cosign verify --key ~/example-not-lab-trust/demo.pub \
+  --insecure-ignore-tlog \
+  image-registry.openshift-image-registry.svc:5000/example/not-your-app:latest
+----
+
+== Your change: key pair, sign `--key`
+
+Empty password is for this lab terminal only so the execute block is non-interactive. Do not reuse that pattern in a customer plant. Do not commit `cosign.key`. `export HOME=/tmp/lab-home` is only so `cosign login` does not write Docker config into the real home; keep `--key` / `--from-file` on `/home/lab-user/lab-trust` (tilde follows `HOME`).
+
+[source,bash,role=execute]
+----
+BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
+IMAGE="image-registry.openshift-image-registry.svc:5000/${BUILD_NS}/spring-boot-lw-poc:latest"
+mkdir -p ~/lab-trust
+cd ~/lab-trust
+if [[ ! -f cosign.key ]]; then
+  COSIGN_PASSWORD="" cosign generate-key-pair
+fi
+export HOME=/tmp/lab-home
+mkdir -p "${HOME}"
+cosign login -u unused -p "$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+  image-registry.openshift-image-registry.svc:5000
+COSIGN_PASSWORD="" cosign sign --key /home/lab-user/lab-trust/cosign.key \
+  --tlog-upload=false \
+  --allow-http-registry --allow-insecure-registry \
+  "${IMAGE}"
+# ImagePolicy signedEmail cannot be a SA URI. Publish the public key for 6.1.
+oc -n tssc-admission create configmap lab-cosign-pubkey \
+  --from-file=cosign.pub=/home/lab-user/lab-trust/cosign.pub \
+  --dry-run=client -o yaml | oc apply -f -
+# Tilde follows HOME. Put the real home back before the Check (or use /home/lab-user/lab-trust).
+export HOME=/home/lab-user
+----
+
+Pass when `~/lab-trust/cosign.pub` exists, `sign` exits 0, and ConfigMap `tssc-admission/lab-cosign-pubkey` has that PEM. Copying the worked-example path fails the Check.
+
+== Check: `cosign verify --key`
+
+[source,bash,role=execute]
+----
+BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
+IMAGE="image-registry.openshift-image-registry.svc:5000/${BUILD_NS}/spring-boot-lw-poc:latest"
+export HOME=/home/lab-user
+LAB_TRUST=/home/lab-user/lab-trust
+test -f "${LAB_TRUST}/cosign.pub"
+test ! -f /home/lab-user/example-not-lab-trust/demo.pub || echo 'example path present (ok if unused)'
+cosign login -u unused -p "$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+  image-registry.openshift-image-registry.svc:5000
+cosign verify --key "${LAB_TRUST}/cosign.pub" \
+  --insecure-ignore-tlog \
+  --allow-http-registry --allow-insecure-registry \
+  "${IMAGE}"
+----
+
+Pass when that command exits 0 on *your* app digest using `/home/lab-user/lab-trust/cosign.pub`. 5.1 keyless verify must still be possible; do not strip the Fulcio signature.
+
+:report-name: report-14-disconnected-verify
+:report-key: diode_honest
+:report-token: not-air-gap
+include::partial$validate-job-report.adoc[]
+
+:validate-job: validate-14-disconnected-verify
+:validate-job-template: job-14.yaml
+include::partial$validate-job-rerun.adoc[]
+
+Honor system: Track 6 still opens.
+
+== Official documentation
+
+* link:{docs-rhtas-url}[Trusted Artifact Signer deployment guide^] (key-based `cosign` alongside keyless)
+* xref:appendix-disconnected-playbook.adoc[Disconnected transfer] (mirrored TUF; not this Check)
+
+== Callout
+
+TUF `root.json` and Fulcio/Rekor PEMs are *not* this Check. Pack them in the xref:appendix-disconnected-playbook.adoc[simulated media drop] so you can say “mirrored TUF” without claiming this cluster is air-gapped.
+
+== Key takeaways
+
+* Track 5 is keyless *and* a key-based signature you created. That is TSSC portability, not a data diode.
+* Publish `cosign.pub` to `tssc-admission/lab-cosign-pubkey`. 6.1 CRI-O admission uses it.
+* The private key stays on Showroom. Never Git.
+* Lightwell Network / Clearinghouse Premier did not produce this key pair.
+
+:lab-cleanup-module: tssc-14
+include::partial$lab-cleanup.adoc[]
