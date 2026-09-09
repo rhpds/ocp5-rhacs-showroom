@@ -20,5 +20,3 @@ tabs:
     url: 'https://central-reencrypt-stackrox.${DOMAIN}'
   - name: OpenShift GitOps
     url: 'https://openshift-gitops-server-openshift-gitops.${DOMAIN}'
-  - name: Quay
-    url: 'https://quay.${DOMAIN}'

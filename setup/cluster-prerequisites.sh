@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # One-time cluster prerequisites for ACME incident exercises.
 # Run as cluster-admin from the repository root: ./setup/cluster-prerequisites.sh
+#
+# Preferred path: OpenShift GitOps Application `roadshow-prereqs` (plus
+# `roadshow-demo-apps` and the RHACS instance chart). Use this script only on
+# clusters that are not GitOps-managed.
 set -euo pipefail
 
 echo "==> Creating node-log-viewer ClusterRole..."
@@ -40,12 +44,18 @@ spec:
 EOF
 
 echo "==> Enabling external IP collection in RHACS..."
-oc apply --filename - <<'EOF'
+RHACS_NS="stackrox"
+if oc get ns rhacs-operator >/dev/null 2>&1 && oc -n rhacs-operator get ds collector >/dev/null 2>&1; then
+  RHACS_NS="rhacs-operator"
+elif oc get ns rhacs-operator >/dev/null 2>&1 && ! oc get ns stackrox >/dev/null 2>&1; then
+  RHACS_NS="rhacs-operator"
+fi
+oc apply --filename - <<EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: collector-config
-  namespace: stackrox
+  namespace: ${RHACS_NS}
 data:
   runtime_config.yaml: |
     networking:

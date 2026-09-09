@@ -6,7 +6,7 @@
 == Module Goals
 
 * Access the OpenShift, RHACS, and Quay consoles used throughout the roadshow
-* Run the bastion setup script to configure RHACS CLI access and deploy vulnerable demo apps
+* Run the bastion setup script for RHACS CLI access and workshop images (cluster apps are already in GitOps)
 * Build and push workshop images to Quay, then deploy the patient-portal application
 * Complete the Trusted Image Pulls from Quay security exercise
 * Navigate the RHACS dashboard, search, and Platform Configuration
@@ -63,7 +63,7 @@ image::00-quay-login.png[Quay Console,link=self, window=blank, width=100%]
 
 == Lab environment setup
 
-The setup script below performs the CLI work for this module in one pass: it verifies OpenShift and RHACS access, saves workshop variables to `~/.bashrc`, deploys the vulnerable demo applications, builds and pushes container images to Quay, and prints a summary when finished.
+The setup script below is the remaining *bastion* work: RHACS CLI variables, a local clone of `demo-apps` (for Dockerfiles), and the Quay image builds. Vulnerable demo apps, Compliance Operator, collector networking, and RHACS Central settings are deployed by OpenShift GitOps.
 
 Variables persisted to `~/.bashrc`:
 
@@ -81,8 +81,8 @@ Variables persisted to `~/.bashrc`:
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-git clone https://github.com/mfosterrox/openshift-security-roadshow.git
-cd openshift-security-roadshow
+git clone https://github.com/rhpds/ocp5-rhacs-showroom.git
+cd ocp5-rhacs-showroom
 bash setup/lab-environment.sh \
   --quay-user {quay_admin_username} \
   --quay-password '{quay_admin_password}'
@@ -94,20 +94,20 @@ bash setup/lab-environment.sh \
 Lab environment setup
 Details: /home/lab-user/.acs-roadshow/lab-environment-YYYYMMDD-HHMMSS.log
 
-[############################] 9/9  Lab environment setup complete
+[############################] 8/8  Lab environment setup complete
 
 ================================================================
   SUCCESS: Lab environment setup completed successfully
 ================================================================
 
   ✓ RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)
-  ✓ Workshop demo applications deployed
+  ✓ demo-apps cloned for image builds (cluster deploy is GitOps)
   ✓ Quay images ready (golden base + frontend, when image steps ran)
   ✓ Env file: /home/lab-user/.acs-roadshow/env
   ✓ Detailed log: /home/lab-user/.acs-roadshow/lab-environment-....log
 ----
 
-IMPORTANT: PodSecurity warnings during `oc apply` are expected—you are deploying intentionally vulnerable applications for the workshop.
+NOTE: Vulnerable demo apps are synced by the `roadshow-demo-apps` Argo CD Application. PodSecurity warnings on those workloads are expected.
 
 [start=2]
 . The script prints progress for each phase. When it completes, reload your shell environment:
@@ -198,15 +198,15 @@ After making the *frontend* repository public, run the second setup phase:
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-cd ~/openshift-security-roadshow
+cd ~/ocp5-rhacs-showroom
 bash setup/lab-environment.sh --deploy-skupper-only
 ----
 
 [.console-output]
 [source,bash,subs="+macros,+attributes"]
 ----
-[lab-user@bastion openshift-security-roadshow]$ cd ~/openshift-security-roadshow
-[lab-user@bastion openshift-security-roadshow]$ bash setup/lab-environment.sh --deploy-skupper-only
+[lab-user@bastion ocp5-rhacs-showroom]$ cd ~/ocp5-rhacs-showroom
+[lab-user@bastion ocp5-rhacs-showroom]$ bash setup/lab-environment.sh --deploy-skupper-only
 
 ==> Deploying patient-portal application (Skupper demo)
 ------------------------------------------------------------------------

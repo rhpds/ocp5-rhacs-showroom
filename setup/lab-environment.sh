@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Provision the ACS roadshow lab environment on the bastion host.
-# Runs RHACS demo configure (settings, compliance, monitoring, MCP, Lightspeed),
-# then configures CLI access, deploys demo apps, and builds/pushes Quay images.
+# Runs RHACS CLI token setup, clones demo-apps (for Dockerfiles), and
+# builds/pushes Quay images. Cluster-wide RHACS/Compliance/demo-app
+# deploy is owned by OpenShift GitOps (roadshow-prereqs + roadshow-demo-apps).
 #
 # Quiet by default (progress bar + current step). Use --verbose for full logs.
 #
@@ -17,13 +18,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/rhacs/lib/progress.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/rhacs/lib/common.sh"
 
 QUAY_USER=""
 QUAY_PASSWORD=""
 DEPLOY_SKUPPER_ONLY=false
 SKIP_DEMO_APPS=false
+SKIP_DEMO_APPLY=true
 SKIP_IMAGES=false
-SKIP_RHACS_CONFIGURE=false
+SKIP_RHACS_CONFIGURE=true
 VERBOSE=false
 WORK_DIR="${HOME}"
 
@@ -66,7 +70,7 @@ load_roadshow_env() {
     local line
     while IFS= read -r line || [[ -n "${line}" ]]; do
       case "${line}" in
-        export\ ROX_*|export\ QUAY_*|export\ TUTORIAL_HOME=*|export\ APP_HOME=*)
+        export\ ROX_*|export\ QUAY_*|export\ TUTORIAL_HOME=*|export\ APP_HOME=*|export\ RHACS_NAMESPACE=*)
           # shellcheck disable=SC2163
           eval "${line}"
           ;;
@@ -83,9 +87,11 @@ Options:
   --quay-user USER          Quay admin username (required unless --deploy-skupper-only)
   --quay-password PASS      Quay admin password (required unless --deploy-skupper-only)
   --deploy-skupper-only     Deploy patient-portal after frontend repo is public in Quay
-  --skip-demo-apps          Skip cloning and applying vulnerable demo manifests
+  --skip-demo-apps          Skip cloning the demo-apps repository
+  --apply-demo-apps         oc apply demo-apps manifests (GitOps deploys these by default)
   --skip-images             Skip golden image and frontend build/push
-  --skip-rhacs-configure    Skip setup/rhacs-configure.sh (RHACS/monitoring/MCP)
+  --rhacs-configure         Run setup/rhacs-configure.sh (GitOps owns this by default)
+  --skip-rhacs-configure    Deprecated; configure is skipped unless --rhacs-configure
   --verbose                 Stream detailed command output
   --work-dir DIR            Base directory for clones (default: $HOME)
   -h, --help                Show this help
@@ -98,7 +104,9 @@ while [[ $# -gt 0 ]]; do
     --quay-password) QUAY_PASSWORD=$2; shift 2 ;;
     --deploy-skupper-only) DEPLOY_SKUPPER_ONLY=true; shift ;;
     --skip-demo-apps) SKIP_DEMO_APPS=true; shift ;;
+    --apply-demo-apps) SKIP_DEMO_APPLY=false; shift ;;
     --skip-images) SKIP_IMAGES=true; shift ;;
+    --rhacs-configure) SKIP_RHACS_CONFIGURE=false; shift ;;
     --skip-rhacs-configure) SKIP_RHACS_CONFIGURE=true; shift ;;
     --verbose|-v) VERBOSE=true; shift ;;
     --work-dir) WORK_DIR=$2; shift 2 ;;
@@ -141,12 +149,13 @@ if [[ -z "${QUAY_USER}" || -z "${QUAY_PASSWORD}" ]]; then
   exit 1
 fi
 
-# Count top-level lab steps (rhacs-configure has its own progress bar)
+# Count top-level lab steps (cluster RHACS/Compliance/apps come from GitOps)
 TOTAL=0
 TOTAL=$((TOTAL + 2)) # admin + wait central
 [[ "${SKIP_RHACS_CONFIGURE}" != true ]] && TOTAL=$((TOTAL + 1))
 TOTAL=$((TOTAL + 2)) # CLI vars + verify API
-[[ "${SKIP_DEMO_APPS}" != true ]] && TOTAL=$((TOTAL + 1))
+[[ "${SKIP_DEMO_APPS}" != true ]] && TOTAL=$((TOTAL + 1)) # clone
+[[ "${SKIP_DEMO_APPS}" != true && "${SKIP_DEMO_APPLY}" != true ]] && TOTAL=$((TOTAL + 1)) # apply
 [[ "${SKIP_IMAGES}" != true ]] && TOTAL=$((TOTAL + 3)) # quay login + golden + frontend
 
 LOG_DIR="${HOME}/.acs-roadshow"
@@ -161,49 +170,33 @@ do_verify_admin() {
 }
 
 do_wait_central() {
-  if ! oc -n stackrox get route central >/dev/null 2>&1; then
-    echo "Error: RHACS Central route not found in namespace stackrox." >&2
-    echo "Ensure RHACS is installed (Central route in namespace stackrox) before running this script." >&2
-    return 1
-  fi
-  oc -n stackrox wait --for=condition=available --timeout=300s deployment/central 2>/dev/null \
-    || echo "NOTE: Central deployment not yet Available; continuing with route lookup."
+  local ns
+  for ns in rhacs-operator stackrox; do
+    if oc -n "${ns}" get route central >/dev/null 2>&1 || oc -n "${ns}" get route central-reencrypt >/dev/null 2>&1; then
+      oc -n "${ns}" wait --for=condition=available --timeout=300s deployment/central 2>/dev/null \
+        || echo "NOTE: Central deployment not yet Available in ${ns}; continuing with route lookup."
+      return 0
+    fi
+  done
+  echo "Error: RHACS Central route not found (tried namespaces rhacs-operator, stackrox)." >&2
+  echo "Ensure the GitOps rhacs-operator Application has synced." >&2
+  return 1
 }
 
 do_cli_vars() {
-  ROX_CENTRAL_ADDRESS="$(oc -n stackrox get route central -o jsonpath='{.spec.host}')"
-  ROX_CENTRAL_ADDRESS="${ROX_CENTRAL_ADDRESS#https://}"
-  ROX_CENTRAL_ADDRESS="${ROX_CENTRAL_ADDRESS#http://}"
+  load_roadshow_env
+  resolve_rox_central_address || return 1
   persist_var ROX_CENTRAL_ADDRESS "${ROX_CENTRAL_ADDRESS}"
-
-  if [[ -z "${ROX_API_TOKEN:-}" ]]; then
-    load_roadshow_env
-  fi
+  persist_var RHACS_NAMESPACE "${RHACS_NAMESPACE}"
 
   if [[ -z "${ROX_PASSWORD:-}" ]]; then
-    ROX_PASSWORD="$(oc -n stackrox get secret central-htpasswd -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)"
+    ROX_PASSWORD="$(rox_admin_password "${RHACS_NAMESPACE}" || true)"
   fi
   if [[ -n "${ROX_PASSWORD:-}" ]]; then
     persist_var ROX_PASSWORD "${ROX_PASSWORD}"
   fi
 
-  if [[ -z "${ROX_API_TOKEN:-}" ]]; then
-    if [[ -z "${ROX_PASSWORD:-}" ]]; then
-      echo "Error: ROX_API_TOKEN is unset and could not read ROX_PASSWORD from central-htpasswd." >&2
-      return 1
-    fi
-    token_json="$(curl -ksS --connect-timeout 15 --max-time 60 \
-      -X POST \
-      -u "admin:${ROX_PASSWORD}" \
-      -H "Content-Type: application/json" \
-      "https://${ROX_CENTRAL_ADDRESS}/v1/apitokens/generate" \
-      -d "{\"name\":\"roadshow-bastion-$(date +%s)\",\"roles\":[\"Admin\"]}")"
-    ROX_API_TOKEN="$(printf '%s' "${token_json}" | jq -r '.token // empty')"
-    if [[ -z "${ROX_API_TOKEN}" || "${#ROX_API_TOKEN}" -lt 20 ]]; then
-      echo "Error: failed to generate ROX_API_TOKEN. Response: ${token_json}" >&2
-      return 1
-    fi
-  fi
+  ensure_rox_api_token || return 1
   persist_var ROX_API_TOKEN "${ROX_API_TOKEN}"
 }
 
@@ -213,7 +206,7 @@ do_verify_api() {
     "https://${ROX_CENTRAL_ADDRESS}/v1/auth/status" | jq -r '.userId // .user // "ok"' >/dev/null
 }
 
-do_demo_apps() {
+do_clone_demo_apps() {
   cd "${WORK_DIR}"
   if [[ ! -d demo-apps ]]; then
     git clone "${DEMO_APPS_REPO}" demo-apps
@@ -223,6 +216,14 @@ do_demo_apps() {
   persist_var TUTORIAL_HOME "${WORK_DIR}/demo-apps"
   if [[ ! -d "${TUTORIAL_HOME}/kubernetes-manifests" ]]; then
     echo "Error: ${TUTORIAL_HOME}/kubernetes-manifests not found." >&2
+    return 1
+  fi
+}
+
+do_apply_demo_apps() {
+  load_roadshow_env
+  if [[ -z "${TUTORIAL_HOME:-}" ]]; then
+    echo "Error: TUTORIAL_HOME is unset; clone demo-apps first." >&2
     return 1
   fi
   oc apply -f "${TUTORIAL_HOME}/kubernetes-manifests/" --recursive
@@ -332,9 +333,12 @@ fi
 progress_run "Configure RHACS CLI variables" do_cli_vars
 progress_run "Verify RHACS API access" do_verify_api
 
-# While RHACS configure runs in the background, deploy apps and build the golden image.
+# While optional RHACS configure runs in the background, clone demo-apps for image builds.
 if [[ "${SKIP_DEMO_APPS}" != true ]]; then
-  progress_run "Deploy workshop applications" do_demo_apps
+  progress_run "Clone workshop application sources" do_clone_demo_apps
+  if [[ "${SKIP_DEMO_APPLY}" != true ]]; then
+    progress_run "Deploy workshop applications" do_apply_demo_apps
+  fi
 fi
 
 if [[ "${SKIP_IMAGES}" != true ]]; then
@@ -376,7 +380,7 @@ load_roadshow_env
 
 progress_success_banner "Lab environment setup completed successfully" \
   "RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)" \
-  "Workshop demo applications deployed" \
+  "demo-apps cloned for image builds (cluster deploy is GitOps)" \
   "Quay images ready (golden base + frontend, when image steps ran)" \
   "Env file: ${ROADSHOW_ENV_FILE}" \
   "Detailed log: ${LOG_FILE}"

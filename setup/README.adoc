@@ -4,12 +4,16 @@ Run these scripts as *cluster-admin* before delivering the OpenShift Security Ro
 
 == Prerequisites
 
-* OpenShift cluster with RHACS (StackRox) installed in the `stackrox` namespace
+* OpenShift cluster with RHACS installed (`rhacs-operator` on GitOps clusters, or `stackrox` on older labs)
 * OpenShift Lightspeed installed (for MCP ↔ OLSConfig wiring; LLM secrets optional)
 * `oc` CLI logged in as cluster-admin
 * `jq`, `curl`, `openssl`, and `envsubst` (from `gettext`) available
 
 == One-time cluster configuration
+
+On RHDP / GitOps-provisioned clusters this is already applied by Argo CD
+(`roadshow-prereqs`, `roadshow-demo-apps`, and the RHACS instance chart).
+Use the script below only for brownfield clusters that do not sync those apps.
 
 [source,bash]
 ----
@@ -75,17 +79,17 @@ Attendees use the Showroom attribute `{workshop_user_suffix}` matching their ass
 
 == Attendee lab environment (bastion)
 
-Attendees clone the roadshow repository, then run `setup/lab-environment.sh`. That script runs `rhacs-configure.sh` (RHACS settings, compliance, monitoring, MCP, Lightspeed helpers), then CLI token setup, demo-apps, and Quay images:
+Attendees clone `ocp5-rhacs-showroom`, then run `setup/lab-environment.sh`. Cluster-wide RHACS, Compliance Operator, collector networking, Central settings, and demo-apps are already synced by OpenShift GitOps. The bastion script configures the RHACS CLI token and builds/pushes Quay images:
 
 [source,bash]
 ----
-git clone https://github.com/mfosterrox/openshift-security-roadshow.git
-cd openshift-security-roadshow
+git clone https://github.com/rhpds/ocp5-rhacs-showroom.git
+cd ocp5-rhacs-showroom
 bash setup/lab-environment.sh --quay-user QUAYADMIN --quay-password 'password'
 bash setup/lab-environment.sh --deploy-skupper-only
 ----
 
-Use `--skip-rhacs-configure` if an instructor already ran configure and attendees should only refresh CLI/apps/images.
+Use `--rhacs-configure` or `--apply-demo-apps` only on brownfield clusters that are not GitOps-managed.
 
 Attendees record module completion by running `setup/lab-cleanup.sh` at the end of each module (documented as a routine cleanup step). Each successful cleanup writes a marker line to `~/.acs-roadshow/progress` on the bastion for instructor verification / gameify scoring:
 

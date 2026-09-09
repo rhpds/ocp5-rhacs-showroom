@@ -10,7 +10,10 @@
 #   ./setup/rhacs-configure.sh
 #   ./setup/rhacs-configure.sh --skip-monitoring --skip-mcp
 #
-# Invoked by setup/lab-environment.sh and setup/cluster-prerequisites.sh.
+# Preferred path: OpenShift GitOps (roadshow-prereqs + rhacs-operator instance
+# chart + roadshow-demo-apps). Use this script on brownfield clusters only.
+#
+# Invoked by setup/lab-environment.sh --rhacs-configure and setup/cluster-prerequisites.sh.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

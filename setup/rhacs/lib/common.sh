@@ -65,16 +65,62 @@ require_oc() {
   fi
 }
 
+# GitOps installs Central in rhacs-operator; older labs used stackrox.
+detect_rhacs_namespace() {
+  local ns
+  if [[ -n "${RHACS_NAMESPACE:-}" ]] && oc -n "${RHACS_NAMESPACE}" get deploy central >/dev/null 2>&1; then
+    printf '%s' "${RHACS_NAMESPACE}"
+    return 0
+  fi
+  for ns in rhacs-operator stackrox; do
+    if oc -n "${ns}" get deploy central >/dev/null 2>&1; then
+      printf '%s' "${ns}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+rox_central_route_host() {
+  local ns="${1}"
+  local route host
+  for route in central central-reencrypt; do
+    host="$(oc -n "${ns}" get route "${route}" -o jsonpath='{.spec.host}' 2>/dev/null || true)"
+    if [[ -n "${host}" ]]; then
+      printf '%s' "${host}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+rox_admin_password() {
+  local ns="${1}"
+  local secret password
+  for secret in central-htpasswd central-admin-password; do
+    password="$(oc -n "${ns}" get secret "${secret}" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)"
+    if [[ -n "${password}" ]]; then
+      printf '%s' "${password}"
+      return 0
+    fi
+  done
+  return 1
+}
+
 # Resolve Central host from env or route; leave ROX_CENTRAL_ADDRESS as host-only.
 resolve_rox_central_address() {
-  local ns="${RHACS_NAMESPACE:-stackrox}"
-  local host="${ROX_CENTRAL_ADDRESS:-}"
-  host="$(rox_central_host "${host}")"
+  local ns host
+  ns="$(detect_rhacs_namespace || true)"
+  if [[ -z "${ns}" ]]; then
+    ns="${RHACS_NAMESPACE:-rhacs-operator}"
+  fi
+  export RHACS_NAMESPACE="${ns}"
+  host="$(rox_central_host "${ROX_CENTRAL_ADDRESS:-}")"
   if [[ -z "${host}" ]]; then
-    host="$(oc -n "${ns}" get route central -o jsonpath='{.spec.host}' 2>/dev/null || true)"
+    host="$(rox_central_route_host "${ns}" || true)"
   fi
   if [[ -z "${host}" ]]; then
-    print_error "Could not resolve ROX_CENTRAL_ADDRESS (set it or ensure route/central exists in ${ns})."
+    print_error "Could not resolve ROX_CENTRAL_ADDRESS (set it or ensure a Central route exists in ${ns})."
     return 1
   fi
   export ROX_CENTRAL_ADDRESS="${host}"
@@ -82,7 +128,7 @@ resolve_rox_central_address() {
 
 # Ensure ROX_API_TOKEN is set (generate from admin password if needed).
 ensure_rox_api_token() {
-  local ns="${RHACS_NAMESPACE:-stackrox}"
+  local ns
   if [[ -n "${ROX_API_TOKEN:-}" ]]; then
     return 0
   fi
@@ -98,11 +144,12 @@ ensure_rox_api_token() {
     fi
   fi
   resolve_rox_central_address || return 1
+  ns="${RHACS_NAMESPACE}"
   if [[ -z "${ROX_PASSWORD:-}" ]]; then
-    ROX_PASSWORD="$(oc -n "${ns}" get secret central-htpasswd -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)"
+    ROX_PASSWORD="$(rox_admin_password "${ns}" || true)"
   fi
   if [[ -z "${ROX_PASSWORD:-}" ]]; then
-    print_error "ROX_API_TOKEN unset and could not read ROX_PASSWORD from central-htpasswd."
+    print_error "ROX_API_TOKEN unset and could not read ROX_PASSWORD from Central secrets in ${ns}."
     return 1
   fi
   local url token_json
