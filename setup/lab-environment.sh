@@ -209,7 +209,7 @@ ensure_roxctl() {
   if command -v roxctl >/dev/null 2>&1; then
     return 0
   fi
-  local host dest tmp
+  local host dest tmp url
   host="$(rox_central_host "${ROX_CENTRAL_ADDRESS:-}")"
   if [[ -z "${host}" ]]; then
     echo "Error: ROX_CENTRAL_ADDRESS is unset; cannot download roxctl." >&2
@@ -219,15 +219,27 @@ ensure_roxctl() {
   mkdir -p "${dest}"
   tmp="$(mktemp)"
   echo "roxctl not found; downloading CLI from Central..."
-  if curl -fsSk -L -o "${tmp}" "https://${host}/api/cli/download/roxctl-linux-amd64" \
-    || curl -fsSk -L -o "${tmp}" "https://${host}/api/cli/download/roxctl-linux"; then
-    chmod +x "${tmp}"
-    mv "${tmp}" "${dest}/roxctl"
-  else
+  # Central's download API requires auth (anonymous → 401).
+  for url in \
+    "https://${host}/api/cli/download/roxctl-linux-amd64" \
+    "https://${host}/api/cli/download/roxctl-linux"; do
+    if [[ -n "${ROX_API_TOKEN:-}" ]] \
+      && curl -fsSk -L -H "Authorization: Bearer ${ROX_API_TOKEN}" -o "${tmp}" "${url}"; then
+      break
+    fi
+    if [[ -n "${ROX_PASSWORD:-}" ]] \
+      && curl -fsSk -L -u "admin:${ROX_PASSWORD}" -o "${tmp}" "${url}"; then
+      break
+    fi
+    : > "${tmp}"
+  done
+  if [[ ! -s "${tmp}" ]] || [[ "$(head -c 4 "${tmp}")" != $'\x7fELF' ]]; then
     rm -f "${tmp}"
-    echo "Error: could not download roxctl from https://${host}/api/cli/download/." >&2
+    echo "Error: could not download roxctl from https://${host}/api/cli/download/ (need API token or admin password)." >&2
     return 1
   fi
+  chmod +x "${tmp}"
+  mv "${tmp}" "${dest}/roxctl"
   export PATH="${dest}:${PATH}"
   if ! grep -qE '(^|:)\$HOME/\.local/bin|^export PATH="\$HOME/\.local/bin' "${HOME}/.bashrc" 2>/dev/null; then
     printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "${HOME}/.bashrc"
