@@ -9,6 +9,7 @@ The OpenShift Security Roadshow is a hands-on lab for field and technical teams 
 * 201 — *Intermediate* — Hardening and shift-left
 * 301 — *Advanced* — Enterprise and zero trust
 * *RHACS (acs-00–acs-07)* — Full application lifecycle with Advanced Cluster Security
+* *OpenShift Virtualization (virt-00–virt-07)* — Hypervisor hardening from the OpenShift Virtualization hardening guide
 * *Lightwell TSSC (tssc-01–tssc-18)* — Hummingbird, Lightwell remediations, hermetic build, keyless signing, GitOps admission, TPA, and ACS
 
 == Lab Guide

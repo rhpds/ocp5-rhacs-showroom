@@ -12,7 +12,7 @@ This course offers hands-on experience with Kubernetes-native security on Red Ha
 * *Use the bastion* — Run `oc`, `roxctl`, and `podman` on the RHEL bastion.
 * *Cluster services come from GitOps* — RHACS, Quay, GitOps, Compliance Operator, and the vulnerable demo apps are already synced by Argo CD.
 * *Run the bastion setup script* — That step only configures your CLI token and workshop images in Quay.
-* *Pick a role* — For a tailored experience, start with the track that matches your desired role.
+* *Work the catalog in order, or jump in* — 101 → 201 → 301, then the product deep-dives (RHACS, Virtualization, Lightwell TSSC).
 
 == Environment setup
 
@@ -83,23 +83,12 @@ Use the *Terminal* tab (or SSH) for CLI work (`oc`, `roxctl`, `podman`, `curl`, 
 |Password| {bastion_ssh_password}
 |===
 
-== Product specific deep-dives 
+== What's in this roadshow
 
-Use these after (or alongside) the role track that owns the capability—especially DevSecOps, Platform Operator, and Security Architect.
-
-* xref:acs-INDEX.adoc[Advanced Cluster Security (RHACS) labs] — Setup, vulnerabilities, policy and risk, CI/CD gates, compliance, notifications and API, network and runtime, installation, and xref:acs.adoc[ACS 5 capabilities] (VM scanning, file activity monitoring, MCP, and init containers).
-* xref:tssc-INDEX.adoc[Lightwell and Red Hat Trusted Software Supply Chain (TSSC)] — Hummingbird, Lightwell remediations, hermetic build, keyless signing, GitOps admission, and TPA/ACS compliance.
+* xref:basic-INDEX.adoc[101 Foundations] — OpenShift secure-by-default posture.
+* xref:intermediate-INDEX.adoc[201 Intermediate] — Hardening and shift-left.
+* xref:advanced-INDEX.adoc[301 Advanced] — Enterprise and zero trust.
+* xref:acs-INDEX.adoc[Advanced Cluster Security (RHACS)] — Setup, vulnerabilities, policy and risk, CI/CD gates, compliance, notifications and API, network and runtime, installation, and xref:acs.adoc[ACS 5 capabilities] (VM scanning, file activity monitoring, MCP, and init containers).
 * xref:virt-INDEX.adoc[OpenShift Virtualization Security] — HyperConverged feature gates, virt RBAC, VM and storage isolation, VM networking, and host firmware/kernel controls from the OpenShift Virtualization hardening guide.
-
-== Choose your role
-
-Start here. Open the track for your role, then follow the recommended sequence (Basic → Intermediate → Advanced).
-
-* xref:track-application-developer.adoc[Application Developer] — Build and ship secure workloads: least privilege, secrets, trusted images, and baseline pipeline hygiene.
-* xref:track-platform-operator.adoc[Platform Operator] — Operate and harden clusters: SCCs, quotas, network baselines, audit, compliance, and day-2 guardrails.
-* xref:track-devsecops-engineer.adoc[DevSecOps Engineer] — Embed security in delivery: CI/CD gates, signing, admission policy, runtime feedback, and supply chain controls.
-* xref:track-security-architect.adoc[Security Architect] — Design governance and zero-trust strategy across teams, clusters, identity, and exceptions.
-* xref:track-network-infrastructure.adoc[Network & Infrastructure Engineer] — Secure the data plane: segmentation, encryption in transit, mTLS patterns, and traffic-focused observability.
-
-Browse full catalogs by skill level: xref:basic-INDEX.adoc[101 Foundations], xref:intermediate-INDEX.adoc[201 Intermediate], xref:advanced-INDEX.adoc[301 Advanced].
+* xref:tssc-INDEX.adoc[Lightwell and Red Hat Trusted Software Supply Chain (TSSC)] — Hummingbird, Lightwell remediations, hermetic build, keyless signing, GitOps admission, and TPA/ACS compliance.
 

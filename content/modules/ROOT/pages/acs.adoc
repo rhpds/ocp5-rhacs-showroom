@@ -70,22 +70,20 @@ IMPORTANT: These are intentionally vulnerable workloads and are not recommended 
 cd ~/ && git clone https://github.com/mfosterrox/demo-applications.git
 cd ~/demo-applications
 oc apply -f k8s-deployment-manifests/-namespaces/
-oc apply -R -f k8s-deployment-manifests/juice-shop/
 oc apply -R -f k8s-deployment-manifests/log4shell/
 oc apply -R -f k8s-deployment-manifests/webgoat/
 oc apply -R -f k8s-deployment-manifests/dvwa/
 oc apply -R -f k8s-deployment-manifests/acs-fam-demo/
 ----
 +
-Confirm the File Activity Monitoring (FAM) trigger and a sample vulnerable app are running:
+Confirm the File Activity Monitoring (FAM) trigger is running:
 +
 [source,sh,subs="attributes",role=execute]
 ----
 oc get deploy,pods -n acs-fam-demo
-oc get deploy,pods -n juice-shop
 ----
 +
-You should see `fam-target` & `juice-shop` in `Running` phase. 
+You should see `fam-target` in a `Running` phase. 
 
 * Verify the ACS MCP server is available:
 +
@@ -552,7 +550,7 @@ Are any of my cluster nodes affected by CVE-2021-44228?
 +
 [source,role="copypaste"]
 ----
-Which deployments in the juice-shop or log4shell namespaces are affected by CVE-2021-44228?
+Which deployments in the log4shell namespace are affected by CVE-2021-44228?
 ----
 +
 [source,role="copypaste"]

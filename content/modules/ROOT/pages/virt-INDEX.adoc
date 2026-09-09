@@ -11,7 +11,7 @@ These labs walk the link:https://www.redhat.com/en/resources/openshift-virtualiz
 
 This is a product deep-dive, not a 101/201/301 skill level. Harden the OpenShift platform first (xref:101-10-security-compliance-addons.adoc[101-10], xref:201-07-compliance-tailoring.adoc[201-07]). Guest operating system CIS/STIG work inside the VM is out of scope.
 
-Use this track after (or alongside) the role path that owns the hypervisor: Platform Operator, Security Architect, and Network and Infrastructure Engineer. Kata sandboxed *pods* are xref:201-09-sandboxed-containers-intro.adoc[201-09]; this pathway is full virtual machines on the `kubevirt-hyperconverged` stack.
+Kata sandboxed *pods* are xref:201-09-sandboxed-containers-intro.adoc[201-09]; this pathway is full virtual machines on the `kubevirt-hyperconverged` stack.
 
 Audience and prerequisites:
 
@@ -35,43 +35,33 @@ Modules are sequential. Later labs reuse the HyperConverged object, VM, and any 
 
 == Virtualization labs index
 
-[cols="1,3,2",options="header"]
+[cols="1,3",options="header"]
 |===
-|Lab | Title | Roles
+|Lab | Title
 
 |xref:virt-00-scope-and-hco.adoc[00]
 |Scope and HyperConverged
-|Platform, Architect, Network
 
 |xref:virt-01-feature-gates-and-trusted-config.adoc[01]
 |Feature Gates and Trusted Config
-|Platform, Architect
 
 |xref:virt-02-devices-ksm-permissions.adoc[02]
 |Host Devices, KSM, and File Permissions
-|Platform
 
 |xref:virt-03-virtualization-rbac.adoc[03]
 |Migration, Exec, VNC, and Shared Types
-|Platform, Architect
 
 |xref:virt-04-vm-configuration.adoc[04]
 |Per-VM Devices and Memory Overcommit
-|Platform
 
 |xref:virt-05-storage-isolation.adoc[05]
 |DataVolume Cloning and Disk Isolation
-|Platform, Architect
 
 |xref:virt-06-network-segmentation.adoc[06]
 |VLAN, MAC Spoof, and MultiNetworkPolicy
-|Network, Architect, Platform
 
 |xref:virt-07-host-firmware-and-kernel.adoc[07]
 |Host Firmware and Kernel
-|Platform, Network
 |===
-
-Role abbreviations: Platform = Platform Operator; Architect = Security Architect; Network = Network and Infrastructure Engineer.
 
 The guide uses CIS-style Level 1 / Level 2 labels. It is not an official CIS benchmark yet. Level 2 controls in this pathway are Kernel Samepage Merging, dedicated VLANs, and MultiNetworkPolicy.

@@ -4,7 +4,7 @@
 
 xref:index.adoc[← Back to HOME]
 
-This track is the link:https://github.com/rhpds/lightwell-tssc-workshop[Lightwell TSSC workshop^] on the OpenShift Security Roadshow cluster. You verify a Hummingbird base, consume Lightwell dependencies, own the application source, build hermetically, sign and attest, promote a production container, then prove continuous compliance.
+This track is the Lightwell TSSC workshop on the OpenShift Security Roadshow cluster. You verify a Hummingbird base, consume Lightwell dependencies, own the application source, build hermetically, sign and attest, promote a production container, then prove continuous compliance.
 
 The lab application is Java (Maven). Where the same control applies to Python (`pip`) or Artifactory, the page says so in one sentence.
 
@@ -14,7 +14,15 @@ This page is a map, not an exercise. There is nothing to pass here. Hands-on wor
 
 A *trusted software supply chain* (TSSC) is the set of controls that let you prove, for every production container, *what* went into the image, *who* built and signed it, and *whether* known vulnerabilities are remediated without pretending the public internet is a trusted input.
 
-Red Hat TSSC is that proof on OpenShift: signed and attested artifacts (link:{docs-rhtas-url}[Red Hat Trusted Artifact Signer^]), a system of record for SBOMs and advisories (link:{docs-rhtpa-url}[Red Hat Trusted Profile Analyzer^]), runtime and pipeline policy (link:{docs-rhacs-url}[Red Hat Advanced Cluster Security^], Conforma / Enterprise Contract), GitOps promotion (link:{docs-gitops-url}[OpenShift GitOps^]), and a golden path for developers (link:{docs-rhdh-url}[Red Hat Developer Hub^]). The same stack is described as the technology behind link:{docs-rhtap-tech-url}[Red Hat Trusted Application Pipeline^].
+Red Hat TSSC provides that proof on OpenShift through:
+
+* **Signed and attested artifacts** - link:{docs-rhtas-url}[Red Hat Trusted Artifact Signer^]
+* **System of record for SBOMs and advisories** - link:{docs-rhtpa-url}[Red Hat Trusted Profile Analyzer^]
+* **Runtime and pipeline policy** - link:{docs-rhacs-url}[Red Hat Advanced Cluster Security^], Conforma / Enterprise Contract
+* **GitOps promotion** - link:{docs-gitops-url}[OpenShift GitOps^]
+* **Golden path for developers** - link:{docs-rhdh-url}[Red Hat Developer Hub^]
+
+This same technology stack powers link:{docs-rhtap-tech-url}[Red Hat Trusted Application Pipeline^].
 
 TSSC does not start at the pipeline. It starts with *inputs you can name*: a signed runtime base, application libraries that come from a trusted repository, and source that binds those pins. That is where Lightwell and Hardened Images sit.
 
@@ -25,7 +33,7 @@ image::tssc-lwn-clearinghouse-overview.png[TSSC controls wrapping Lightwell Netw
 
 link:{lightwell-product-url}[Lightwell^] is the Red Hat and IBM initiative that extends enterprise open source maintenance to *third-party application dependencies* (libraries, frameworks, build tools, transitive deps). Scanners find CVEs; teams often cannot upgrade because of certification, compatibility, or release windows. Lightwell supplies surgical security remediations on the versions you already run.
 
-Lightwell is an annual subscription with two models. This workshop *scores* the Network consumption path. Clearinghouse Premier is limited availability and is *not* a second hands-on path. You still need to name both models in a customer conversation.
+Lightwell is an annual subscription with two models.
 
 [cols="1,2,2",options="header"]
 |===
