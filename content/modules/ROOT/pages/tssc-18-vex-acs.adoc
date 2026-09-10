@@ -3,40 +3,35 @@
 :toc:
 :toclevels: 2
 
-*C+:* Pull Lightwell *GAV-bound* CycloneDX + VEX for the Track 2 pin from Nexus, ingest it into TPA, and write a blast-radius report: that advisory is remediated *via the Lightwell pin*, not still-open upstream. Hummingbird / Red Hat CSAF is an *OS-layer callout* — not the Check. Live CSAF importer stays off.
+== Overview
 
-ACS (`acs-image-check`) must not be the soft-skip stub. ACS is *not* the admission gate (that was xref:tssc-15-gitops-admission.adoc[6.1]).
+You ingest Lightwell GAV-bound CycloneDX and OSV for the Track 2 pin into Trusted Profile Analyzer. Then you write a blast-radius report. That advisory is remediated *via the Lightwell pin*, not still-open upstream. The ACS task `acs-image-check` must not be skipped. Hummingbird and Red Hat CSAF are an OS-layer callout. They are not this Check. The live CSAF importer stays off.
 
-== How this serves TSSC
+ACS is *not* the admission gate. That was xref:tssc-15-gitops-admission.adoc[6.1].
 
-TSSC continuous compliance is: the SoR says the library CVE is remediated *because you pinned Lightwell*, and the pipeline ACS check is actually on. 7.2 is the observation of GAV-bound Lightwell Network metadata (OSV `LW-DEMO-0002` + Maven classifier CDX) versus OS-layer Hummingbird CSAF. Consultants over-claim when they quote RHEL CSAF for a library CVE.
+== Why it matters
 
-You learn Nexus download + TPA `/api/v3/sbom` and `/api/v3/advisory`, plus blast-radius tokens (`via-lightwell-pin`), because scanners and TPA only recognize the pin if that metadata is ingested. ACS `fail-on-skipped: true` proves the control is not a stub.
+Scanners stay red unless the system of record knows the library CVE is remediated because you pinned Lightwell. ACS must actually run in the pipeline. Do not quote RHEL CSAF for a library CVE.
 
-Lightwell Clearinghouse Premier member advisories ingest the same way. The report would still say via-Lightwell-pin (member version), never via-upstream and never via-Hummingbird-CSAF. Public OSV/VEX on this Check is the *post-disclosure* Network state. During a Premier embargo, that advisory would stay member-private (off public scanner feeds) until disclosure; ACS can still scan the image.
+You download from Nexus, ingest into TPA (`/api/v3/sbom` and `/api/v3/advisory`), and record blast-radius tokens (`via-lightwell-pin`) so scanners and TPA recognize the pin. Setting `fail-on-skipped` to `true` proves the ACS control is not a stub.
 
-== Learning objectives
+Lightwell Clearinghouse Premier member advisories ingest the same way. The report would still say via-Lightwell-pin (member version), never via-upstream and never via-Hummingbird-CSAF. Public OSV and VEX on this lab are the *post-disclosure* Network state. During a Premier embargo, that advisory would stay member-private until disclosure. ACS can still scan the image.
 
-By the end of this module, you will be able to:
+== What does it solve
 
-* Observe TSSC’s continuous-compliance control: TPA shows the Track 2 GAV as remediated via the Lightwell pin, and `acs-image-check` is not skipped
-* Download CDX from Nexus and the scored OSV (`LW-DEMO-0002`), ingest them, and report id + status + GAV + “via Lightwell”
-* Contrast library VEX (Network post-disclosure, and Premier member advisories, including embargoed metadata that is not yet public) with OS-layer Hummingbird CSAF
-* Show `acs-image-check` as `passed` or `failed`, not `skipped`
+* Scanner noise with no GAV-bound VEX
+* ACS left out or skipped
+* Mixing OS-layer CSAF with library VEX
 
-== Layer map: library VEX vs OS CSAF
+== Layer map (library VEX vs OS CSAF)
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/53
 image::vex-library-vs-os-layer.png[Library Lightwell GAV VEX versus OS-layer Hummingbird CSAF,width=700,link=self,window=blank]
 
-Consultants over-claim when they quote RHEL/Hummingbird CSAF for a *library* CVE. The scored layer is the `.rhlw-*` GAV you pinned in xref:tssc-04-remediated-pin.adoc[2.2].
+Do not quote RHEL or Hummingbird CSAF for a *library* CVE. The library layer is the `.rhlw-*` GAV you pinned in xref:tssc-04-remediated-pin.adoc[2.2].
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/111
 image::tssc-artifact-trust-chain.png[End-state trust chain: Hummingbird digest, Lightwell GAV, signed app, TPA VEX,width=700,link=self,window=blank]
-
-== Delivery note
-
-*Customers* get VEX that travels with the remediated GAV. After disclosure that VEX is public (this Check). During a Premier embargo it stays in the member set. *You* pull the public Network files from the enterprise proxy (Nexus) and put them in the SoR. *Red Hat* CSAF is a different layer.
 
 == Discover the scored VEX (not the spring-core sample)
 
@@ -161,13 +156,13 @@ include::partial$validate-job-rerun.adoc[]
 
 * Hummingbird / RHEL CSAF = OS layer. Do not score it.
 * PyPI VEX/SPDX is the same “metadata travels with the pin” idea (`+rhlw.*` on `requirements.txt`). This Check is the Maven GAV from Track 2.
-* Artifactory can host the same GAV-bound CDX/VEX classifiers beside the Maven GAV (local/generic or the remote cache). It is not installed on this claim; this Check downloads from Nexus Remediated.
+* Artifactory can host the same GAV-bound CDX/VEX classifiers beside the Maven GAV (local/generic or the remote cache). It is not installed here. This Check downloads from Nexus Remediated.
 
 == Key takeaways
 
-* TSSC metadata travels with the `.rhlw-*` GAV consultants pin in a PoV (Lightwell Network post-disclosure; Premier member versions use the same ingest, embargoed until disclosure).
-* Wrong-layer VEX is how consultants over-claim.
-* ACS on is a pipeline control, not the 6.1 admission gate.
+* Advisory metadata travels with the `.rhlw-*` GAV you pin. Lightwell Network is post-disclosure. Premier member versions use the same ingest and stay embargoed until disclosure.
+* Quoting OS-layer CSAF for a library CVE is the wrong layer.
+* ACS on is a pipeline control. It is not the 6.1 admission gate.
 
 :lab-cleanup-module: tssc-18
 include::partial$lab-cleanup.adoc[]

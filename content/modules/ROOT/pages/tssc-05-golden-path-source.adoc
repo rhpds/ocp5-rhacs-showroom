@@ -3,39 +3,32 @@
 :toc:
 :toclevels: 2
 
-Application source must be *learner-owned* on in-cluster Gitea. Operator templates live under `workshop-templates`. The scored remote is `lw-student/spring-boot-lw-poc` (`student_repo_url`). Do *not* clone GitHub — lab git is this cluster’s Gitea.
+== Overview
 
-The scored path is the learner seed script (it also adds `renovate-bot`, required in 3.3). Red Hat Developer Hub (RHDH) `lightwell-java-service` is an optional callout, not this Check.
+Application source must live on in-cluster Gitea in organization `lw-student`. It must not live on GitHub. It must not stay under `workshop-templates`. The scored remote is `lw-student/spring-boot-lw-poc` (`student_repo_url`).
 
-Do not change `Dockerfile` `FROM` here (xref:tssc-06-bind-base-deps.adoc[3.2]). Do not merge a fake Renovate PR (xref:tssc-07-live-renovate.adoc[3.3]).
+The scored path is the seed script. That script also adds `renovate-bot`, which xref:tssc-07-live-renovate.adoc[3.3] requires. Red Hat Developer Hub (RHDH) `lightwell-java-service` is an optional golden path, not this Check.
 
-== How this serves TSSC
+Do not change `Dockerfile` `FROM` here. That is xref:tssc-06-bind-base-deps.adoc[3.2]. Do not merge a fake Renovate PR. That is xref:tssc-07-live-renovate.adoc[3.3].
 
-TSSC’s source of truth is *your* git, not a vendor zip. Pins, `FROM` lines, pipeline YAML, and GitOps remotes only count if the later Checks can see them on a remote the learner owns. 3.1 is the observation that the golden path copies a prepared tree into `lw-student` and then you own every commit.
+== Why it matters
 
-You learn org/repo creation and the seed script because customers do this with GitHub/GitLab plus a software template (often RHDH). If source stays in `workshop-templates`, Lightwell pins and Hummingbird `FROM` never become *their* supply chain.
+Pins and `FROM` lines only count if later Checks can see them on a remote you own. Operator templates are a starting tree. Your org is where you pin, promote, and prove the rest of the chain.
 
-Lightwell Network and Clearinghouse Premier do not host application source. They supply the GAVs you will commit in 3.2 and that Renovate will bump in 3.3. Premier member remediations still require this learner-owned remote.
+Lightwell Network and Clearinghouse Premier do not host application source. They supply the GAVs you will commit in 3.2 and that Renovate will bump in 3.3. Premier member remediations still require this remote on your git.
 
-== Learning objectives
+== What does it solve
 
-By the end of this module, you will be able to:
+* Application source that is not yours to pin and promote
+* Cloning GitHub in the lab
+* Shipping from operator templates
 
-* Observe TSSC’s golden-path control: application and GitOps remotes are learner-owned on in-cluster Gitea, not GitHub and not `workshop-templates`
-* Create organization `lw-student` and empty app + GitOps remotes, then seed from templates (including `renovate-bot`)
-* Confirm `student_repo_url` is the working copy (`pom.xml` at repo root)
-* Map RHDH Software Templates in a client engagement to this seed (optional callout)
+== Why your git
 
-== Why learner-owned git
-
-Consultants do not ship from an operator template. The golden path is: copy a prepared tree into *your* org, then you own every later commit (pins, `FROM`, pipeline, GitOps).
+You do not ship from an operator template. The golden path copies a prepared tree into your org. After that you own every later commit (pins, `FROM`, pipeline, GitOps).
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/60
-image::gitea-templates-vs-learner-org.png[workshop-templates versus learner-owned lw-student remotes,width=700,link=self,window=blank]
-
-== Delivery note
-
-*Customers* use GitHub, GitLab, or Bitbucket plus a software template (often RHDH). *This lab* uses Gitea so there is no `github.com` for learners. MintMaker in a client engagement maps to the in-cluster Renovate bot you meet in 3.3.
+image::gitea-templates-vs-learner-org.png[workshop-templates versus your lw-student remotes,width=700,link=self,window=blank]
 
 == Discover Gitea (never paste a hostname from this page)
 
@@ -100,7 +93,7 @@ chmod +x /tmp/learner-seed.sh
 /tmp/learner-seed.sh
 ----
 
-== Check: learner remote exists and is not the template org
+== Check: your remote exists and is not the template org
 
 [source,bash,role=execute]
 ----
@@ -124,21 +117,21 @@ include::partial$validate-job-report.adoc[]
 :validate-job-template: job-05.yaml
 include::partial$validate-job-rerun.adoc[]
 
-Honor system: 3.2 still opens. The Validate Job grades the Gitea remotes — not a screenshot.
+Honor system: 3.2 still opens. The Validate Job grades the Gitea remotes, not a screenshot.
 
 == Callout: RHDH (optional)
 
-Software Template `lightwell-java-service` can publish into the same org. It is *not* required for this Check. `lightwell-python-service` is the same golden-path idea (`requirements.txt` at repo root); that template is not enabled on this claim.
+Software Template `lightwell-java-service` can publish into the same org. It is *not* required for this Check. `lightwell-python-service` is the same golden-path idea (`requirements.txt` at repo root). That template is not enabled on this cluster.
 
 == Official documentation
 
-* link:{docs-rhdh-url}[Getting started with Red Hat Developer Hub^] (golden path / Software Templates in a client engagement)
+* link:{docs-rhdh-url}[Getting started with Red Hat Developer Hub^] (golden path / Software Templates)
 * link:{docs-rhtap-tech-url}[Technologies behind Trusted Application Pipeline^]
 
 == Key takeaways
 
-* TSSC source of truth is learner-owned git. Golden path is Gitea + templates (or RHDH), not a zip from GitHub.
-* Lightwell Network / Clearinghouse Premier GAVs are committed in 3.2; `renovate-bot` on the app repo is a side effect of seed (3.3 scores the PR).
+* TSSC source of truth is your git. Golden path is Gitea plus templates (or RHDH), not a zip from GitHub.
+* Lightwell Network / Clearinghouse Premier GAVs are committed in 3.2. `renovate-bot` on the app repo is a side effect of seed (3.3 scores the PR).
 
 :lab-cleanup-module: tssc-05
 include::partial$lab-cleanup.adoc[]

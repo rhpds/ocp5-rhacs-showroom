@@ -3,34 +3,26 @@
 :toc:
 :toclevels: 2
 
-Track 1 starts on a *published* Project Hummingbird / Red Hat Hardened Images runtime — not a Universal Base Image (UBI) you already trust from muscle memory, and not an image this cluster mirrored for you.
+== Overview
 
-In this module you discover the workshop pin from cluster userinfo, complete the incomplete ConfigMap snippet (placeholders fail the Check), and run `cosign verify` against that *published* digest. You do *not* run `oc-mirror` yet. That is xref:tssc-02-hummingbird-mirror.adoc[1.2].
+You verify a published Project Hummingbird / Red Hat Hardened Images runtime with `cosign` before anything is mirrored. You discover the workshop pin from cluster userinfo, complete the incomplete ConfigMap, and run `cosign verify` against that *published* digest. You do not run `oc-mirror` yet (xref:tssc-02-hummingbird-mirror.adoc[1.2]), and you do not rebuild the Hummingbird factory.
 
-This claim is *not* the Hummingbird factory (Fedora / Konflux on the inside). Consultants consume a signed catalog image.
+== Why it matters
 
-== How this serves TSSC
+Unsigned or unverified bases undermine every later signature, SBOM, and admission decision. Lightwell Network and Lightwell Clearinghouse Premier remediate application libraries. They are not this `FROM`. Hummingbird is the OS and runtime layer. A Premier GAV still needs a verified base.
 
-TSSC requires a *named, signed runtime input*. If the base is unsigned UBI from memory, every later signature, SBOM, and admission decision sits on an unproven foundation. 1.1 is the observation that Red Hat Hardened Images (`hi/openjdk`) carry a Red Hat key you can verify *before* the image enters the cluster.
+== What does it solve
 
-You learn the *configuration* of that verify (`--key`, digest pin, not `:latest`) because customers will ask you to write the same snippet against *their* catalog pin. Getting the key URL or the digest wrong is how a PoV “uses Hummingbird” without a supply chain.
-
-Lightwell Network and Lightwell Clearinghouse Premier do *not* replace this step. They remediate *application* libraries. Hummingbird is the OS/runtime layer. Premier member-specific GAVs still need a verified base; they never become a substitute `FROM`.
-
-== Learning objectives
-
-By the end of this module, you will be able to:
-
-* Observe TSSC’s trusted-runtime control: a published Hardened Images digest that `cosign verify` accepts against the Red Hat key
-* Discover the scored pull spec from ConfigMap userinfo (do not invent a tag from memory)
-* Complete the verify snippet so no `REPLACE_ME_*` remains, then run it against the *published* digest you recorded
-* Explain that Lightwell (Network or Clearinghouse Premier) is the library layer, not this base; the catalog index may list other architectures (this Check is amd64 only)
+* Runtime bases that were never signature-checked
+* Mutable tags such as `:latest` instead of a digest pin
+* Mixing the Hummingbird Red Hat key with in-cluster RHTAS
+* Treating Lightwell as a runtime substitute
 
 == Why verify before you mirror
 
-UBI is a general-purpose base. Red Hat Hardened Images (`registry.access.redhat.com/hi/…`) are a *minimal, signed* runtime: smaller attack surface, no package manager in the image, built for production constraints.
+UBI is a general-purpose base. Red Hat Hardened Images (`registry.access.redhat.com/hi/…`) are a *minimal, signed* runtime with a smaller attack surface and no package manager in the image. They are built for production constraints.
 
-A PoV that “uses Hummingbird” but never checks the signature is a story, not a supply chain. 1.1 proves the *published* coordinate. 1.2 copies that trust into the cluster dest. Track 3 is when application `FROM` switches — not here.
+1.1 proves the *published* coordinate. 1.2 copies that trust into the cluster dest. Track 3 is when application `FROM` switches. That switch is not this module.
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/49
 image::hummingbird-published-vs-dest.png[Published Hummingbird digest versus internal dest digest after learner oc-mirror,width=700,link=self,window=blank]
@@ -39,10 +31,6 @@ image::hummingbird-published-vs-dest.png[Published Hummingbird digest versus int
 ====
 A Hummingbird Python runtime uses the same verify story (`hi/python` or the pin your catalog names). This Check is the Java `hi/openjdk` pin from userinfo.
 ====
-
-== Delivery note
-
-*Customers* subscribe to Hardened Images and pin digests in their catalogs. *Red Hat* operates the factory and signing keys. *You* (this lab) consume the published pin, verify it, then mirror — you do not rebuild `openjdk` from source.
 
 == Prerequisites
 
@@ -162,7 +150,7 @@ Do *not*:
 
 == Callout: multi-arch
 
-The catalog index for this pin may list arm64 alongside amd64. This cluster and this Check are amd64. You recorded `hummingbird_amd64_manifest` so you can say that in a customer conversation without running a second architecture in the lab.
+The catalog index for this pin may list arm64 alongside amd64. This cluster and this Check are amd64. You recorded `hummingbird_amd64_manifest` so you can name the platform digest without running a second architecture in the lab.
 
 == Official documentation
 
@@ -171,7 +159,7 @@ The catalog index for this pin may list arm64 alongside amd64. This cluster and 
 
 == Key takeaways
 
-* TSSC starts with a signed published runtime. Consultants consume Hummingbird; they do not rebuild the factory.
+* TSSC starts with a signed published runtime. You consume Hummingbird. You do not rebuild the factory.
 * Verify the *published* digest before you mirror. 1.2 is a separate Check on the *internal* digest.
 * Lightwell Network / Clearinghouse Premier remediate libraries. They are not this `FROM`.
 * `cosign` was already on `PATH`. You did not download it from GitHub.

@@ -3,34 +3,29 @@
 :toc:
 :toclevels: 2
 
-The *promoted* app digest from xref:tssc-16-prod-gitops.adoc[6.2] must exist in *Red Hat Trusted Profile Analyzer (RHTPA)* / TPA as a system of record. This is not the Track 2 OSV read and not the GAV VEX blast-radius Check (xref:tssc-18-vex-acs.adoc[7.2]).
+== Overview
+
+The *promoted* app digest from xref:tssc-16-prod-gitops.adoc[6.2] must exist in Red Hat Trusted Profile Analyzer (RHTPA) as CycloneDX. That document is the system of record for what shipped. This is not the Track 2 OSV read and not the GAV VEX blast-radius lab (xref:tssc-18-vex-acs.adoc[7.2]).
 
 Showroom `syft` may be missing (`syft_baked=false`). Use the CycloneDX file from Task `syft-sbom-rhtpa` (xref:tssc-11-build-sbom.adoc[4.4]). Do *not* curl `github.com` for syft. Do *not* enable the live Red Hat CSAF importer as this gate.
 
-== How this serves TSSC
+== Why it matters
 
-TSSC compliance starts from the *promoted* artifact, not a laptop folder. 7.1 is the observation that TPA stores the CycloneDX SBOM for that digest. You should be able to find the Lightwell-pinned component in that document.
+Compliance starts from the promoted artifact, not a laptop folder. Trusted Profile Analyzer stores the CycloneDX SBOM for that digest. You should be able to find the Lightwell-pinned component in that document.
 
-You learn OIDC token ingest (`/api/v3/sbom`) and the TPA UI because customers keep a SoR (TPA, Dependency Track). RHDA on a laptop is the shift-left client of the same intelligence, not this Check.
+You ingest with an OIDC token (`/api/v3/sbom`) and confirm in the TPA UI. Organizations keep a system of record such as TPA or Dependency Track. RHDA on a laptop is the shift-left client of the same intelligence. It is not this lab.
 
-Lightwell Clearinghouse Premier member SBOMs ingest on the same API. Do not enable the live CSAF importer as this gate (OS-layer Hummingbird CSAF is a 7.2 callout).
+Lightwell Clearinghouse Premier member SBOMs ingest on the same API. Do not enable the live CSAF importer here. OS-layer Hummingbird CSAF is a 7.2 callout.
 
-== Learning objectives
+== What does it solve
 
-By the end of this module, you will be able to:
-
-* Observe TSSC’s system-of-record control: TPA holds a CycloneDX document for the *promoted* digest
-* Discover TPA URL and OIDC from userinfo (do not paste secrets into git)
-* Copy CycloneDX from ConfigMap `lab-sbom-cyclonedx` and ingest it; find that document in the TPA UI
-* Explain that Network and Premier library metadata is Track 7.2 (GAV VEX), not this app-SBOM ingest
+* No durable record of what the promoted digest contains
+* Curling GitHub for syft
+* Treating RHDA IDE as the system of record
 
 == TPA vs RHDA
 
-*TPA* is the SBOM / advisory system of record. *Red Hat Dependency Analytics (RHDA)* is the laptop IDE shift-left client of the same intelligence. This Check is TPA. No IDE in Showroom.
-
-== Delivery note
-
-*Customers* keep promoted artifacts in a SoR (TPA, Dependency Track, …). *You* ingest *this* digest — not a laptop folder and not a Hummingbird CSAF feed.
+*TPA* is the SBOM and advisory system of record. *Red Hat Dependency Analytics (RHDA)* is the laptop IDE shift-left client of the same intelligence. This lab is the TPA ingest. There is no IDE in Showroom.
 
 == Discover TPA (no secrets in git)
 
@@ -107,21 +102,21 @@ include::partial$validate-job-report.adoc[]
 :validate-job-template: job-17.yaml
 include::partial$validate-job-rerun.adoc[]
 
-Honor system: 7.2 still opens.
+Continue to xref:tssc-18-vex-acs.adoc[7.2] when you are ready.
 
 == Official documentation
 
 * link:{docs-rhtpa-url}[Overview of Red Hat Trusted Profile Analyzer^]
-* xref:rhda-shift-left.adoc[RHDA shift-left] (laptop client; not this Check)
+* xref:rhda-shift-left.adoc[RHDA shift-left] (laptop client, not this Check)
 
-== Callout: SPDX
+== SPDX callout
 
-Wheels typically ingest as SPDX; this Check looks for the CycloneDX document from the Maven / syft path. Either format is the system-of-record idea.
+Wheels typically ingest as SPDX. This Check looks for the CycloneDX document from the Maven / syft path. Either format is the system-of-record idea.
 
 == Key takeaways
 
-* TSSC compliance starts from the promoted artifact, not a laptop folder.
-* CSAF is not this Check. Lightwell Network / Clearinghouse Premier GAV VEX is 7.2.
+* Compliance starts from the promoted artifact, not a laptop folder.
+* CSAF is not this Check. Lightwell Network and Clearinghouse Premier GAV VEX is 7.2.
 
 :lab-cleanup-module: tssc-17
 include::partial$lab-cleanup.adoc[]

@@ -3,37 +3,34 @@
 :toc:
 :toclevels: 2
 
-Sign the *app* digest you built in xref:tssc-11-build-sbom.adoc[4.4] — not the Hummingbird base. This Check is *keyless* RHTAS (Fulcio, Rekor, TUF) plus `cosign verify` on *that* digest. Key-based sign + `--key` verify is a *second* Check (xref:tssc-14-disconnected-verify.adoc[5.3]). Do not treat keyless-only as Track 5 done.
+== Overview
 
-The seeded pipeline already has task `cosign-sign-keyless`. Placeholders in the PipelineRun fail that task until you fill live **in-cluster** Fulcio / Rekor / TUF URLs (`fulcio_internal_url` and friends). Route hints (`fulcio_url_hint`) are for Showroom `cosign verify` only — the build namespace cannot reach them after 4.3.
+You sign the application digest you built in xref:tssc-11-build-sbom.adoc[4.4] with keyless Red Hat Trusted Artifact Signer. Fulcio issues the short-lived certificate, Rekor records the signature, and TUF distributes the trust root. Then you run `cosign verify` on *that* digest.
 
-== How this serves TSSC
+This is not the Hummingbird runtime signature from Track 1. It is not Lightwell’s signed libraries. Key-based sign and `--key` verify are xref:tssc-14-disconnected-verify.adoc[5.3]. Do not treat keyless-only as Track 5 done.
 
-TSSC integrity is a signature on *your* application image, distinct from Red Hat’s Hummingbird key and from Lightwell’s signed libraries. 5.1 is the observation that the pipeline SA gets a short-lived Fulcio cert, Rekor records it, and `cosign verify` accepts that identity.
+The seeded pipeline already includes task `cosign-sign-keyless`. Placeholders in the PipelineRun fail that task until you fill live in-cluster Fulcio, Rekor, and TUF URLs (`fulcio_internal_url` and the matching keys). Route hints (`fulcio_url_hint`) are for Showroom `cosign verify` only. After 4.3 the build namespace cannot reach those Routes.
 
-You learn in-cluster Fulcio/Rekor/TUF URLs and the pipeline SA regexp because a Hummingbird key, a fake issuer, or a Route URL after 4.3 is not this control. Admission in Track 6 still needs the 5.3 public key for native ImagePolicy; keep both signatures.
+== Why it matters
+
+Integrity is a signature on *your* application image. That is distinct from Red Hat’s Hummingbird key and from Lightwell’s signed libraries. Until the app digest verifies, later admission and promotion sit on an unsigned artifact.
+
+You use in-cluster Fulcio, Rekor, and TUF URLs so the pipeline still signs after hermetic egress. A Hummingbird key, a fake issuer, or a Route URL after 4.3 is not this control. Admission in Track 6 still needs the 5.3 public key for native ImagePolicy. Keep both signatures.
 
 Lightwell Network and Clearinghouse Premier sign *dependencies*. They do not sign this app digest. Premier does not replace RHTAS.
 
-== Learning objectives
+== What does it solve
 
-By the end of this module, you will be able to:
-
-* Observe TSSC’s app-integrity control: keyless RHTAS sign plus `cosign verify` on the *learner-built* digest (not Hummingbird, not a Lightwell GAV)
-* Discover Fulcio, Rekor, and TUF from cluster userinfo and get `cosign-sign-keyless` to Succeeded
-* `cosign verify` that digest with the pipeline SA identity and Kubernetes OIDC issuer
-* Leave key-based sign + `--key` verify for xref:tssc-14-disconnected-verify.adoc[5.3]
+* Application images with no signature
+* Using Route URLs for Fulcio, Rekor, or TUF after 4.3 hermetic egress
+* Treating Hummingbird verify as enough for the app
 
 == Keyless vs keys
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/65
 image::keyless-rhtas-vs-keys.png[Keyless RHTAS Fulcio Rekor TUF versus later key-based verify,width=700,link=self,window=blank]
 
-Keyless is the *connected* PoV path: the pipeline SA presents an OIDC token, Fulcio issues a short-lived cert, Rekor records the signature, TUF distributes the trust root. Customers who cannot reach Fulcio at verify time still need xref:tssc-14-disconnected-verify.adoc[5.3].
-
-== Delivery note
-
-*Customers* get a signed image from CI (Sigstore / TAS). *You* prove *your* BuildConfig digest verifies keylessly against *this* cluster’s RHTAS. Admission (`oc tag` / ImagePolicy) is Track 6.
+Keyless is the connected path, when the cluster can reach Fulcio. The pipeline service account presents an OIDC token, Fulcio issues a short-lived cert, Rekor records the signature, and TUF distributes the trust root. When Fulcio is unreachable at verify time, you still need xref:tssc-14-disconnected-verify.adoc[5.3].
 
 == Discover RHTAS URLs
 
@@ -125,7 +122,7 @@ include::partial$validate-job-report.adoc[]
 :validate-job-template: job-12.yaml
 include::partial$validate-job-rerun.adoc[]
 
-Honor system: 5.2 still opens.
+Continue to xref:tssc-13-attest-conforma.adoc[5.2] when you are ready.
 
 == Official documentation
 
@@ -134,8 +131,8 @@ Honor system: 5.2 still opens.
 
 == Key takeaways
 
-* TSSC keyless signing is the connected path for the *app* digest; xref:tssc-14-disconnected-verify.adoc[5.3] adds a key-based signature on the same digest.
-* Lightwell Network / Clearinghouse Premier signed the library; they did not sign this image.
+* Keyless signing is the connected path for the *app* digest. xref:tssc-14-disconnected-verify.adoc[5.3] adds a key-based signature on the same digest.
+* Lightwell Network and Clearinghouse Premier signed the library. They did not sign this image.
 
 :lab-cleanup-module: tssc-12
 include::partial$lab-cleanup.adoc[]

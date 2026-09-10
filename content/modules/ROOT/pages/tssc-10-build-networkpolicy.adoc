@@ -3,35 +3,28 @@
 :toc:
 :toclevels: 2
 
-NetworkPolicy `build-egress` on `lw-poc-build` is seeded *too open* (allow-all egress). You tighten it to deny-egress with DNS + internal registry + Nexus + in-cluster Gitea + the Kubernetes API. 4.4 clone / `oc start-build` need those last two. Do *not* allow public registry hosts or the worked-example `8.8.8.8`.
+== Overview
 
-Do *not* copy this policy onto `lw-poc-staging` / `lw-poc-prod`. `app-operate` stays operate (Track 6).
+Tighten NetworkPolicy `build-egress` on `lw-poc-build` from allow-all to deny-egress plus DNS, registry, Nexus, Gitea, and the Kubernetes API. xref:tssc-11-build-sbom.adoc[4.4] clone and `oc start-build` need those last two. Do not allow public registry hosts or the worked-example `8.8.8.8`.
 
-== How this serves TSSC
+Do not copy this policy onto `lw-poc-staging` or `lw-poc-prod`. `app-operate` stays operate (Track 6).
 
-TSSC hermetic is enforced at the network, not only in grep. 4.3 is the observation that after you tighten `build-egress`, Maven Central, public registries, and even the Nexus *Route* fail from `lw-poc-build`. Lightwell Network GAVs must use the in-cluster Nexus service. Gitea clone must use the in-cluster URL.
+== Why it matters
 
-You learn namespaceSelectors and pod ports (not Service ports after DNAT) because a missing Gitea/Nexus/RHTAS allow breaks 4.4 and 5.1, and an extra public CIDR undoes the control. Build NP is not app operate.
+Hermetic must be enforced at the network, not only in grep. After you tighten `build-egress`, Maven Central, public registries, and even the Nexus Route fail from `lw-poc-build` for real. Lightwell Network GAVs must use the in-cluster Nexus service. Gitea clone must use the in-cluster URL.
 
-Lightwell Clearinghouse Premier does not need `packages.redhat.com` on this allow-list. Member artifacts are already in the proxy you allowed.
+Build NP is not app operate. Clearinghouse Premier does not need `packages.redhat.com` on this allow-list. Member artifacts are already in the proxy you allowed.
 
-== Learning objectives
+== What does it solve
 
-By the end of this module, you will be able to:
-
-* Observe TSSC’s hermetic-network control: `build-egress` on `lw-poc-build` allows only in-cluster DNS, registry, Nexus (Lightwell), Gitea, and API
-* Replace allow-all egress with the documented allow-list from userinfo (including Gitea and kube API)
-* Confirm the policy is live on `lw-poc-build` only, and that `registry.redhat.io` is *not* on the scored hermetic list
-* Explain that Network and Premier remediations keep working through Nexus `8081`, not through a new egress hole
+* Build pods that can egress anywhere
+* Reusing build NP on runtime namespaces
+* Allowing public registry CIDRs
 
 == Two policies, two Checks
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/51
 image::np-build-vs-app-operate.png[build-egress hermetic versus app-operate on staging and prod,width=700,link=self,window=blank]
-
-== Delivery note
-
-*Customers* isolate CI namespaces. *You* do not reuse the same NetworkPolicy on runtime namespaces.
 
 == Discover seed + allow-list hints
 
@@ -75,7 +68,7 @@ Allow-list (from userinfo keys — do not invent CIDRs except the kube API Clust
 * `trusted-artifact-signer` TCP `8080` (TUF), `5555` (Fulcio HTTP), `5554` (Fulcio gRPC), `3000` (Rekor)
 * `trusted-profile-analyzer` TCP `8080` (TPA Service is `443` → pod `8080`)
 
-Discover the API addresses (they differ per claim):
+Discover the API addresses (they differ per cluster).
 
 [source,bash,role=execute]
 ----
@@ -103,7 +96,7 @@ Pass when:
 * You did not copy it to `lw-poc-staging`
 * `app-operate` on staging/prod is still the operate seed
 
-After this tighten, a PipelineRun that still clones the Gitea HTTPS Route or resolves Maven from Central *will* hang or fail. That is the lesson — not a reason to reopen egress.
+After this tighten, a PipelineRun that still clones the Gitea HTTPS Route or resolves Maven from Central *will* hang or fail. That is the lesson, not a reason to reopen egress.
 
 `build-egress` applies to *pods* in `lw-poc-build`. Node/kubelet image pulls (Task step images, some BuildConfig strategy pulls) are not that NetworkPolicy. The prefetch Task image (`registry.access.redhat.com/ubi9/openjdk-21`) can still land after 4.3; xref:tssc-08-forbid-list.adoc[4.1]'s ImageStream import is what keeps the Dockerfile `FROM` internal. Do not add `registry.redhat.io` to the allow-list because a Task step pulled.
 

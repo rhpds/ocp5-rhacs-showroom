@@ -3,35 +3,31 @@
 :toc:
 :toclevels: 2
 
-Hermetic starts in *source*. Active build files must not fetch from the public internet: no leftover `curl` of random hosts, no Maven Central as the Lightwell remote, no `registry.access.redhat.com` / `registry.redhat.io` on the *active* Dockerfile `FROM` lines.
+== Overview
 
-xref:tssc-06-bind-base-deps.adoc[3.2] already pointed the *runtime* stage at dest Hummingbird. The *build* stage is still UBI on a public registry. 4.3 will deny that pull. While egress is still open, import a JDK builder into the internal registry and retarget the build `FROM`.
+Hermetic starts in source. Strip public `FROM`, `curl`, and Maven Central from active files. Import a builder ImageStream. Retarget `FROM`. Keep `Dockerfile.known-bad`.
+
+xref:tssc-06-bind-base-deps.adoc[3.2] already pointed the runtime stage at dest Hummingbird. The build stage is still UBI on a public registry. xref:tssc-10-build-networkpolicy.adoc[4.3] will deny that pull. While egress is still open, import a JDK builder into the internal registry and retarget the build `FROM`.
 
 This is not the prefetch Check (xref:tssc-09-prefetch.adoc[4.2]) and not the NetworkPolicy Check (xref:tssc-10-build-networkpolicy.adoc[4.3]).
 
-== How this serves TSSC
+== Why it matters
 
-TSSC hermetic production starts in git, not in a firewall ticket. 4.1 is the observation that Lightwell Network GAVs and dest Hummingbird only enter the image if active `Dockerfile` / `settings.xml` have no public fallback. A Central remote would bypass the proxy you configured in 2.1 the moment prefetch or NetworkPolicy is skipped.
+A Central remote bypasses the proxy the moment prefetch or NetworkPolicy is skipped. Lightwell Network GAVs and dest Hummingbird only enter the image if active `Dockerfile` and `settings.xml` have no public fallback. Keep `Dockerfile.known-bad` as the negative fixture xref:tssc-11-build-sbom.adoc[4.4] still uses.
 
-You learn the forbid patterns (`FROM` public registry, `curl`, public Maven index) and the internal ImageStream retarget because 4.3 will make those fetches fail for real. Keep `Dockerfile.known-bad` as the negative fixture 4.4 still uses.
-
-Lightwell Clearinghouse Premier does not add a public index. Member-specific GAVs must resolve from the *same* in-cluster Nexus service URL you point Maven at here.
+Clearinghouse Premier does not add a public index. Member-specific GAVs must resolve from the same in-cluster Nexus service URL you point Maven at here.
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/112
 image::forbid-list-public-vs-internal.png[Public FROM and Maven Central versus internal ImageStreams and Nexus so Lightwell GAVs stay inside the trust boundary,width=700,link=self,window=blank]
 
-== Learning objectives
+== What does it solve
 
-By the end of this module, you will be able to:
-
-* Observe TSSC’s hermetic-source control: active build files pull only internal ImageStreams and the enterprise Lightwell proxy
-* List the scored forbid patterns (`FROM` public registry, `curl` to the internet, public Maven index) and edit the files the BuildConfig actually uses until none remain
-* Keep a known-bad Dockerfile as a negative fixture
-* Explain that Network and Clearinghouse Premier artifacts must use `nexus_internal_url`, not Maven Central
+* Public `FROM`, Maven Central, or `curl` still in active files
+* Runtime `FROM` still on the Nexus Route that 4.3 will block
 
 == Seeded violations
 
-Clone the learner app if needed (`student_repo_url`). Inspect:
+Clone your app if needed (`student_repo_url`). Inspect:
 
 [source,bash,role=execute]
 ----
@@ -40,10 +36,6 @@ grep -nE 'FROM |curl |repo.maven.apache.org|registry.access.redhat.com|registry.
 ----
 
 Expect at least: build-stage `FROM` UBI on `registry.access.redhat.com`, and `repo.maven.apache.org` in `settings.xml`.
-
-== Delivery note
-
-*Customers* enforce hermetic *source* policies (Konflux “no network in the Containerfile”). *You* grep and fix git. The cluster NetworkPolicy is a later gate.
 
 == Worked example (not the Check)
 
@@ -121,7 +113,7 @@ On a pip app the same grep is `pypi.org` / public `index-url` in `requirements.t
 == Key takeaways
 
 * TSSC hermetic starts in source, before NP and prefetch.
-* Lightwell Network / Clearinghouse Premier GAVs stay on the internal Nexus service. Mapping: Konflux hermetic source policies → this Check. Product names: xref:appendix-konflux-mapping.adoc[Konflux mapping].
+* Lightwell Network and Clearinghouse Premier GAVs stay on the internal Nexus service. Konflux hermetic source policies map to this Check. Product names are in xref:appendix-konflux-mapping.adoc[Konflux mapping].
 
 :lab-cleanup-module: tssc-08
 include::partial$lab-cleanup.adoc[]

@@ -3,28 +3,24 @@
 :toc:
 :toclevels: 2
 
-Field Lightwell Network delivery almost always puts an *enterprise artifact manager* between developers and `packages.redhat.com`. This claim uses in-cluster Nexus as that stand-in. Direct remotes exist; *seeded* Nexus is the workshop default so the Check does not require live Lightwell membership.
+== Overview
 
-In this module you *complete* ConfigMap `stub-03-enterprise-proxy` (copying finished `lightwell-maven-settings` as the scored file fails). Maven must resolve a Validated GAV from Nexus, not Maven Central. You do *not* pin `.rhlw-*` yet — that is xref:tssc-04-remediated-pin.adoc[2.2]. You do *not* seed Gitea yet — that is Track 3.
+You complete ConfigMap `stub-03-enterprise-proxy` so Maven resolves a Validated GAV from in-cluster Nexus, not Maven Central. Copying finished `lightwell-maven-settings` as the scored file fails. You do not pin `.rhlw-*` yet (xref:tssc-04-remediated-pin.adoc[2.2]), and you do not seed Gitea yet (Track 3).
 
-== How this serves TSSC
+== Why it matters
 
-TSSC’s library input must be a *trusted repository*, not Maven Central. 2.1 is the observation that Lightwell Network Validated and Remediated are consumed the way customers already consume everything else: through Nexus or Artifactory remotes and virtuals.
+Trusted libraries must come from an enterprise artifact manager. A mis-pointed remote silently falls through to Maven Central. Hermetic Track 4 will deny that fallback. This module is where you wire the proxy before egress is closed.
 
-You learn `settings.xml` (repository ids, URLs, active profiles) because a mis-pointed remote silently falls through to Central and the rest of the chain (pin, prefetch, VEX) is theater. Hermetic Track 4 will deny that fallback; this module is where you wire the proxy *before* egress is closed.
+== What does it solve
 
-Lightwell Clearinghouse Premier remediations for member-specific versions still land in *this* proxy. There is no Premier-only Maven protocol. The same `settings.xml` profiles that hit Nexus Validated/Remediated are the profiles a Premier GAV would resolve from once the artifact manager caches it. That includes an *embargoed* GAV: it must resolve from the enterprise manager and must not fall through to Maven Central (the Artifactory include/exclude callout below is the customer form of that rule).
-
-== Learning objectives
-
-By the end of this module, you will be able to:
-
-* Observe TSSC’s trusted-library control: Maven resolves a Lightwell Network Validated GAV from the enterprise proxy, not from Maven Central
-* Contrast **direct**, **proxied (enterprise)**, and **seeded (RHDP)** consumption, and say why Clearinghouse Premier (including embargoed GAVs) uses the proxied pattern too
-* Produce a `settings.xml` that is not the worked-example file, with no `REPLACE_ME_*`
-* State how `pip.conf` and an Artifactory virtual/remote would do the same job
+* Builds that pull from Maven Central
+* No proxy between developers and packages.redhat.com
+* Mixing direct, proxied, and seeded consumption
+* Thinking Premier needs a different Maven protocol
 
 == Direct vs proxied vs seeded
+
+Direct remotes exist. Seeded Nexus is the workshop default so the Check does not require live Lightwell membership.
 
 [cols="1,2,2",options="header"]
 |===
@@ -32,25 +28,21 @@ By the end of this module, you will be able to:
 
 |*Direct*
 |{java-validated-url} / {java-remediated-url}
-|Laptop PoC or CI with Lightwell membership
+|Laptop or CI with Lightwell membership
 
 |*Proxied (enterprise)*
 |Nexus or Artifactory remotes/virtuals that fetch Lightwell
-|Nearly all customer PoVs — the pattern this lab scores
+|Typical enterprise. The pattern this lab scores
 
 |*Seeded (RHDP)*
 |Same Nexus repository *names*; Job `lightwell-repo-seed` uploaded stubs
-|This workshop default when live membership is unavailable
+|This workshop when live membership is unavailable
 |===
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/50
 image::artifact-direct-proxied-seeded.png[Direct packages.redhat.com versus enterprise Nexus or Artifactory proxy versus RHDP seeded Nexus,width=700,link=self,window=blank]
 
 Do *not* copy v1 `module-02-direct-vs-proxy.png` (different framing). The diagram above is the Track 2 visual.
-
-== Delivery note
-
-*Customers* already run Nexus or Artifactory. *You* wire remotes/virtuals at Lightwell Validated and Remediated. *Red Hat* operates `packages.redhat.com`. Nexus in this claim is an RHDP stand-in, not the product you sell.
 
 == Discover Nexus (do not invent the host)
 
@@ -200,11 +192,11 @@ oc -n lightwell-repo get configmap lightwell-pip-settings \
 
 == Callout: Artifactory (not installed)
 
-JFrog Artifactory is the SoW name for this enterprise-proxy pattern. The Check is still Nexus `settings.xml`. Do not paste an Artifactory client file as the scored settings.
+On your cluster you would configure Artifactory remotes and virtuals the same way. The Check is still Nexus `settings.xml`. Do not paste an Artifactory client file as the scored settings.
 
 [cols="1,2",options="header"]
 |===
-|This claim (Nexus) |Customer Artifactory
+|This workshop (Nexus) |Your Artifactory
 
 |Proxy or hosted Maven repo whose URL is Lightwell Validated / Remediated
 |*Remote* Maven repository. URL is `{java-validated-url}/` or `{java-remediated-url}/`. Product docs often use a repository key such as `lightwell-remote`.
@@ -229,10 +221,10 @@ Artifactory naming must allow the `.rhlw-*` version suffix (`3.14.0.rhlw-00001`)
 
 == Key takeaways
 
-* TSSC library input is the enterprise proxy. Consultants wire the customer’s artifact manager; Nexus is the RHDP stand-in.
+* TSSC library input is the enterprise proxy. You wire *your* artifact manager. Nexus is the workshop stand-in.
 * Clearinghouse Premier member versions (including during embargo) use the same remotes. They do not invent a second `settings.xml`.
 * `pip.conf` `index-url` is the PyPI analogue of these Nexus remotes.
-* Artifactory is remote + virtual + include/exclude against the same Lightwell URLs — not a second Check.
+* Artifactory is remote plus virtual plus include/exclude against the same Lightwell URLs. That is not a second Check.
 * 2.2 is the exact `.rhlw-*` pin, not this Validated resolve.
 
 :lab-cleanup-module: tssc-03

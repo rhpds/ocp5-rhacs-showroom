@@ -3,37 +3,35 @@
 :toc:
 :toclevels: 2
 
-Konflux *Conforma* (Enterprise Contract) is an `ec validate` policy on the image after sign. This claim maps that control to Task `conforma-policy` in namespace `lightwell-tasks`. The Task is *not* in the seeded pipeline. The seeded ConfigMap is *too permissive* (signature checks skipped, identity `.*`, CVE 999). Argo reverts edits to that object — copy it to `lw-poc-build` and tighten the *copy*.
+== Overview
 
-This Check is fail-then-pass on *signatures + policy*, not SLSA L3. There is no Tekton Chains on this claim and no `cosign attest` step. Leave `skip-att-sig-check=true` on the ConfigMap. Showroom `ec` is 0.7 (`ec-rhel9:0.7`): it has no `--skip-att-sig-check`, and `--ignore-rekor` breaks Fulcio timestamps on the *pass* path. The listing and Task ignore only `builtin.attestation.signature_check` in the report. Mapping: Konflux Conforma → this Task; Chains / in-toto → callout. Full table: xref:appendix-konflux-mapping.adoc[Appendix: Konflux mapping].
+You copy the too-permissive Conforma seed and tighten *your* copy. Unsigned builder images must fail. The signed app digest from 5.1 must pass. You run that gate as Task `conforma-policy` in namespace `lightwell-tasks`. The Task is *not* in the seeded pipeline.
 
-== How this serves TSSC
+This is not SLSA L3. There is no Tekton Chains on this cluster and no `cosign attest` step. Leave `skip-att-sig-check=true` on the ConfigMap. Showroom `ec` is 0.7 (`ec-rhel9:0.7`). It has no `--skip-att-sig-check`, and `--ignore-rekor` breaks Fulcio timestamps on the pass path. The listing and Task ignore only `builtin.attestation.signature_check` in the report. Konflux Conforma maps to this Task. Chains and in-toto are a callout. Full table is xref:appendix-konflux-mapping.adoc[Konflux mapping].
 
-TSSC policy must be able to *fail*. 5.2 is the observation that an unsigned in-cluster image (`openjdk-21-builder`) violates `builtin.image.signature_check`, then your 5.1 digest passes. A pipeline that always passes is a demo.
+The seeded ConfigMap skips signature checks, uses identity `.*`, and sets CVE 999. Argo reverts edits to that object. Copy it to `lw-poc-build` and tighten the copy.
 
-You learn to copy and tighten the ConfigMap (skip-image off, identity not `.*`, registry prefix internal) because Argo owns the seed and a wildcard identity would accept anything. Task order is after `cosign-sign-keyless`.
+== Why it matters
 
-Lightwell Network and Clearinghouse Premier do not replace Conforma. Library VEX is Track 7. Conforma here gates *image signature and identity*. A Premier GAV inside an unsigned image still fails.
+Policy must be able to fail. A pipeline that always passes is not a gate. You own the policy copy. Do not fetch a bundle from `quay.io` or `github.com`.
 
-== Learning objectives
+You copy and tighten the ConfigMap because Argo owns the seed. A wildcard identity would accept anything. Task order is after `cosign-sign-keyless`.
 
-By the end of this module, you will be able to:
+Lightwell Network and Clearinghouse Premier do not replace Conforma. Library VEX is Track 7. Conforma here gates image signature and identity. A Premier GAV inside an unsigned image still fails.
 
-* Observe TSSC’s policy-gate control: unsigned / wrong-identity images fail; the signed app digest passes against a policy *you* own
-* Copy the weak seed ConfigMap into the build namespace and tighten it (skip-image off, identity not `.*`, CVE not 999)
-* Wire Task `conforma-policy` *after* `cosign-sign-keyless` (not the worked-example order)
-* Fail `ec validate` on the in-cluster builder, then pass on the digest from 5.1
+== What does it solve
+
+* Policy that never fails
+* Unsigned work that still ships
+* Wildcard identity that accepts any signer
+* Editing the Argo-owned seed instead of a copy you own
 
 == Why Conforma
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/67
 image::conforma-seed-vs-tightened.png[Too-permissive Conforma seed versus learner-tightened copy in lw-poc-build,width=700,link=self,window=blank]
 
-A pipeline that always passes is a demo, not a gate. You own the policy. Do not fetch a bundle from `quay.io` or `github.com`.
-
-== Delivery note
-
-*Customers* on hosted Konflux attach Conforma to the build. *You* sell the *control* (unsigned / wrong-identity images fail) implemented as a namespaced Task plus a ConfigMap *you* tightened.
+The seed is too permissive. Your copy in `lw-poc-build` is the gate. Do not fetch a bundle from `quay.io` or `github.com`.
 
 == Discover the seed (do not paste the example)
 
@@ -137,7 +135,7 @@ include::partial$validate-job-report.adoc[]
 :validate-job-template: job-13.yaml
 include::partial$validate-job-rerun.adoc[]
 
-Honor system: xref:tssc-14-disconnected-verify.adoc[5.3] still opens. Track 6 still opens.
+Continue to xref:tssc-14-disconnected-verify.adoc[5.3] when you are ready. Track 6 still opens.
 
 == Official documentation
 
@@ -146,13 +144,13 @@ Honor system: xref:tssc-14-disconnected-verify.adoc[5.3] still opens. Track 6 st
 
 == Callout
 
-SLSA L3 / Tekton Chains is a mapping sentence, not this Check. Full table: xref:appendix-konflux-mapping.adoc[Konflux mapping].
+SLSA L3 / Tekton Chains is a mapping sentence, not this Check. Full table is xref:appendix-konflux-mapping.adoc[Konflux mapping].
 
 == Key takeaways
 
-* TSSC policy is learner-owned, not a passing default.
-* Lightwell Network / Clearinghouse Premier do not skip this gate.
-* This claim is not SLSA L3; leave `skip-att-sig-check=true` and ignore `builtin.attestation.signature_check` in the `ec` report (do not use `--ignore-rekor`).
+* You own the Conforma policy copy. A passing default is not a gate.
+* Lightwell Network and Clearinghouse Premier do not skip this gate.
+* This lab is not SLSA L3. Leave `skip-att-sig-check=true` and ignore `builtin.attestation.signature_check` in the `ec` report. Do not use `--ignore-rekor`.
 
 :lab-cleanup-module: tssc-13
 include::partial$lab-cleanup.adoc[]

@@ -3,36 +3,31 @@
 :toc:
 :toclevels: 2
 
-xref:tssc-12-sign-keyless.adoc[5.1] already signed the *app* digest keylessly with RHTAS. This Check is a *second* signature on *that same digest*: you generate a cosign key pair on Showroom, `cosign sign --key`, then `cosign verify --key`. Do not treat keyless-only as Track 5 done.
+== Overview
 
-This cluster stays *networked*. You are practicing the disconnected *procedure* (keys you can carry), not a physical air-gap. Mirrored TUF for keyless verifiers, and a simulated media drop, live in xref:appendix-disconnected-playbook.adoc[Appendix: disconnected transfer].
+xref:tssc-12-sign-keyless.adoc[5.1] already signed the *app* digest keylessly with RHTAS. This lab adds a *second* signature on *that same digest*. You generate a cosign key pair, run `cosign sign --key`, then `cosign verify --key`. Do not treat keyless-only as Track 5 done.
 
-== How this serves TSSC
+The cluster stays networked. You practice the procedure for when Fulcio is unreachable. You are not building a physical air-gap. Mirrored TUF for keyless verifiers, and a simulated media drop, live in xref:appendix-disconnected-playbook.adoc[Appendix: disconnected transfer].
 
-TSSC must still verify when Fulcio is unreachable. 5.3 is the observation that a key-based signature you control travels with the digest. Native ImagePolicy in 6.1 cannot hold the 5.1 SA URI; CRI-O admission uses *this* `cosign.pub`.
+== Why it matters
 
-You learn `generate-key-pair`, `--tlog-upload=false`, and publishing the PEM to ConfigMap `lab-cosign-pubkey` because that is the plant procedure. Do not claim this cluster is a diode.
+You must still verify when Fulcio is unreachable. A key-based signature you control travels with the digest. Native ImagePolicy in 6.1 cannot hold the 5.1 service-account URI. CRI-O admission uses *this* `cosign.pub`.
 
-Lightwell Network and Clearinghouse Premier artifacts may already have their own signatures. This Check is the *app* image for admission. Premier does not replace the key pair.
+You generate the pair, sign with `--tlog-upload=false`, and publish the PEM to ConfigMap `lab-cosign-pubkey` so 6.1 can render ImagePolicy. Do not claim this cluster is a diode.
 
-== Learning objectives
+Lightwell Network and Clearinghouse Premier artifacts may already have their own signatures. This lab signs the *app* image for admission. Premier does not replace the key pair.
 
-By the end of this module, you will be able to:
+== What does it solve
 
-* Observe TSSC’s disconnected-verify control: a second, key-based signature on the same app digest, while the claim stays on the network
-* Generate a cosign key pair under `~/lab-trust`, attach `cosign sign --key` without a Rekor tlog, and `cosign verify --key`
-* Publish `cosign.pub` to ConfigMap `lab-cosign-pubkey` so Track 6.1 can render ImagePolicy
-* Explain that Lightwell (Network or Premier) library signatures are a different layer
+* No way to verify when public key servers are out of reach
+* Treating keyless-only as Track 5 done
+* Committing private keys
 
 == Why a second signature
 
-Keyless (5.1) needs Fulcio at *sign* time and a TUF root at *verify* time. Customers who cannot reach Fulcio still need a public key they control. You add that signature here. Native `ImagePolicy` `signedEmail` cannot hold the 5.1 Kubernetes SA URI, so xref:tssc-15-gitops-admission.adoc[6.1] CRI-O admission uses *this* `cosign.pub`. Keep the keyless signature on the image; do not strip it.
+Keyless (5.1) needs Fulcio at *sign* time and a TUF root at *verify* time. When Fulcio is unreachable you still need a public key you control. You add that signature here. Native `ImagePolicy` `signedEmail` cannot hold the 5.1 Kubernetes service-account URI, so xref:tssc-15-gitops-admission.adoc[6.1] CRI-O admission uses *this* `cosign.pub`. Keep the keyless signature on the image. Do not strip it.
 
 The two-column picture is on xref:tssc-12-sign-keyless.adoc[5.1 Keyless vs keys].
-
-== Delivery note
-
-*Customers* in a disconnected plant verify with keys (and a mirrored TUF root for *keyless* artifacts). *You* generate the pair on this terminal and sign the digest you already built. *Red Hat* does not operate a data diode on RHDP.
 
 == Discover the 5.1 digest
 
@@ -61,7 +56,7 @@ cosign verify --key ~/example-not-lab-trust/demo.pub \
 
 == Your change: key pair, sign `--key`
 
-Empty password is for this lab terminal only so the execute block is non-interactive. Do not reuse that pattern in a customer plant. Do not commit `cosign.key`. `export HOME=/tmp/lab-home` is only so `cosign login` does not write Docker config into the real home; keep `--key` / `--from-file` on `/home/lab-user/lab-trust` (tilde follows `HOME`).
+Empty password is for this lab terminal only so the execute block is non-interactive. Do not reuse that empty-password pattern when you issue keys for your own organization. Do not commit `cosign.key`. `export HOME=/tmp/lab-home` is only so `cosign login` does not write Docker config into the real home. Keep `--key` / `--from-file` on `/home/lab-user/lab-trust` (tilde follows `HOME`).
 
 [source,bash,role=execute]
 ----
@@ -119,12 +114,12 @@ include::partial$validate-job-report.adoc[]
 :validate-job-template: job-14.yaml
 include::partial$validate-job-rerun.adoc[]
 
-Honor system: Track 6 still opens.
+Continue to Track 6 when you are ready.
 
 == Official documentation
 
 * link:{docs-rhtas-url}[Trusted Artifact Signer deployment guide^] (key-based `cosign` alongside keyless)
-* xref:appendix-disconnected-playbook.adoc[Disconnected transfer] (mirrored TUF; not this Check)
+* xref:appendix-disconnected-playbook.adoc[Disconnected transfer] (mirrored TUF, not this Check)
 
 == Callout
 
@@ -132,10 +127,10 @@ TUF `root.json` and Fulcio/Rekor PEMs are *not* this Check. Pack them in the xre
 
 == Key takeaways
 
-* Track 5 is keyless *and* a key-based signature you created. That is TSSC portability, not a data diode.
+* Track 5 is keyless *and* a key-based signature you created. That is portability, not a data diode.
 * Publish `cosign.pub` to `tssc-admission/lab-cosign-pubkey`. 6.1 CRI-O admission uses it.
-* The private key stays on Showroom. Never Git.
-* Lightwell Network / Clearinghouse Premier did not produce this key pair.
+* The private key stays on Showroom. Never commit it to Git.
+* Lightwell Network and Clearinghouse Premier did not produce this key pair.
 
 :lab-cleanup-module: tssc-14
 include::partial$lab-cleanup.adoc[]

@@ -3,25 +3,25 @@
 :toc:
 :toclevels: 2
 
-Production is a *second Gitea remote* (`student_prod_gitops_repo_url` → `lw-student/gitops-prod-spring-boot-lw-poc`), not a second Helm file in the stage repo. Seed digest is `sha256:REPLACE_ME_PROD_DIGEST`; `replicas: 0`; there is *no* TrustPolicy on the prod tree (admission already landed on `lw-poc-prod` from 6.1).
+== Overview
 
-You commit the *same signed digest* used on stage. Check fails if Application `lw-poc-prod` still tracks the stage remote.
+You commit the *same signed digest* to a *second* Gitea remote (`student_prod_gitops_repo_url` points at `lw-student/gitops-prod-spring-boot-lw-poc`). Production is not a second Helm file in the stage repo. The seed digest is `sha256:REPLACE_ME_PROD_DIGEST`, replicas start at 0, and there is *no* TrustPolicy on the prod tree. Admission already landed on `lw-poc-prod` from 6.1.
 
-== How this serves TSSC
+The Check fails if Application `lw-poc-prod` still tracks the stage remote.
 
-TSSC promotion is a *deliberate git commit* to production desired state, not retargeting Argo at stage. 6.2 is the observation that `lw-poc-prod` sources the prod remote, ImagePolicy from 6.1 still holds, and the digest is the one you signed.
+== Why it matters
 
-You learn a second clone and `cosign copy` onto the prod ImageStream because `oc tag` still does not copy `.sig` tags. Konflux Release Service maps to this commit.
+Production is a deliberate git commit to production desired state. It is not retargeting Argo at stage. ImagePolicy from 6.1 still holds. The digest is the one you signed.
+
+You clone the prod remote and `cosign copy` onto the prod ImageStream because `oc tag` still does not copy `.sig` tags. Konflux Release Service maps to this commit.
 
 Lightwell Network and Clearinghouse Premier do not change the promote remote. The GAV is already inside the digest.
 
-== Learning objectives
+== What does it solve
 
-By the end of this module, you will be able to:
-
-* Observe TSSC’s production-promote control: the same signed digest is committed to a *prod* GitOps remote; Argo does not track stage
-* `oc tag` into `lw-poc-prod`, `cosign copy` (and dest `cosign sign --key`), then set digest + `replicas: 1` on the prod remote
-* Keep `lw-poc-prod` `.spec.source.repoURL` on the prod remote; leave the stage Application and TrustPolicy file alone
+* Production that is not a separate digest-pinned promote
+* Pointing prod Argo at stage
+* A second Helm file in the stage repo
 
 == Why two remotes
 
@@ -29,10 +29,6 @@ By the end of this module, you will be able to:
 image::gitops-stage-vs-prod-remotes.png[Stage versus prod Gitea remotes — promotion is a commit to the second remote,width=700,link=self,window=blank]
 
 Konflux *Release Service* maps to this commit (xref:appendix-konflux-mapping.adoc[Konflux mapping]). Do not “fix” a broken prod app by pointing Argo at stage.
-
-== Delivery note
-
-*Customers* promote by merging to a prod GitOps repo (or Release). *You* push the digest you already signed. Unsigned deny from 6.1 must still hold.
 
 == Worked example (not the Check)
 
@@ -123,7 +119,7 @@ include::partial$validate-job-report.adoc[]
 :validate-job-template: job-16.yaml
 include::partial$validate-job-rerun.adoc[]
 
-Honor system: Track 7 still opens.
+Continue to Track 7 when you are ready.
 
 == Official documentation
 
@@ -132,8 +128,8 @@ Honor system: Track 7 still opens.
 
 == Key takeaways
 
-* TSSC promotion is a git commit to a second remote, not a second values file and not retargeting prod Argo at stage.
-* Lightwell Network / Clearinghouse Premier ride inside the digest. They are not a different promote button.
+* Promotion is a git commit to a second remote, not a second values file and not retargeting prod Argo at stage.
+* Lightwell Network and Clearinghouse Premier ride inside the digest. They are not a different promote button.
 
 :lab-cleanup-module: tssc-16
 include::partial$lab-cleanup.adoc[]

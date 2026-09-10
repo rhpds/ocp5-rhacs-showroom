@@ -3,35 +3,35 @@
 :toc:
 :toclevels: 2
 
-Promote the signed app digest into *stage* via GitOps, then turn on portable admission so unsigned images cannot run. You edit *one* file: `admission/trust-policy.yaml` (`kind: TrustPolicy`) on the *stage* Gitea remote. A CronJob renders namespaced `ImagePolicy` on `lw-poc-staging` *and* `lw-poc-prod`. Do not apply `ClusterImagePolicy`. Do not use RHACS Trusted image signers for this gate.
+== Overview
 
-Native `ImagePolicy` `signedEmail` must be an email. Track 5.1 identity is a Kubernetes SA URI, so the CronJob renders `policyType: PublicKey` from ConfigMap `lab-cosign-pubkey` (the 5.3 `cosign.pub` you published). Keep the 5.1 SA URI in TrustPolicy — that is still the Fulcio identity. `oc tag` does not copy `.sig` tags; `cosign copy` (and a dest-repo `cosign sign --key`) after the tag.
+You promote the signed app digest into *stage* via GitOps, then turn on admission so unsigned images cannot run. You edit *one* file on the *stage* Gitea remote. That file is `admission/trust-policy.yaml` (`kind: TrustPolicy`). A CronJob renders namespaced `ImagePolicy` on `lw-poc-staging` *and* `lw-poc-prod`. Do not apply `ClusterImagePolicy`. Do not use RHACS Trusted image signers for this gate.
 
-Prod GitOps is a *second remote* — leave it for xref:tssc-16-prod-gitops.adoc[6.2]. `app-operate` NetworkPolicy on staging stays *open* (that is not the xref:tssc-10-build-networkpolicy.adoc[4.3] build-egress Check).
+Native `ImagePolicy` `signedEmail` must be an email. Track 5.1 identity is a Kubernetes service-account URI, so the CronJob renders `policyType: PublicKey` from ConfigMap `lab-cosign-pubkey` (the 5.3 `cosign.pub` you published). Keep the 5.1 service-account URI in TrustPolicy. That is still the Fulcio identity. `oc tag` does not copy `.sig` tags. Use `cosign copy` (and a dest-repo `cosign sign --key`) after the tag.
 
-== How this serves TSSC
+Prod GitOps is a *second remote*. Leave it for xref:tssc-16-prod-gitops.adoc[6.2]. `app-operate` NetworkPolicy on staging stays *open*. That is not the xref:tssc-10-build-networkpolicy.adoc[4.3] build-egress lab.
 
-TSSC runtime enforcement is: only the signed digest runs. 6.1 is the observation that GitOps sets that digest on stage, and unsigned deny is a *pull* failure (`ImagePullBackOff`), not `oc apply` stderr. Lightwell pins inside the image do not admit an unsigned tag.
+== Why it matters
 
-You learn TrustPolicy (`enforce: true`, live digest, pipeline SA subject) plus `cosign copy` after `oc tag` because signatures do not travel with `oc tag` by themselves. Prod Argo stays on the prod remote.
+Only the signed digest may run. Lightwell pins inside the image do not admit an unsigned tag. Unsigned deny is a *pull* failure (`ImagePullBackOff`), not `oc apply` stderr.
+
+You fill TrustPolicy (`enforce: true`, live digest, pipeline service-account subject) and run `cosign copy` after `oc tag` because signatures do not travel with `oc tag` by themselves. Prod Argo stays on the prod remote.
 
 Lightwell Network and Clearinghouse Premier are already in the image as GAVs. Admission does not inspect Maven. A Premier member version does not skip unsigned deny.
 
-== Learning objectives
+== What does it solve
 
-By the end of this module, you will be able to:
-
-* Observe TSSC’s admit-and-promote control: stage GitOps runs the signed digest; an unsigned tag on the same ImageStream is denied at pull
-* `oc tag` the signed image into `lw-poc-staging`, `cosign copy` signatures, and commit digest + `replicas: 1` to the *stage* GitOps remote
-* Fill TrustPolicy so no `REPLACE_ME_*` remains and `enforce: true`
-* Leave the prod remote and prod Argo Application untouched
+* Unsigned images that still deploy
+* Signatures that are not copied after `oc tag`
+* Using `ClusterImagePolicy` instead of namespaced `ImagePolicy`
+* Mixing stage and prod remotes
 
 == Stage vs prod remotes
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/52
 image::gitops-stage-vs-prod-remotes.png[Stage versus prod Gitea remotes, Argo Applications, and namespaces,width=700,link=self,window=blank]
 
-Discover URLs from userinfo. The Gitea password is the *value* of ConfigMap key `student_password` (not the key name) — do not put that value in Git or a screenshot.
+Discover URLs from userinfo. The Gitea password is the *value* of ConfigMap key `student_password` (not the key name). Do not put that value in Git or a screenshot.
 
 [source,bash,role=execute]
 ----
@@ -40,10 +40,6 @@ oc -n gitea get configmap demo-userinfo-gitea \
 oc -n tssc-admission get configmap demo-userinfo-admission \
   -o jsonpath='scored={.data.scored_kind}{"\n"}live={.data.live_kind}{"\n"}hint={.data.unsigned_deny_hint}{"\n"}'
 ----
-
-== Delivery note
-
-*Customers* promote a signed digest with GitOps and admit only that identity. *You* commit to Gitea and fill TrustPolicy; the cluster renders `ImagePolicy`. A production VM is the *same digest* on a different runtime (bootc / Satellite) — callout only, no VM in this claim.
 
 == Worked example (not the Check)
 
@@ -173,7 +169,7 @@ include::partial$validate-job-report.adoc[]
 :validate-job-template: job-15.yaml
 include::partial$validate-job-rerun.adoc[]
 
-Honor system: 6.2 still opens.
+Continue to xref:tssc-16-prod-gitops.adoc[6.2] when you are ready.
 
 == Official documentation
 
@@ -182,14 +178,14 @@ Honor system: 6.2 still opens.
 
 == Callouts (not Checks)
 
-* A production *VM* is the same signed digest on bootc / Satellite. No VM in this claim.
-* Canary and blue-green are other strategies for that digest. This lab scores *rolling* (default Deployment).
+* A production *VM* is the same signed digest on bootc / Satellite. No VM in this lab.
+* Canary and blue-green are other strategies for that digest. This lab uses *rolling* (default Deployment).
 
 == Key takeaways
 
-* TSSC admission is namespaced `ImagePolicy` from one learner TrustPolicy (not `ClusterImagePolicy`).
-* Lightwell Network / Clearinghouse Premier GAVs do not bypass unsigned deny.
-* SA URI subjects render `PublicKey` from 5.3 `lab-cosign-pubkey`; `oc tag` needs `cosign copy`.
+* Admission is namespaced `ImagePolicy` from one TrustPolicy file you own. It is not `ClusterImagePolicy`.
+* Lightwell Network and Clearinghouse Premier GAVs do not bypass unsigned deny.
+* Service-account URI subjects render `PublicKey` from 5.3 `lab-cosign-pubkey`. `oc tag` needs `cosign copy`.
 * Promotion to prod is a git commit to a second remote (6.2).
 
 :lab-cleanup-module: tssc-15
