@@ -11,12 +11,13 @@ This course offers hands-on experience with Kubernetes-native security on Red Ha
 * *Use consoles in Showroom, or open them in a new tab* — Keep this guide open. Prefer the console tabs on the right of the lab UI. To open a link in a new browser tab: on a Mac, *<cmd> click*; on Windows/Linux, *<ctrl> click* or right-click → "Open in new tab."
 * *Use the bastion* — Run `oc`, `roxctl`, and `podman` on the RHEL bastion.
 * *Cluster services come from GitOps* — RHACS, Quay, GitOps, Compliance Operator, and the vulnerable demo apps are already synced by Argo CD.
-* *Run the bastion setup script* — That step only configures your CLI token and workshop images in Quay.
+* *Run the bastion setup script* — That step configures your CLI token, workshop images in Quay, and TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
 * *Work the catalog in order, or jump in* — 101 → 201 → 301, then the product deep-dives (RHACS, Virtualization, Lightwell TSSC).
 
+[[environment-setup]]
 == Environment setup
 
-Cluster-wide install (RHACS, Quay, GitOps, Compliance Operator, demo apps) is already applied by OpenShift GitOps. From the *Terminal* tab, run the remaining bastion steps: RHACS CLI access and workshop images.
+Cluster-wide install (RHACS, Quay, GitOps, Compliance Operator, demo apps) is already applied by OpenShift GitOps. From the *Terminal* tab, run the remaining bastion steps: RHACS CLI access, workshop images, and TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----

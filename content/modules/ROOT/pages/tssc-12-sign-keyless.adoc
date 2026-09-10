@@ -34,7 +34,7 @@ Keyless is the connected path, when the cluster can reach Fulcio. The pipeline s
 
 == Discover RHTAS URLs
 
-`cosign` is already on Showroom `PATH`. Do *not* curl `github.com` for the CLI.
+`cosign` is installed by Welcome xref:index.adoc#environment-setup[Environment setup] into `~/.local/bin`. Do *not* curl `github.com` for the CLI.
 
 [source,bash,role=execute]
 ----

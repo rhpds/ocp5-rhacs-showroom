@@ -96,13 +96,14 @@ bash setup/lab-environment.sh \
 Lab environment setup
 Details: /home/lab-user/.acs-roadshow/lab-environment-YYYYMMDD-HHMMSS.log
 
-[############################] 8/8  Lab environment setup complete
+[############################] 9/9  Lab environment setup complete
 
 ================================================================
   SUCCESS: Lab environment setup completed successfully
 ================================================================
 
   ✓ RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)
+  ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)
   ✓ demo-apps cloned for image builds (cluster deploy is GitOps)
   ✓ Quay images ready (golden base + frontend, when image steps ran)
   ✓ Env file: /home/lab-user/.acs-roadshow/env

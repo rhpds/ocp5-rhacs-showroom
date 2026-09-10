@@ -5,7 +5,7 @@
 
 == Overview
 
-You verify a published Project Hummingbird / Red Hat Hardened Images runtime with `cosign` before anything is mirrored. You discover the workshop pin from cluster userinfo, complete the incomplete ConfigMap, and run `cosign verify` against that *published* digest. You do not run `oc-mirror` yet (xref:tssc-02-hummingbird-mirror.adoc[1.2]), and you do not rebuild the Hummingbird factory.
+You verify a published Project Hummingbird / Red Hat Hardened Images runtime with `cosign` before anything is mirrored. You discover the workshop pin from cluster userinfo, complete the incomplete ConfigMap, and run `cosign verify` against that *published* digest. 
 
 == Why it matters
 
@@ -20,9 +20,9 @@ Unsigned or unverified bases undermine every later signature, SBOM, and admissio
 
 == Why verify before you mirror
 
-UBI is a general-purpose base. Red Hat Hardened Images (`registry.access.redhat.com/hi/…`) are a *minimal, signed* runtime with a smaller attack surface and no package manager in the image. They are built for production constraints.
+UBI is a general-purpose base image. Red Hat Hardened Images (`registry.access.redhat.com/hi/…`) are a *minimal, signed* runtime with a smaller attack surface and no package manager in the image. They are built for production constraints.
 
-1.1 proves the *published* coordinate. 1.2 copies that trust into the cluster dest. Track 3 is when application `FROM` switches. That switch is not this module.
+1.1 proves the *published* coordinate. 1.2 copies that trust into the cluster dest. Track 3 is when application `FROM` switches. 
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/49
 image::hummingbird-published-vs-dest.png[Published Hummingbird digest versus internal dest digest after learner oc-mirror,width=700,link=self,window=blank]
@@ -34,16 +34,17 @@ A Hummingbird Python runtime uses the same verify story (`hi/python` or the pin 
 
 == Prerequisites
 
-* Showroom terminal. `cosign` is already on `PATH` (copied in-cluster). Do *not* curl `github.com` for CLIs.
-* ConfigMaps `demo-userinfo-lightwell-repo` (namespace `lightwell-repo`) and `demo-userinfo-showroom` (namespace `showroom`).
+* Bastion or Showroom terminal after xref:index.adoc#environment-setup[Environment setup] on the Welcome page (`setup/lab-environment.sh`). That script installs `cosign`, `oc-mirror`, and `ec` into `~/.local/bin` from Red Hat images. Do *not* curl `github.com` for CLIs.
+* ConfigMap `demo-userinfo-lightwell-repo` in namespace `lightwell-repo`.
+* If `command -v cosign` prints nothing, run `source ~/.bashrc` or re-run the Welcome setup block.
 
-.Confirm the lab CLIs
+.Confirm the lab CLIs (expect a path and a version, not an empty prompt)
 [source,bash,role=execute]
 ----
 command -v cosign
 command -v oc-mirror
-oc -n showroom get configmap demo-userinfo-showroom \
-  -o jsonpath='{.data.lab_clis}{"\n"}{.data.do_not_curl_github}{"\n"}'
+cosign version
+oc-mirror version
 ----
 
 == Discover the published pin
@@ -54,19 +55,12 @@ Do *not* paste a digest from chat, a slide, or this page’s narrative. The live
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
-  -o jsonpath='{.data.hummingbird_source_pullspec}{"\n"}'
+  -o jsonpath='{.data.hummingbird_source_pullspec}{"\n"}{.data.dest_registry_host}{"\n"}'
 ----
 
-.Record the amd64 manifest digest (callout — the Check does not inspect architectures)
-[source,bash,role=execute]
-----
-oc -n showroom get configmap demo-userinfo-showroom \
-  -o jsonpath='{.data.hummingbird_amd64_manifest}{"\n"}{.data.hummingbird_source_registry}{"\n"}'
-----
+Keep the pull spec. The `@sha256:…` on that line is the *index* (it may list more than amd64). This cluster and this Check are amd64. Dual-arch hands-on is out of this lab.
 
-Keep both values. The pull spec’s `@sha256:…` is the *index* (it may list more than amd64). `hummingbird_amd64_manifest` is the platform digest this workshop scores. Dual-arch hands-on is out of this lab.
-
-== Worked example (not the Check)
+== Here's an example for you
 
 The following verifies a *different* image with a *non-Red Hat* key URL. If your Check uses this block unchanged, it fails.
 
@@ -150,7 +144,7 @@ Do *not*:
 
 == Callout: multi-arch
 
-The catalog index for this pin may list arm64 alongside amd64. This cluster and this Check are amd64. You recorded `hummingbird_amd64_manifest` so you can name the platform digest without running a second architecture in the lab.
+The catalog index for this pin may list arm64 alongside amd64. This cluster and this Check are amd64. The pull spec you recorded is the index digest. You do not run a second architecture in the lab.
 
 == Official documentation
 
@@ -162,7 +156,7 @@ The catalog index for this pin may list arm64 alongside amd64. This cluster and 
 * TSSC starts with a signed published runtime. You consume Hummingbird. You do not rebuild the factory.
 * Verify the *published* digest before you mirror. 1.2 is a separate Check on the *internal* digest.
 * Lightwell Network / Clearinghouse Premier remediate libraries. They are not this `FROM`.
-* `cosign` was already on `PATH`. You did not download it from GitHub.
+* `cosign` and `oc-mirror` came from Welcome xref:index.adoc#environment-setup[Environment setup] (`~/.local/bin`). You did not download them from GitHub.
 
 :lab-cleanup-module: tssc-01
 include::partial$lab-cleanup.adoc[]

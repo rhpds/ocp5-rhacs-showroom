@@ -38,6 +38,11 @@ ROADSHOW_ENV_FILE="${HOME}/.acs-roadshow/env"
 # current Alpine (3.24.1 today); catalog Clair indexes it but leaves version_id
 # empty, so Quay's Security Scan column shows Passed / namespace "".
 PYTHON_ALPINE_BASE="${PYTHON_ALPINE_BASE:-docker.io/library/python:3.12-alpine3.20}"
+# TSSC CLIs: same registry.redhat.io pins as Lightwell Showroom (no github.com).
+COSIGN_IMAGE="${COSIGN_IMAGE:-registry.redhat.io/rhtas/cosign-rhel9:1.3.0}"
+OC_MIRROR_IMAGE="${OC_MIRROR_IMAGE:-registry.redhat.io/openshift4/oc-mirror-plugin-rhel9:v4.20}"
+EC_IMAGE="${EC_IMAGE:-registry.redhat.io/rhtas/ec-rhel9:0.7}"
+INSTALL_TSSC_CLIS_ONLY=false
 
 # Persist lab vars to a dedicated env file (safe to source from scripts) and ~/.bashrc
 # (for interactive shells). Never source ~/.bashrc from this script — bastion images
@@ -84,9 +89,10 @@ usage() {
 Usage: lab-environment.sh [options]
 
 Options:
-  --quay-user USER          Quay admin username (required unless --deploy-skupper-only)
-  --quay-password PASS      Quay admin password (required unless --deploy-skupper-only)
+  --quay-user USER          Quay admin username (required unless --deploy-skupper-only or --install-tssc-clis-only)
+  --quay-password PASS      Quay admin password (required unless --deploy-skupper-only or --install-tssc-clis-only)
   --deploy-skupper-only     Deploy patient-portal after frontend repo is public in Quay
+  --install-tssc-clis-only  Install cosign, oc-mirror, and ec into ~/.local/bin, then exit
   --skip-demo-apps          Skip cloning the demo-apps repository
   --apply-demo-apps         oc apply demo-apps manifests (GitOps deploys these by default)
   --skip-images             Skip golden image and frontend build/push
@@ -103,6 +109,7 @@ while [[ $# -gt 0 ]]; do
     --quay-user) QUAY_USER=$2; shift 2 ;;
     --quay-password) QUAY_PASSWORD=$2; shift 2 ;;
     --deploy-skupper-only) DEPLOY_SKUPPER_ONLY=true; shift ;;
+    --install-tssc-clis-only) INSTALL_TSSC_CLIS_ONLY=true; shift ;;
     --skip-demo-apps) SKIP_DEMO_APPS=true; shift ;;
     --apply-demo-apps) SKIP_DEMO_APPLY=false; shift ;;
     --skip-images) SKIP_IMAGES=true; shift ;;
@@ -138,8 +145,127 @@ deploy_skupper() {
   echo "Patient portal deployed. Frontend image: ${QUAY_URL}/${QUAY_USER}/frontend:0.1"
 }
 
+ensure_lab_local_bin() {
+  local dest="${HOME}/.local/bin"
+  mkdir -p "${dest}"
+  export PATH="${dest}:${PATH}"
+  if ! grep -qE '(^|:)\$HOME/\.local/bin|^export PATH="\$HOME/\.local/bin' "${HOME}/.bashrc" 2>/dev/null; then
+    printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "${HOME}/.bashrc"
+  fi
+}
+
+# Copy a named binary out of a registry.redhat.io image (same method as Lightwell Showroom).
+install_cli_from_rh_image() {
+  local name="$1"
+  local image="$2"
+  local dest="${HOME}/.local/bin/${name}"
+  local work pull src found="" outdir
+  ensure_lab_local_bin
+  if command -v "${name}" >/dev/null 2>&1; then
+    local existing
+    existing="$(command -v "${name}")"
+    if [[ -f "${existing}" && "$(head -c 4 "${existing}")" == $'\x7fELF' ]]; then
+      echo "${name} already on PATH (${existing})"
+      return 0
+    fi
+  fi
+  echo "Installing ${name} from ${image}"
+  work="$(mktemp -d)"
+  pull="${work}/.dockerconfigjson"
+  if ! oc -n openshift-config extract secret/pull-secret --keys=.dockerconfigjson --to="${work}" --confirm >/dev/null; then
+    echo "Error: could not read openshift-config/pull-secret (needed to pull ${image})." >&2
+    rm -rf "${work}"
+    return 1
+  fi
+  for src in "/usr/bin/${name}" "/usr/local/bin/${name}"; do
+    outdir="${work}/out"
+    rm -rf "${outdir}"
+    mkdir -p "${outdir}"
+    if oc image extract "${image}" \
+      --registry-config="${pull}" \
+      --filter-by-os linux/amd64 \
+      --path "${src}:${outdir}" \
+      --confirm \
+      || oc image extract "${image}" \
+        --registry-config="${pull}" \
+        --path "${src}:${outdir}" \
+        --confirm; then
+      found="$(find "${outdir}" -type f -name "${name}" -print -quit 2>/dev/null || true)"
+      if [[ -n "${found}" && "$(head -c 4 "${found}")" == $'\x7fELF' ]]; then
+        chmod 0755 "${found}"
+        mv "${found}" "${dest}"
+        rm -rf "${work}"
+        hash -r 2>/dev/null || true
+        echo "Installed ${name} -> ${dest}"
+        return 0
+      fi
+    fi
+  done
+  echo "Falling back to a cluster pod to copy ${name} from ${image}"
+  local ns="${TSSC_CLI_EXTRACT_NS:-default}"
+  local pod="roadshow-extract-${name}"
+  oc -n "${ns}" delete pod "${pod}" --ignore-not-found --wait=true >/dev/null 2>&1 || true
+  if ! oc -n "${ns}" run "${pod}" \
+    --image="${image}" \
+    --restart=Never \
+    --image-pull-policy=IfNotPresent \
+    --command -- /bin/sh -c 'sleep 300'; then
+    echo "Error: could not start extract pod for ${name}." >&2
+    rm -rf "${work}"
+    return 1
+  fi
+  if ! oc -n "${ns}" wait --for=condition=Ready "pod/${pod}" --timeout=180s; then
+    oc -n "${ns}" describe "pod/${pod}" >&2 || true
+    oc -n "${ns}" delete pod "${pod}" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+    rm -rf "${work}"
+    return 1
+  fi
+  src="$(oc -n "${ns}" exec "${pod}" -- /bin/sh -c \
+    "for c in /usr/bin/${name} /usr/local/bin/${name}; do if [ -x \"\$c\" ]; then echo \$c; exit 0; fi; done; command -v ${name}")" || true
+  if [[ -z "${src}" ]]; then
+    oc -n "${ns}" delete pod "${pod}" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+    echo "Error: ${name} not found inside ${image}." >&2
+    rm -rf "${work}"
+    return 1
+  fi
+  oc -n "${ns}" cp "${pod}:${src}" "${dest}"
+  oc -n "${ns}" delete pod "${pod}" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+  chmod 0755 "${dest}"
+  rm -rf "${work}"
+  if [[ "$(head -c 4 "${dest}")" != $'\x7fELF' ]]; then
+    echo "Error: extracted ${dest} is not an ELF binary." >&2
+    return 1
+  fi
+  hash -r 2>/dev/null || true
+  echo "Installed ${name} -> ${dest}"
+}
+
+ensure_tssc_clis() {
+  ensure_lab_local_bin
+  install_cli_from_rh_image cosign "${COSIGN_IMAGE}" || return 1
+  install_cli_from_rh_image oc-mirror "${OC_MIRROR_IMAGE}" || return 1
+  install_cli_from_rh_image ec "${EC_IMAGE}" || return 1
+  echo "TSSC CLIs on PATH:"
+  command -v cosign
+  command -v oc-mirror
+  command -v ec
+  cosign version || true
+  oc-mirror version || true
+  ec version || ec --version || true
+  echo "If command -v still prints nothing in this SSH session, run: source ~/.bashrc"
+}
+
+do_tssc_clis() {
+  ensure_tssc_clis
+}
+
 if [[ "${DEPLOY_SKUPPER_ONLY}" == true ]]; then
   deploy_skupper
+  exit 0
+fi
+
+if [[ "${INSTALL_TSSC_CLIS_ONLY}" == true ]]; then
+  ensure_tssc_clis
   exit 0
 fi
 
@@ -156,7 +282,7 @@ fi
 
 # Count top-level lab steps (cluster RHACS/Compliance/apps come from GitOps)
 TOTAL=0
-TOTAL=$((TOTAL + 2)) # admin + wait central
+TOTAL=$((TOTAL + 3)) # admin + tssc clis + wait central
 [[ "${SKIP_RHACS_CONFIGURE}" != true ]] && TOTAL=$((TOTAL + 1))
 TOTAL=$((TOTAL + 2)) # CLI vars + verify API
 [[ "${SKIP_DEMO_APPS}" != true ]] && TOTAL=$((TOTAL + 1)) # clone
@@ -215,8 +341,8 @@ ensure_roxctl() {
     echo "Error: ROX_CENTRAL_ADDRESS is unset; cannot download roxctl." >&2
     return 1
   fi
+  ensure_lab_local_bin
   dest="${HOME}/.local/bin"
-  mkdir -p "${dest}"
   tmp="$(mktemp)"
   echo "roxctl not found; downloading CLI from Central..."
   # Central's download API requires auth (anonymous → 401).
@@ -240,10 +366,6 @@ ensure_roxctl() {
   fi
   chmod +x "${tmp}"
   mv "${tmp}" "${dest}/roxctl"
-  export PATH="${dest}:${PATH}"
-  if ! grep -qE '(^|:)\$HOME/\.local/bin|^export PATH="\$HOME/\.local/bin' "${HOME}/.bashrc" 2>/dev/null; then
-    printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "${HOME}/.bashrc"
-  fi
   hash -r 2>/dev/null || true
   command -v roxctl >/dev/null 2>&1
 }
@@ -427,6 +549,7 @@ do_frontend_image() {
 }
 
 progress_run "Verify OpenShift access" do_verify_admin
+progress_run "Install TSSC CLIs (cosign, oc-mirror, ec)" do_tssc_clis
 progress_run "Wait for RHACS Central" do_wait_central
 
 # Kick off RHACS configure in the background so demo apps / Quay work can overlap.
@@ -498,6 +621,7 @@ load_roadshow_env
 
 progress_success_banner "Lab environment setup completed successfully" \
   "RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)" \
+  "TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)" \
   "demo-apps cloned for image builds (cluster deploy is GitOps)" \
   "Quay images ready (golden base + frontend, when image steps ran)" \
   "Env file: ${ROADSHOW_ENV_FILE}" \

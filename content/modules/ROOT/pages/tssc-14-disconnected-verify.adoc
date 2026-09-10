@@ -31,7 +31,7 @@ The two-column picture is on xref:tssc-12-sign-keyless.adoc[5.1 Keyless vs keys]
 
 == Discover the 5.1 digest
 
-`cosign` is already on Showroom `PATH`. Private keys never go in Git or a screenshot.
+`cosign` is installed by Welcome xref:index.adoc#environment-setup[Environment setup] into `~/.local/bin`. Private keys never go in Git or a screenshot.
 
 [source,bash,role=execute]
 ----
