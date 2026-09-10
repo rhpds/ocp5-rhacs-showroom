@@ -217,27 +217,32 @@ You walk *one* Java (Maven) supply chain on this OpenShift environment. The item
 
 The nav does not lock. You can open 7.2 first. Nothing in this workshop pastes the answer for you. If you skip a *Check*, later steps fail for real (wrong `FROM`, no signature, unsigned image denied).
 
-Each lab has an in-cluster *Validate Job* in `lw-poc-validate`. Do the *Your change*. Fill that module’s report ConfigMap token. Run the Job (delete it if it already exists, create it from ConfigMap `validate-job-templates`, read the logs). Then continue. There is no Solve. Unlimited retries.
+Each lab has two objects. Filling the report token alone does not pass.
 
-Here is 1.1 as an example.
+* *Your change* is the scored ConfigMap, git file, or cluster object named on that page. For 1.1 that is ConfigMap `stub-01-hummingbird-verify` in namespace `lightwell-repo` (the `published-verify.sh` snippet, with no `REPLACE_ME`).
+* *The report* is ConfigMap `report-…` in `lw-poc-validate`. After the work is done, set one key to a short token. Empty or `REPLACE_ME` on the report also fails.
 
-:report-name: report-01-hummingbird-verify
-:report-key: consume_published
-:report-token: consume-published
-include::partial$validate-job-report.adoc[]
+Then run the *Validate Job* in `lw-poc-validate`. Delete it if it already exists. Create it from ConfigMap `validate-job-templates`. Read the logs. Expect `CHECK PASSED`. If you see `CHECK FAILED`, the log names the object to fix. There is no Solve. Unlimited retries.
 
-:validate-job: validate-01-hummingbird-verify
-:validate-job-template: job-01.yaml
-include::partial$validate-job-rerun.adoc[]
+Do not run a Validate Job from this overview. The first Check is at the end of xref:tssc-01-hummingbird-verify.adoc[1.1 Verify Hummingbird], after you fill the stub and run `cosign verify`.
 
 The same three commands appear on every *Check*, with that module’s Job name.
+
+[source,bash]
+----
+oc -n lw-poc-validate delete job validate-<module> --ignore-not-found
+TPL='job-<nn>.yaml'
+oc -n lw-poc-validate get configmap validate-job-templates \
+  -o go-template="{{ index .data \"${TPL}\" }}" | oc create -f -
+oc -n lw-poc-validate logs -f job/validate-<module>
+----
 
 == Before you start
 
 * This guide runs in the RHDP *Showroom* (lab nav plus embedded terminal).
 * `oc`, `cosign`, `oc-mirror`, and `ec` are already on `PATH`. Do *not* curl `github.com` for CLIs.
 * Console URLs and passwords for Gitea, Keycloak, RHTPA, and Developer Hub are on xref:index.adoc[Welcome]. CLI steps still discover hosts from `demo-userinfo-*` ConfigMaps. Do not invent Route hosts. Do not use GitHub as lab git. Gitea is in-cluster.
-* Checks are Validate Jobs in `lw-poc-validate`. The example above shows how to run one.
+* Checks are Validate Jobs in `lw-poc-validate`. Do *Your change* first. Then fill the report token. Then run the Job from that lab’s *Check* section.
 * Never commit credentials (`LW_USERNAME` / `LW_PASSWORD`, `student_password`, `cosign.key`).
 
 == Related documentation
