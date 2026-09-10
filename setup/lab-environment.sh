@@ -344,6 +344,36 @@ wait_for_quay() {
   return 1
 }
 
+# FEATURE_USER_INITIALIZE creates the first account via this API. The GitOps
+# Job often finishes (or fails) before registry-quay-app is Ready, so the
+# bastion does it after /v2/ returns 401.
+initialize_quay_admin() {
+  local url="$1" user="$2" password="$3"
+  local email="${user}@example.com" body code
+  body="$(
+    QUAY_USERNAME="${user}" QUAY_PASSWORD="${password}" QUAY_EMAIL="${email}" \
+      python3 -c 'import json,os; print(json.dumps({"username":os.environ["QUAY_USERNAME"],"password":os.environ["QUAY_PASSWORD"],"email":os.environ["QUAY_EMAIL"],"access_token": True}))'
+  )"
+  echo "Initializing Quay admin user '${user}'..."
+  code="$(curl -sk -o /tmp/quay-init.json -w '%{http_code}' \
+    -X POST "https://${url}/api/v1/user/initialize" \
+    -H "Content-Type: application/json" \
+    -d "${body}" || true)"
+  echo "Quay initialize HTTP ${code}"
+  cat /tmp/quay-init.json 2>/dev/null || true
+  echo
+  case "${code}" in
+    200|201) echo "Quay admin user created" ;;
+    400|409) echo "Quay admin user already exists" ;;
+    *) echo "Warning: Quay initialize returned HTTP ${code:-000}" ;;
+  esac
+}
+
+podman_login_quay() {
+  local url="$1" user="$2" password="$3"
+  podman login --tls-verify=false "${url}" -u "${user}" -p "${password}"
+}
+
 do_quay_login() {
   ensure_podman || return 1
   QUAY_URL="$(detect_quay_url)" || {
@@ -354,7 +384,25 @@ do_quay_login() {
   persist_var QUAY_URL "${QUAY_URL}"
   echo "Using Quay at ${QUAY_URL}"
   wait_for_quay "${QUAY_URL}" || return 1
-  podman login "${QUAY_URL}" -u "${QUAY_USER}" -p "${QUAY_PASSWORD}"
+  initialize_quay_admin "${QUAY_URL}" "${QUAY_USER}" "${QUAY_PASSWORD}"
+  if podman_login_quay "${QUAY_URL}" "${QUAY_USER}" "${QUAY_PASSWORD}"; then
+    return 0
+  fi
+  local cluster_pass=""
+  cluster_pass="$(oc -n quay get secret quay-admin-password -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)"
+  if [[ -n "${cluster_pass}" && "${cluster_pass}" != "${QUAY_PASSWORD}" ]]; then
+    echo "Login failed with the Showroom password; trying secret/quay-admin-password..."
+    initialize_quay_admin "${QUAY_URL}" "${QUAY_USER}" "${cluster_pass}"
+    if podman_login_quay "${QUAY_URL}" "${QUAY_USER}" "${cluster_pass}"; then
+      persist_var QUAY_PASSWORD "${cluster_pass}"
+      return 0
+    fi
+  fi
+  echo "Error: podman login to ${QUAY_URL} failed for user '${QUAY_USER}'." >&2
+  echo "Create the first user (once) with:" >&2
+  echo "  curl -sk -X POST 'https://${QUAY_URL}/api/v1/user/initialize' -H 'Content-Type: application/json' \\" >&2
+  echo "    -d '{\"username\":\"${QUAY_USER}\",\"password\":\"<password>\",\"email\":\"${QUAY_USER}@example.com\",\"access_token\":true}'" >&2
+  return 1
 }
 
 do_golden_image() {
