@@ -73,6 +73,54 @@ TIP: Using the Showroom allows you to move through the console tabs while you wo
 |Password| {openshift_gitops_password}
 |===
 
+=== SSO (Keycloak)
+
+TSSC identity for RHTPA. Open the *SSO (Keycloak)* tab (or go to `{keycloak_url}/admin/[{keycloak_url}/admin/^]`). Use `tpa-user` on the RHTPA tab — not this admin console — when the lab asks you to sign in to Trusted Profile Analyzer.
+
+[cols="1,1"]
+|===
+|Admin console| {keycloak_url}/admin/[{keycloak_url}/admin/^]
+|Admin username| {keycloak_admin_username}
+|Admin password| {keycloak_admin_password}
+|TPA username| {keycloak_username}
+|TPA password| {keycloak_password}
+|===
+
+=== Red Hat Trusted Profile Analyzer (RHTPA)
+
+. Open the *RHTPA* tab (or go to `{rhtpa_url}[{rhtpa_url}^]`).
+. Sign in with the TPA user (Keycloak realm `tpa`).
+
+[cols="1,1"]
+|===
+|Console URL| {rhtpa_url}[{rhtpa_url}^]
+|Username| {rhtpa_username}
+|Password| {rhtpa_password}
+|===
+
+=== Gitea
+
+. Open the *Gitea* tab (or go to `{gitea_url}[{gitea_url}^]`).
+. Sign in with the credentials below.
+
+[cols="1,1"]
+|===
+|Console URL| {gitea_url}[{gitea_url}^]
+|Username| {gitea_username}
+|Password| {gitea_password}
+|===
+
+=== Red Hat Developer Hub
+
+. Open the *Developer Hub* tab (or go to `{rhdh_url}[{rhdh_url}^]`).
+. Choose *Guest* — Developer Hub has no workshop password.
+
+[cols="1,1"]
+|===
+|Console URL| {rhdh_url}[{rhdh_url}^]
+|Sign-in| Guest (no password)
+|===
+
 === Showroom Terminal
 
 Use the *Terminal* tab (or SSH) for CLI work (`oc`, `roxctl`, `podman`, `curl`, etc.).

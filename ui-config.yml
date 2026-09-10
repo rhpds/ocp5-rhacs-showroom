@@ -20,8 +20,9 @@ tabs:
     url: 'https://central-reencrypt-stackrox.${DOMAIN}'
   - name: OpenShift GitOps
     url: 'https://openshift-gitops-server-openshift-gitops.${DOMAIN}'
+  # RHDP RHBK already owns sso.<domain> (realm keycloak). TSSC Keycloak is sso-tpa.
   - name: SSO (Keycloak)
-    url: 'https://sso.${DOMAIN}/realms/tpa/account/'
+    url: 'https://sso-tpa.${DOMAIN}/admin/'
     external: true
   - name: RHTPA
     url: 'https://server-trusted-profile-analyzer.${DOMAIN}'

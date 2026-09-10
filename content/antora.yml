@@ -18,6 +18,10 @@ asciidoc:
     quay_admin_username: admin
     quay_user: admin
     student_username: student
+    gitea_username: student
+    keycloak_admin_username: admin
+    keycloak_username: tpa-user
+    rhtpa_username: tpa-user
     cosign_version: v2.4.3
     lightwell-console-url: 'https://console.redhat.com/lightwell'
     lightwell-product-url: 'https://www.redhat.com/en/lightwell'

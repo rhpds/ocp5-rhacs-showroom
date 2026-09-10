@@ -32,3 +32,18 @@
 // VM
 :vm_user: cloud-user
 :vm_password: {common_password}
+
+// Lightwell TSSC — Route hosts must match GitOps + ui-config.yml.
+// RHDP already owns sso.<domain> (RHBK); TSSC Keycloak is sso-tpa.<domain>.
+:gitea_url: https://gitea.{openshift_cluster_ingress_domain}
+:gitea_username: student
+:gitea_password: {common_password}
+:keycloak_url: https://sso-tpa.{openshift_cluster_ingress_domain}
+:keycloak_admin_username: admin
+:keycloak_admin_password: {common_password}
+:keycloak_username: tpa-user
+:keycloak_password: {common_password}
+:rhtpa_url: https://server-trusted-profile-analyzer.{openshift_cluster_ingress_domain}
+:rhtpa_username: tpa-user
+:rhtpa_password: {common_password}
+:rhdh_url: https://backstage-developer-hub-rhdh.{openshift_cluster_ingress_domain}
