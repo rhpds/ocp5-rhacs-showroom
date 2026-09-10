@@ -289,7 +289,7 @@ do_apply_demo_apps() {
 detect_quay_url() {
   local ns route host
   for ns in quay quay-enterprise; do
-    for route in quay-quay quay; do
+    for route in registry-quay quay-quay quay; do
       host="$(oc -n "${ns}" get route "${route}" -o jsonpath='{.spec.host}' 2>/dev/null || true)"
       if [[ -n "${host}" ]]; then
         echo "${host}"

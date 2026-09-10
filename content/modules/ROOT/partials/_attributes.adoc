@@ -25,8 +25,8 @@
 :acs_portal_password: {common_password}
 
 // Quay
-:quay_url: quay.{openshift_cluster_ingress_domain}
-:quay_console_url: https://quay.{openshift_cluster_ingress_domain}
+:quay_url: registry-quay-quay.{openshift_cluster_ingress_domain}
+:quay_console_url: https://registry-quay-quay.{openshift_cluster_ingress_domain}
 :quay_admin_password: {common_password}
 
 // VM
