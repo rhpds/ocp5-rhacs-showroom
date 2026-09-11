@@ -75,22 +75,37 @@ cosign verify \
 
 == Your change: complete the verify ConfigMap
 
-The scored object is ConfigMap `stub-01-hummingbird-verify` in `lightwell-repo` (not a file you invent only in Showroom home). Extract it, replace every `REPLACE_ME_*` with values you discovered (pull spec from userinfo; key URL from the Hardened Images verify documentation below), then write it back. Leave a placeholder and the Check fails. Do not copy the ubi-minimal worked example.
+The Check grades ConfigMap `stub-01-hummingbird-verify` in namespace `lightwell-repo`, key `published-verify.sh`. That key is a short shell script. It ships with two placeholders. You copy it to your home directory, fill those two strings, then write the file back onto the same ConfigMap. A file that exists only on the bastion does not pass. Leave `REPLACE_ME` in the cluster object and the Check fails.
 
-.Extract the incomplete seed
+There are exactly two substitutions.
+
+[cols="1,2",options="header"]
+|===
+|Placeholder in the seed |What you put there
+
+|`REPLACE_ME_HUMMINGBIRD_PULLSPEC`
+|The `hummingbird_source_pullspec` line you printed under *Discover the published pin* (the `hi/openjdk` digest, not `ubi-minimal`)
+
+|`REPLACE_ME_COSIGN_KEY`
+|`https://security.access.redhat.com/data/63405576.txt` (Red Hat Hardened Images public key, from the docs link below)
+|===
+
+Do not paste the ubi-minimal worked example. Do not use an in-cluster Fulcio or Rekor URL. This Check is Red Hat’s published key, not Track 5 RHTAS.
+
+.1. Copy the seed out of the ConfigMap
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap stub-01-hummingbird-verify \
   -o jsonpath='{.data.published-verify\.sh}' > ~/track-1-1-published-verify.sh
+cat ~/track-1-1-published-verify.sh
 ----
 
-The seed looks like this (placeholders fail):
+You should see both `REPLACE_ME_*` strings. The seed looks like this:
 
 [source,bash]
 ----
 #!/usr/bin/env bash
 set -euo pipefail
-# Scored snippet — not paste-identical to the worked example.
 export HUMMINGBIRD_PUBLISHED='REPLACE_ME_HUMMINGBIRD_PULLSPEC'
 cosign verify \
   --key REPLACE_ME_COSIGN_KEY \
@@ -98,23 +113,46 @@ cosign verify \
   "${HUMMINGBIRD_PUBLISHED}"
 ----
 
-Red Hat documents key-based verify for Hardened Images (not in-cluster RHTAS Fulcio — that is Track 5, on *your* app image). On non-RHEL hosts the published pattern is:
-
-* `--key https://security.access.redhat.com/data/63405576.txt`
-* `--insecure-ignore-tlog`
-
-That host is Red Hat’s key distribution, not `github.com`. If the fetch is blocked on a locked-down claim, stop and tell an instructor — do not invent a Fulcio identity for this Check.
-
-See link:{docs-hardened-images-url}[Verify the integrity of Red Hat Hardened Images^] (key-based `cosign verify`, including `--key https://security.access.redhat.com/data/63405576.txt`).
-
-.Write the snippet back to the ConfigMap (after you filled the placeholders)
+.2. Fill both placeholders from live userinfo (do not type a digest from this page)
 [source,bash,role=execute]
 ----
+PIN="$(oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
+  -o jsonpath='{.data.hummingbird_source_pullspec}')"
+echo "PIN=${PIN}"
+test -n "${PIN}"
+
+cat > ~/track-1-1-published-verify.sh <<ENDSCRIPT
+#!/usr/bin/env bash
+set -euo pipefail
+export HUMMINGBIRD_PUBLISHED='${PIN}'
+cosign verify --key https://security.access.redhat.com/data/63405576.txt --insecure-ignore-tlog "\${HUMMINGBIRD_PUBLISHED}"
+ENDSCRIPT
+
 chmod +x ~/track-1-1-published-verify.sh
+cat ~/track-1-1-published-verify.sh
+----
+
+The `PIN=` line must be a `registry.access.redhat.com/hi/openjdk` pull spec with `@sha256:`. The script body must show that pull spec and the `63405576.txt` key URL, with no `REPLACE_ME`.
+
+See link:{docs-hardened-images-url}[Verify the integrity of Red Hat Hardened Images^] for why that key URL is the documented non-RHEL verify pattern. That host is Red Hat key distribution, not `github.com`. If the fetch is blocked, stop and tell an instructor.
+
+.3. Write the filled script back onto the ConfigMap
+[source,bash,role=execute]
+----
 oc -n lightwell-repo create configmap stub-01-hummingbird-verify \
   --from-file=published-verify.sh=$HOME/track-1-1-published-verify.sh \
   --dry-run=client -o yaml | oc apply -f -
-grep -E 'REPLACE_ME' ~/track-1-1-published-verify.sh && echo 'STILL HAS PLACEHOLDERS' || echo 'placeholders gone'
+----
+
+.4. Confirm the *cluster* object is filled (this is what the Check reads)
+[source,bash,role=execute]
+----
+oc -n lightwell-repo get configmap stub-01-hummingbird-verify \
+  -o jsonpath='{.data.published-verify\.sh}'
+echo
+oc -n lightwell-repo get configmap stub-01-hummingbird-verify \
+  -o jsonpath='{.data.published-verify\.sh}' | grep -E 'REPLACE_ME' \
+  && echo 'STILL HAS PLACEHOLDERS' || echo 'placeholders gone'
 ----
 
 == Check: published `cosign verify`
