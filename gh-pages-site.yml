@@ -1,9 +1,9 @@
 ---
-# Antora playbook for GitHub Pages
-# Public URL: https://mfosterrox.github.io/openshift-security-roadshow/
+# Antora playbook for GitHub Pages.
+# CI overwrites site.url with the Pages base URL from actions/configure-pages.
 site:
   title: OpenShift Security Roadshow
-  url: https://mfosterrox.github.io/openshift-security-roadshow
+  url: https://mfosterrox.github.io/ocp5-rhacs-showroom
   start_page: modules::index.adoc
 
 content:
@@ -13,7 +13,7 @@ content:
 
 ui:
   bundle:
-    url: https://github.com/jnewsome97/rhdp_showroom_theme_execute/releases/download/rh-one-2025-execute-v3/ui-bundle.zip
+    url: https://github.com/jnewsome97/rhdp_showroom_theme_execute/releases/download/rh-one-2025-execute-v4/ui-bundle.zip
     snapshot: true
   supplemental_files:
     - path: ./content/supplemental-ui

@@ -1,21 +1,33 @@
-# openshift-security-roadshow
+# OpenShift Security Roadshow
 
-Public site (GitHub Pages): **https://mfosterrox.github.io/openshift-security-roadshow/**
+Hands-on Showroom labs for Kubernetes-native security on Red Hat OpenShift Container Platform. The catalog covers platform foundations, Red Hat Advanced Cluster Security (RHACS), Lightwell Trusted Software Supply Chain, and OpenShift Virtualization hardening.
 
-=== Getting Started
+**Live site:** [https://mfosterrox.github.io/ocp5-rhacs-showroom/](https://mfosterrox.github.io/ocp5-rhacs-showroom/)
 
-. Edit your content in `content/modules/ROOT/pages/`
-. Run `make build` to build your html (or `npx antora --fetch default-site.yml`)
-. Run `make serve` to view the roadshow locally via http://localhost:8080/
-. Use `git` to branch and commit your work
-. Push your work to your repo
-.. You should use `git tags` or `git branches` in production
-.. However development items default to the head of `main`
+Catalog source of truth for RHDP: [rhpds/ocp5-rhacs-showroom](https://github.com/rhpds/ocp5-rhacs-showroom).
 
-Pushes to `main` publish the site via `.github/workflows/gh-pages.yml` (Antora playbook: `gh-pages-site.yml`).
+Public GitHub Pages is a read-only preview of the lab website. Cluster URLs and passwords on that site are placeholders; RHDP injects the real environment at runtime.
 
-== Variables
+## Content
 
-Other vars can also be set there, such as `ssh_user` and `ssh_password`, and referenced inline in the lab content by using the `\{foo}` syntax.
+| Path | What you get |
+| --- | --- |
+| [101 Foundations](content/modules/ROOT/pages/basic-INDEX.adoc) | Secure-by-default OpenShift: projects, RBAC, SCCs, NetworkPolicy, secrets, images, audit |
+| [201 Intermediate](content/modules/ROOT/pages/intermediate-INDEX.adoc) | Shift-left, Vault, compliance tailoring, cert-manager, admission governance |
+| [301 Advanced](content/modules/ROOT/pages/advanced-INDEX.adoc) | GitOps policy, AdminNetworkPolicy, runtime enforce, supply-chain integrity |
+| [RHACS](content/modules/ROOT/pages/acs-INDEX.adoc) | Vulnerabilities, policy and risk, CI/CD gates, compliance, network and runtime, ACS 5 |
+| [Lightwell TSSC](content/modules/ROOT/pages/tssc-INDEX.adoc) | Signed Hummingbird, enterprise proxy, pin, build, sign, attest, GitOps admission |
+| [Virtualization](content/modules/ROOT/pages/virt-INDEX.adoc) | HyperConverged, virt RBAC, VM/storage isolation, network segmentation |
 
-This is another var, or asciidoc attribute, from `./content/antora.yml` {my_var}
+Start at [`content/modules/ROOT/pages/index.adoc`](content/modules/ROOT/pages/index.adoc).
+
+## Preview locally
+
+```bash
+make build
+make serve
+```
+
+The site is at http://localhost:8080/. Override the port with `make serve PORT=9090`.
+
+GitHub Pages builds from `gh-pages-site.yml` via [`.github/workflows/gh-pages.yml`](.github/workflows/gh-pages.yml). Local `make build` uses `site.yml` (same content, RHDP-oriented playbook).

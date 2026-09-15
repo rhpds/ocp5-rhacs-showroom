@@ -1,7 +1,7 @@
 ---
 site:
   title: OpenShift Security Roadshow
-  url: https://github.com/rhpds/ocp5-ea-showroom
+  url: https://github.com/rhpds/ocp5-rhacs-showroom
   start_page: modules::index.adoc
 
 content:

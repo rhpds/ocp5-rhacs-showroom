@@ -24,6 +24,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v5
       - name: configure pages
+        id: pages
         uses: actions/configure-pages@v6
       - name: setup node
         uses: actions/setup-node@v5
@@ -32,7 +33,11 @@ jobs:
       - name: install antora
         run: npm install --global @antora/cli@3.1 @antora/site-generator@3.1
       - name: antora generate
-        run: antora generate site.yml --stacktrace
+        run: |
+          SITE_URL="${{ steps.pages.outputs.base_url }}"
+          SITE_URL="${SITE_URL%/}"
+          sed -i "s|^  url:.*|  url: ${SITE_URL}|" gh-pages-site.yml
+          antora generate gh-pages-site.yml --stacktrace
       - name: upload pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
