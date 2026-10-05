@@ -584,11 +584,49 @@ do_quay_login() {
   return 1
 }
 
+# Blob upload sometimes returns HTTP 500 while MinIO or Quay is still settling.
+# Retry that status only. Auth and other errors stop immediately.
+podman_push_retry() {
+  local image="$1"
+  shift
+  local attempt=1 max=3 rc=0 log ns
+  while (( attempt <= max )); do
+    log="$(mktemp)"
+    if podman push "$@" "${image}" >"${log}" 2>&1; then
+      cat "${log}"
+      rm -f "${log}"
+      return 0
+    fi
+    rc=$?
+    cat "${log}"
+    if (( attempt == max )) || ! grep -q 'HTTP status: 500' "${log}"; then
+      if grep -q 'HTTP status: 500' "${log}"; then
+        echo "Quay storage errors from the last 2 minutes:"
+        oc -n quay logs deploy/registry-quay-app -c quay-app --since=2m 2>/dev/null \
+          | grep -Ei 'storage|s3|bucket|boto|ClientError|NoSuch|exception' \
+          | grep -viE 'secret_key|access_key|password' \
+          | tail -20 || true
+      fi
+      rm -f "${log}"
+      return "${rc}"
+    fi
+    rm -f "${log}"
+    echo "Push of ${image} returned HTTP 500 (attempt ${attempt}/${max}). Retrying in 15s..."
+    ns="$(quay_namespace 2>/dev/null || true)"
+    if [[ -n "${ns}" ]]; then
+      repair_quay_storage "${ns}" || true
+    fi
+    sleep 15
+    attempt=$((attempt + 1))
+  done
+  return "${rc}"
+}
+
 do_golden_image() {
   ensure_podman || return 1
   podman pull "${PYTHON_ALPINE_BASE}"
   podman tag "${PYTHON_ALPINE_BASE}" "${QUAY_URL}/${QUAY_USER}/python-alpine-golden:0.1"
-  podman push "${QUAY_URL}/${QUAY_USER}/python-alpine-golden:0.1"
+  podman_push_retry "${QUAY_URL}/${QUAY_USER}/python-alpine-golden:0.1"
 }
 
 do_frontend_image() {
@@ -602,7 +640,7 @@ do_frontend_image() {
     "${TUTORIAL_HOME}/app-images/frontend/Dockerfile"
   cd "${TUTORIAL_HOME}/app-images/frontend/"
   podman build -t "${QUAY_URL}/${QUAY_USER}/frontend:0.1" .
-  podman push "${QUAY_URL}/${QUAY_USER}/frontend:0.1" --remove-signatures
+  podman_push_retry "${QUAY_URL}/${QUAY_USER}/frontend:0.1" --remove-signatures
 }
 
 # True when a MinIO workload is still on an image other than the public mirror.
@@ -776,8 +814,40 @@ except ClientError as exc:
 '
 }
 
-# MinIO rejects the unsigned default. Quay 3.15 RadosGWStorage honors
-# signature_version, so add s3v4 when an older bundle omitted it.
+# Quay's config tool defaults signature_version to s3v2, which botocore rejects,
+# and a missing region makes the signed MinIO call fail. Either one becomes
+# HTTP 500 on blob upload. The registry process only reads config.yaml at start.
+quay_loaded_storage_config() {
+  local ns=$1 py
+  py="$(oc -n "${ns}" exec deploy/registry-quay-app -c quay-app -- \
+    sh -c 'command -v /quay-registry/venv/bin/python || command -v python3 || command -v python' \
+    2>/dev/null | tr -d '\r' || true)"
+  [[ -n "${py}" ]] || return 1
+  oc -n "${ns}" exec deploy/registry-quay-app -c quay-app -- "${py}" -c '
+import pathlib, sys
+paths = [pathlib.Path("/conf/stack/config.yaml"), pathlib.Path("/quay-registry/conf/stack/config.yaml")]
+text = ""
+for path in paths:
+    if path.is_file():
+        data = path.read_text(errors="ignore")
+        if "DISTRIBUTED_STORAGE_CONFIG" in data:
+            text = data
+            break
+sys.exit(0 if ("signature_version: s3v4" in text and "region_name:" in text) else 1)
+'
+}
+
+restart_quay_app() {
+  local ns=$1 host
+  echo "Restarting Quay so it reloads the MinIO storage config."
+  oc -n "${ns}" rollout restart deploy/registry-quay-app >/dev/null
+  oc -n "${ns}" rollout status deploy/registry-quay-app --timeout=300s || return 1
+  host="$(detect_quay_url 2>/dev/null || true)"
+  if [[ -n "${host}" ]]; then
+    wait_for_quay "${host}" || return 1
+  fi
+}
+
 ensure_quay_storage_signature() {
   local ns=$1
   local cfg updated
@@ -787,65 +857,67 @@ ensure_quay_storage_signature() {
   cfg="$(mktemp)"
   updated="$(mktemp)"
   oc -n "${ns}" get secret quay-config-bundle -o jsonpath='{.data.config\.yaml}' | base64 -d > "${cfg}"
-  if grep -q 'signature_version:' "${cfg}"; then
-    rm -f "${cfg}" "${updated}"
-    return 0
-  fi
-  python3 - "${cfg}" "${updated}" <<'PY'
+  if ! grep -q 'signature_version: s3v4' "${cfg}" || ! grep -q 'region_name:' "${cfg}"; then
+    python3 - "${cfg}" "${updated}" <<'PY'
 import pathlib, sys
 src, dst = sys.argv[1], sys.argv[2]
 text = pathlib.Path(src).read_text()
-out = []
-inserted = False
+lines = []
+saw_sig = False
+saw_region = False
 for line in text.splitlines(True):
-    out.append(line)
-    if (not inserted) and line.strip().startswith("storage_path:"):
+    stripped = line.strip()
+    if stripped.startswith("signature_version:"):
         indent = line[:len(line) - len(line.lstrip())]
-        out.append(f"{indent}signature_version: s3v4\n")
-        out.append(f"{indent}region_name: us-east-1\n")
-        inserted = True
-if not inserted:
+        lines.append(f"{indent}signature_version: s3v4\n")
+        saw_sig = True
+        continue
+    lines.append(line)
+    if stripped.startswith("region_name:"):
+        saw_region = True
+    if stripped.startswith("storage_path:") and not saw_sig:
+        indent = line[:len(line) - len(line.lstrip())]
+        lines.append(f"{indent}signature_version: s3v4\n")
+        saw_sig = True
+if saw_sig and not saw_region:
+    lines.append("      region_name: us-east-1\n")
+    saw_region = True
+if not saw_sig or not saw_region:
     sys.exit(2)
-pathlib.Path(dst).write_text("".join(out))
+pathlib.Path(dst).write_text("".join(lines))
 PY
-  oc -n "${ns}" create secret generic quay-config-bundle \
-    --from-file=config.yaml="${updated}" \
-    --dry-run=client -o yaml | oc apply -f - >/dev/null
+    oc -n "${ns}" create secret generic quay-config-bundle \
+      --from-file=config.yaml="${updated}" \
+      --dry-run=client -o yaml | oc apply -f - >/dev/null
+    echo "Updated Quay storage to sign MinIO requests with s3v4 in us-east-1."
+    nudge_quayregistry "${ns}"
+  fi
   rm -f "${cfg}" "${updated}"
-  echo "Updated Quay storage to sign MinIO requests with s3v4."
-  nudge_quayregistry "${ns}"
-  # The app mounts the operator's rendered secret, not quay-config-bundle.
-  # The Quay image may not include grep, so check that secret from the API.
-  local i secret=""
-  for i in $(seq 1 24); do
-    secret="$(oc -n "${ns}" get deploy registry-quay-app -o json 2>/dev/null | python3 -c '
-import json, sys
-try:
-    deploy = json.load(sys.stdin)
-except json.JSONDecodeError:
-    sys.exit(0)
-for vol in deploy.get("spec", {}).get("template", {}).get("spec", {}).get("volumes") or []:
-    secret = vol.get("secret") or {}
-    name = secret.get("secretName") or ""
-    keys = [item.get("key") for item in (secret.get("items") or [])]
-    if name and (not keys or "config.yaml" in keys):
-        print(name)
-        break
-' || true)"
-    if [[ -n "${secret}" ]] && oc -n "${ns}" get secret "${secret}" -o jsonpath='{.data.config\.yaml}' 2>/dev/null \
-      | base64 -d | grep -q 'signature_version:'; then
-      oc -n "${ns}" rollout status deploy/registry-quay-app --timeout=180s || return 1
-      return 0
-    fi
-    sleep 5
-  done
-  echo "Warning: mounted Quay config did not show signature_version within 120s. Bucket quay exists; continuing."
-  oc -n "${ns}" get quayregistry registry -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason} {.message}{"\n"}{end}' 2>/dev/null || true
-  if quay_v2_ready; then
+
+  if ! oc -n "${ns}" get deploy registry-quay-app >/dev/null 2>&1; then
     return 0
   fi
-  echo "Error: Quay is not ready after the storage config update." >&2
-  return 1
+  # A secret volume update does not reload the running Quay process.
+  local config_rv restarted
+  config_rv="$(oc -n "${ns}" get secret quay-config-bundle -o jsonpath='{.metadata.resourceVersion}')"
+  restarted="$(oc -n "${ns}" get deploy registry-quay-app -o jsonpath='{.metadata.annotations.roadshow/storage-config-restarted}' 2>/dev/null || true)"
+  if [[ "${restarted}" != "${config_rv}" ]] || ! quay_loaded_storage_config "${ns}"; then
+    restart_quay_app "${ns}" || return 1
+    oc -n "${ns}" annotate deploy/registry-quay-app \
+      "roadshow/storage-config-restarted=${config_rv}" --overwrite >/dev/null || true
+  fi
+  if quay_loaded_storage_config "${ns}"; then
+    return 0
+  fi
+  echo "Quay did not load region_name from config.yaml. Setting AWS_DEFAULT_REGION on the registry."
+  oc -n "${ns}" set env deploy/registry-quay-app -c quay-app \
+    AWS_DEFAULT_REGION=us-east-1 AWS_REGION=us-east-1 >/dev/null
+  oc -n "${ns}" rollout status deploy/registry-quay-app --timeout=300s || return 1
+  local host
+  host="$(detect_quay_url 2>/dev/null || true)"
+  if [[ -n "${host}" ]]; then
+    wait_for_quay "${host}" || return 1
+  fi
 }
 
 # Blob upload returns HTTP 500 when bucket quay is missing or MinIO rejects
