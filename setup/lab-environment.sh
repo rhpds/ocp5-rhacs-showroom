@@ -644,6 +644,161 @@ quay_v2_ready() {
   [[ "${code}" == "401" || "${code}" == "200" ]]
 }
 
+# Read a MinIO credential from the deployment env, including secretKeyRef and envFrom.
+minio_credential() {
+  local ns=$1 key=$2
+  oc -n "${ns}" get deploy minio -o json | python3 -c '
+import json, subprocess, sys
+ns, key = sys.argv[1], sys.argv[2]
+deploy = json.load(sys.stdin)
+containers = deploy["spec"]["template"]["spec"].get("containers") or []
+container = next((c for c in containers if c.get("name") == "minio"), containers[0] if containers else {})
+for env in container.get("env") or []:
+    if env.get("name") != key:
+        continue
+    if env.get("value"):
+        print(env["value"].strip())
+        sys.exit(0)
+    ref = (env.get("valueFrom") or {}).get("secretKeyRef") or {}
+    if ref.get("name") and ref.get("key"):
+        raw = subprocess.check_output([
+            "oc", "-n", ns, "get", "secret", ref["name"],
+            "-o", "jsonpath={.data." + ref["key"] + "}",
+        ])
+        print(subprocess.check_output(["base64", "-d"], input=raw).decode().strip())
+        sys.exit(0)
+for src in container.get("envFrom") or []:
+    name = (src.get("secretRef") or {}).get("name")
+    if not name:
+        continue
+    data = json.loads(subprocess.check_output([
+        "oc", "-n", ns, "get", "secret", name, "-o", "json",
+    ])).get("data") or {}
+    if key in data:
+        print(subprocess.check_output(["base64", "-d"], input=data[key].encode()).decode().strip())
+        sys.exit(0)
+sys.exit(1)
+' "${ns}" "${key}"
+}
+
+# QuayRegistry "registry" publishes route registry-quay, which the lab expects.
+ensure_quay_registry() {
+  local ns=$1
+  if oc -n "${ns}" get quayregistry registry >/dev/null 2>&1; then
+    echo "QuayRegistry ${ns}/registry already exists."
+    return 0
+  fi
+  local existing
+  existing="$(oc -n "${ns}" get quayregistry --no-headers 2>/dev/null | wc -l | tr -d ' ')"
+  if [[ "${existing}" != "0" ]]; then
+    echo "QuayRegistry objects already exist in ${ns}; not creating another."
+    return 0
+  fi
+
+  echo "No QuayRegistry in ${ns}. Creating registry so the operator publishes a route."
+  local user pass svc port host
+  user="$(minio_credential "${ns}" MINIO_ROOT_USER 2>/dev/null || minio_credential "${ns}" MINIO_ACCESS_KEY 2>/dev/null || true)"
+  pass="$(minio_credential "${ns}" MINIO_ROOT_PASSWORD 2>/dev/null || minio_credential "${ns}" MINIO_SECRET_KEY 2>/dev/null || true)"
+  if [[ -z "${user}" || -z "${pass}" ]]; then
+    echo "Error: could not read MinIO credentials from deployment/minio in ${ns}." >&2
+    return 1
+  fi
+
+  if ! oc -n "${ns}" get svc minio >/dev/null 2>&1; then
+    echo "Creating Service ${ns}/minio"
+    oc -n "${ns}" expose deploy/minio --name=minio --port=9000 --target-port=9000 >/dev/null
+  fi
+  svc="minio"
+  port="$(oc -n "${ns}" get svc "${svc}" -o jsonpath='{.spec.ports[0].port}')"
+  port="${port:-9000}"
+  host="${svc}.${ns}.svc"
+
+  echo "Ensuring MinIO bucket quay"
+  oc -n "${ns}" exec deploy/minio -- env \
+    MINIO_USER="${user}" MINIO_PASS="${pass}" \
+    sh -c 'mc alias set local http://127.0.0.1:9000 "$MINIO_USER" "$MINIO_PASS" >/dev/null && mc mb --ignore-existing local/quay' \
+    || echo "Warning: could not create the MinIO bucket with mc; Quay will try to use bucket quay."
+
+  local cfg
+  cfg="$(mktemp)"
+  MINIO_USER="${user}" MINIO_PASS="${pass}" MINIO_HOST="${host}" MINIO_PORT="${port}" python3 -c '
+import json, os
+user = json.dumps(os.environ["MINIO_USER"])
+password = json.dumps(os.environ["MINIO_PASS"])
+host = json.dumps(os.environ["MINIO_HOST"])
+port = os.environ["MINIO_PORT"]
+print(f"""ALLOW_PULLS_WITHOUT_STRICT_LOGGING: false
+AUTHENTICATION_TYPE: Database
+DEFAULT_TAG_EXPIRATION: 2w
+ENTERPRISE_LOGO_URL: /static/img/RH_Logo_Quay_Black_UX-horizontal_white.png
+FEATURE_BUILD_SUPPORT: false
+FEATURE_DIRECT_LOGIN: true
+FEATURE_MAILING: false
+FEATURE_USER_INITIALIZE: true
+REGISTRY_TITLE: Red Hat Quay
+REGISTRY_TITLE_SHORT: Red Hat Quay
+SETUP_COMPLETE: true
+TAG_EXPIRATION_OPTIONS:
+  - 2w
+TEAM_RESYNC_STALE_TIME: 60m
+TESTING: false
+DISTRIBUTED_STORAGE_CONFIG:
+  default:
+    - RadosGWStorage
+    - access_key: {user}
+      secret_key: {password}
+      bucket_name: quay
+      hostname: {host}
+      is_secure: false
+      port: {port}
+      storage_path: /datastorage/registry
+""")
+' > "${cfg}"
+  oc -n "${ns}" create secret generic quay-config-bundle \
+    --from-file=config.yaml="${cfg}" \
+    --dry-run=client -o yaml | oc apply -f - >/dev/null
+  rm -f "${cfg}"
+
+  oc -n "${ns}" apply -f - <<EOF
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: registry
+spec:
+  configBundleSecret: quay-config-bundle
+  components:
+    - kind: objectstorage
+      managed: false
+EOF
+  echo "Created QuayRegistry ${ns}/registry (route will be registry-quay)."
+}
+
+# Ask the Quay operator to reconcile again now that MinIO can start.
+nudge_quayregistry() {
+  local ns=$1 name
+  local found=false
+  while read -r name; do
+    [[ -z "${name}" ]] && continue
+    found=true
+    echo "Requesting reconcile of QuayRegistry ${ns}/${name}"
+    oc -n "${ns}" annotate "quayregistry/${name}" \
+      "quay-operator.redhat.com/objectstorage-retry=$(date +%s)" --overwrite >/dev/null
+  done < <(oc -n "${ns}" get quayregistry -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+  if [[ "${found}" == false ]]; then
+    echo "No QuayRegistry in namespace ${ns}. The operator will not create a route until that object exists."
+  fi
+}
+
+show_quay_status() {
+  local ns=$1
+  echo "Quay workloads in ${ns}:"
+  oc -n "${ns}" get pods,route --no-headers 2>/dev/null || true
+  oc -n "${ns}" get quayregistry -o json 2>/dev/null | jq -r '
+    .items[]? | "QuayRegistry \(.metadata.name):",
+    (.status.conditions[]? | "  \(.type)=\(.status) \(.reason // "") \(.message // "")")
+  ' || true
+}
+
 # Repair Quay object storage before the rest of the lab. A healthy registry
 # is left alone. A MinIO pod that cannot pull, or is not already on the
 # public mirror, is switched to MINIO_REPLACEMENT_IMAGE.
@@ -666,10 +821,14 @@ do_ensure_quay() {
     repaired=true
   else
     echo "Quay is not healthy yet. MinIO is already on ${MINIO_REPLACEMENT_IMAGE}."
-    echo "Waiting for the registry..."
   fi
 
-  local deadline=$((SECONDS + 180))
+  # The operator does not create a route until a QuayRegistry exists.
+  ensure_quay_registry "${ns}" || return 1
+  nudge_quayregistry "${ns}"
+  echo "Waiting for the Quay route..."
+  local deadline=$((SECONDS + 600))
+  local next_note=0
   while (( SECONDS < deadline )); do
     host="$(detect_quay_url 2>/dev/null || true)"
     if [[ -n "${host}" ]]; then
@@ -677,17 +836,19 @@ do_ensure_quay() {
       echo "Quay is up at ${host}"
       return 0
     fi
-    echo "Waiting for a Quay route..."
+    if (( SECONDS >= next_note )); then
+      show_quay_status "${ns}"
+      next_note=$((SECONDS + 30))
+    fi
     sleep 5
   done
 
-  echo "Error: Quay route did not appear within 180s (namespace ${ns})." >&2
+  echo "Error: Quay route did not appear within 600s (namespace ${ns})." >&2
   if [[ "${repaired}" == true ]]; then
-    echo "MinIO was switched to ${MINIO_REPLACEMENT_IMAGE}" >&2
+    echo "MinIO is running ${MINIO_REPLACEMENT_IMAGE}, but the registry route is still missing." >&2
   fi
-  oc -n "${ns}" get pods -o wide >&2 || true
-  oc -n "${ns}" get quayregistry,route,deploy >&2 || true
-  oc -n "${ns}" get events --sort-by='.lastTimestamp' >&2 | tail -n 30 || true
+  show_quay_status "${ns}" >&2 || true
+  oc -n "${ns}" logs deploy/minio --tail=40 >&2 || true
   return 1
 }
 
