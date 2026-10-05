@@ -9,9 +9,11 @@
 # Quiet by default (progress bar + current step). Use --verbose for full logs.
 #
 # Usage:
-#   bash setup/lab-environment.sh \
-#     --quay-user QUAYADMIN \
-#     --quay-password 'secret'
+#   bash setup/lab-environment.sh
+#
+# The script creates the Quay admin user and writes QUAY_USER and QUAY_PASSWORD
+# to ~/.acs-roadshow/env and ~/.bashrc. Optional --quay-user / --quay-password
+# override that account.
 #
 # After making the frontend repository public in Quay UI:
 #   bash setup/lab-environment.sh --deploy-skupper-only
@@ -96,8 +98,8 @@ usage() {
 Usage: lab-environment.sh [options]
 
 Options:
-  --quay-user USER          Quay admin username (required unless --deploy-skupper-only or --install-tssc-clis-only)
-  --quay-password PASS      Quay admin password (required unless --deploy-skupper-only or --install-tssc-clis-only)
+  --quay-user USER          Quay admin username (default: admin, or the value already in ~/.bashrc)
+  --quay-password PASS      Quay admin password (default: create one and save it to ~/.bashrc)
   --deploy-skupper-only     Deploy patient-portal after frontend repo is public in Quay
   --install-tssc-clis-only  Install cosign, oc-mirror, and ec into ~/.local/bin, then exit
   --skip-demo-apps          Skip cloning the demo-apps repository
@@ -281,16 +283,26 @@ if [[ "${INSTALL_TSSC_CLIS_ONLY}" == true ]]; then
   exit 0
 fi
 
-if [[ -z "${QUAY_USER}" || -z "${QUAY_PASSWORD}" ]]; then
-  echo "Error: --quay-user and --quay-password are required for full setup." >&2
-  usage
-  exit 1
+# Flags win over a previous run. Otherwise reuse ~/.acs-roadshow/env so a rerun
+# keeps the same account, then create one and store it in ~/.bashrc.
+cli_quay_user="${QUAY_USER}"
+cli_quay_password="${QUAY_PASSWORD}"
+load_roadshow_env
+[[ -n "${cli_quay_user}" ]] && QUAY_USER="${cli_quay_user}"
+[[ -n "${cli_quay_password}" ]] && QUAY_PASSWORD="${cli_quay_password}"
+if [[ -z "${QUAY_USER}" ]]; then
+  QUAY_USER="admin"
+fi
+if [[ -z "${QUAY_PASSWORD}" ]]; then
+  QUAY_PASSWORD="$(openssl rand -hex 12)"
+  echo "Created a Quay admin password. It will be saved to ~/.bashrc as QUAY_PASSWORD."
 fi
 if [[ "${QUAY_USER}" == *'{'* || "${QUAY_PASSWORD}" == *'{'* ]]; then
-  echo "Error: --quay-user / --quay-password still contain Showroom placeholders." >&2
-  echo "Use the values from the credentials table (username is usually admin), not {quay_admin_username}." >&2
+  echo "Error: Quay username or password still contains a Showroom placeholder." >&2
   exit 1
 fi
+persist_var QUAY_USER "${QUAY_USER}"
+persist_var QUAY_PASSWORD "${QUAY_PASSWORD}"
 
 # Count top-level lab steps (cluster RHACS/Compliance/apps come from GitOps)
 TOTAL=0
@@ -494,8 +506,6 @@ initialize_quay_admin() {
     -H "Content-Type: application/json" \
     -d "${body}" || true)"
   echo "Quay initialize HTTP ${code}"
-  cat /tmp/quay-init.json 2>/dev/null || true
-  echo
   case "${code}" in
     200|201) echo "Quay admin user created" ;;
     400|409) echo "Quay admin user already exists" ;;
@@ -506,6 +516,47 @@ initialize_quay_admin() {
 podman_login_quay() {
   local url="$1" user="$2" password="$3"
   podman login --tls-verify=false "${url}" -u "${user}" -p "${password}"
+}
+
+# Hash with the bcrypt library inside the Quay image so the prefix is $2b$,
+# which is what Quay stores in public.user.password_hash.
+quay_bcrypt_hash() {
+  local ns=$1 password=$2 py hash
+  py="$(oc -n "${ns}" exec deploy/registry-quay-app -c quay-app -- \
+    sh -c 'command -v /quay-registry/venv/bin/python || command -v python3 || command -v python' \
+    2>/dev/null | tr -d '\r' || true)"
+  if [[ -n "${py}" ]]; then
+    hash="$(oc -n "${ns}" exec deploy/registry-quay-app -c quay-app -- \
+      env QUAY_PASSWORD="${password}" "${py}" -c \
+      'import bcrypt,os; print(bcrypt.hashpw(os.environ["QUAY_PASSWORD"].encode(), bcrypt.gensalt(12)).decode())' \
+      2>/dev/null | tr -d '\r' | grep '^\$2' | tail -1 || true)"
+  fi
+  if [[ -z "${hash}" ]] && command -v htpasswd >/dev/null 2>&1; then
+    hash="$(htpasswd -bnBC 12 x "${password}" | cut -d: -f2 | sed 's/^\$2y\$/\$2b\$/')"
+  fi
+  [[ -n "${hash}" ]] || return 1
+  printf '%s' "${hash}"
+}
+
+# /api/v1/user/initialize only succeeds once. Later runs must overwrite that
+# password so the account matches QUAY_PASSWORD in ~/.bashrc.
+reset_quay_admin_password() {
+  local user="$1" password="$2"
+  local hash out
+  hash="$(quay_bcrypt_hash quay "${password}")" || {
+    echo "Error: could not generate a bcrypt hash for the Quay admin password." >&2
+    return 1
+  }
+  echo "Setting Quay user '${user}' to the password passed to this script..."
+  out="$(oc -n quay exec deploy/registry-quay-database -- env HASH="${hash}" QUAY_USER_NAME="${user}" \
+    sh -c 'u=${POSTGRESQL_USER:-${POSTGRES_USER:-quay}}; d=${POSTGRESQL_DATABASE:-${POSTGRES_DB:-quay}}; export PGPASSWORD=${POSTGRESQL_PASSWORD:-$POSTGRES_PASSWORD}; psql -U "$u" -d "$d" -c "UPDATE public.\"user\" SET password_hash = '\''${HASH}'\'' WHERE username = '\''${QUAY_USER_NAME}'\'';"')" \
+    || return 1
+  if [[ "${out}" != *"UPDATE 1"* ]]; then
+    echo "Error: Quay did not update a password row for user '${user}'." >&2
+    printf '%s\n' "${out}" | grep -v '\$2' >&2 || true
+    return 1
+  fi
+  echo "Quay admin password updated."
 }
 
 do_quay_login() {
@@ -520,22 +571,16 @@ do_quay_login() {
   wait_for_quay "${QUAY_URL}" || return 1
   initialize_quay_admin "${QUAY_URL}" "${QUAY_USER}" "${QUAY_PASSWORD}"
   if podman_login_quay "${QUAY_URL}" "${QUAY_USER}" "${QUAY_PASSWORD}"; then
+    persist_var QUAY_PASSWORD "${QUAY_PASSWORD}"
     return 0
   fi
-  local cluster_pass=""
-  cluster_pass="$(oc -n quay get secret quay-admin-password -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)"
-  if [[ -n "${cluster_pass}" && "${cluster_pass}" != "${QUAY_PASSWORD}" ]]; then
-    echo "Login failed with the Showroom password; trying secret/quay-admin-password..."
-    initialize_quay_admin "${QUAY_URL}" "${QUAY_USER}" "${cluster_pass}"
-    if podman_login_quay "${QUAY_URL}" "${QUAY_USER}" "${cluster_pass}"; then
-      persist_var QUAY_PASSWORD "${cluster_pass}"
-      return 0
-    fi
+  echo "Login with the supplied password failed. The admin account already exists with a different password."
+  reset_quay_admin_password "${QUAY_USER}" "${QUAY_PASSWORD}" || return 1
+  if podman_login_quay "${QUAY_URL}" "${QUAY_USER}" "${QUAY_PASSWORD}"; then
+    persist_var QUAY_PASSWORD "${QUAY_PASSWORD}"
+    return 0
   fi
-  echo "Error: podman login to ${QUAY_URL} failed for user '${QUAY_USER}'." >&2
-  echo "Create the first user (once) with:" >&2
-  echo "  curl -sk -X POST 'https://${QUAY_URL}/api/v1/user/initialize' -H 'Content-Type: application/json' \\" >&2
-  echo "    -d '{\"username\":\"${QUAY_USER}\",\"password\":\"<password>\",\"email\":\"${QUAY_USER}@example.com\",\"access_token\":true}'" >&2
+  echo "Error: podman login to ${QUAY_URL} failed for user '${QUAY_USER}' after resetting the password." >&2
   return 1
 }
 
@@ -681,6 +726,127 @@ sys.exit(1)
 ' "${ns}" "${key}"
 }
 
+# The thanos MinIO image has no mc client. Create bucket quay with the boto3
+# library already in the Quay image, using path-style SigV4.
+ensure_minio_bucket() {
+  local ns=$1 user=$2 pass=$3 host=$4 port=$5
+  local py endpoint
+  echo "Ensuring MinIO bucket quay"
+  if oc -n "${ns}" exec deploy/minio -- sh -c 'command -v mc >/dev/null 2>&1'; then
+    oc -n "${ns}" exec deploy/minio -- env \
+      MINIO_USER="${user}" MINIO_PASS="${pass}" MINIO_PORT="${port}" \
+      sh -c 'mc alias set local "http://127.0.0.1:${MINIO_PORT}" "$MINIO_USER" "$MINIO_PASS" >/dev/null && mc mb --ignore-existing local/quay'
+    return
+  fi
+  if ! oc -n "${ns}" get deploy registry-quay-app >/dev/null 2>&1; then
+    echo "Warning: Quay is not up yet, so bucket quay will be created after the registry starts."
+    return 0
+  fi
+  py="$(oc -n "${ns}" exec deploy/registry-quay-app -c quay-app -- \
+    sh -c 'command -v /quay-registry/venv/bin/python || command -v python3 || command -v python' \
+    2>/dev/null | tr -d '\r' || true)"
+  if [[ -z "${py}" ]]; then
+    echo "Error: cannot create MinIO bucket quay (no mc client, and Quay has no Python)." >&2
+    return 1
+  fi
+  endpoint="http://${host}:${port}"
+  oc -n "${ns}" exec deploy/registry-quay-app -c quay-app -- \
+    env MINIO_USER="${user}" MINIO_PASS="${pass}" MINIO_ENDPOINT="${endpoint}" "${py}" -c '
+import os
+import boto3
+from botocore.client import Config
+from botocore.exceptions import ClientError
+s3 = boto3.client(
+    "s3",
+    endpoint_url=os.environ["MINIO_ENDPOINT"],
+    aws_access_key_id=os.environ["MINIO_USER"],
+    aws_secret_access_key=os.environ["MINIO_PASS"],
+    region_name="us-east-1",
+    config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+)
+try:
+    s3.head_bucket(Bucket="quay")
+    print("MinIO bucket quay exists")
+except ClientError as exc:
+    code = str(exc.response.get("Error", {}).get("Code", ""))
+    if code not in ("404", "NoSuchBucket", "NotFound"):
+        raise
+    s3.create_bucket(Bucket="quay")
+    print("Created MinIO bucket quay")
+'
+}
+
+# MinIO rejects the unsigned default. Quay 3.15 RadosGWStorage honors
+# signature_version, so add s3v4 when an older bundle omitted it.
+ensure_quay_storage_signature() {
+  local ns=$1
+  local cfg updated
+  if ! oc -n "${ns}" get secret quay-config-bundle >/dev/null 2>&1; then
+    return 0
+  fi
+  cfg="$(mktemp)"
+  updated="$(mktemp)"
+  oc -n "${ns}" get secret quay-config-bundle -o jsonpath='{.data.config\.yaml}' | base64 -d > "${cfg}"
+  if grep -q 'signature_version:' "${cfg}"; then
+    rm -f "${cfg}" "${updated}"
+    return 0
+  fi
+  python3 - "${cfg}" "${updated}" <<'PY'
+import pathlib, sys
+src, dst = sys.argv[1], sys.argv[2]
+text = pathlib.Path(src).read_text()
+out = []
+inserted = False
+for line in text.splitlines(True):
+    out.append(line)
+    if (not inserted) and line.strip().startswith("storage_path:"):
+        indent = line[:len(line) - len(line.lstrip())]
+        out.append(f"{indent}signature_version: s3v4\n")
+        out.append(f"{indent}region_name: us-east-1\n")
+        inserted = True
+if not inserted:
+    sys.exit(2)
+pathlib.Path(dst).write_text("".join(out))
+PY
+  oc -n "${ns}" create secret generic quay-config-bundle \
+    --from-file=config.yaml="${updated}" \
+    --dry-run=client -o yaml | oc apply -f - >/dev/null
+  rm -f "${cfg}" "${updated}"
+  echo "Updated Quay storage to sign MinIO requests with s3v4."
+  nudge_quayregistry "${ns}"
+  local i live=""
+  for i in $(seq 1 36); do
+    live="$(oc -n "${ns}" exec deploy/registry-quay-app -c quay-app -- \
+      sh -c 'grep -Rsl signature_version /quay-registry/conf /conf/stack 2>/dev/null | head -1' \
+      2>/dev/null | tr -d '\r' || true)"
+    if [[ -n "${live}" ]]; then
+      oc -n "${ns}" rollout status deploy/registry-quay-app --timeout=180s || return 1
+      return 0
+    fi
+    sleep 5
+  done
+  echo "Error: Quay did not load signature_version within 180s." >&2
+  return 1
+}
+
+# Blob upload returns HTTP 500 when bucket quay is missing or MinIO rejects
+# the request signature. Repair both even if /v2/ is already answering.
+repair_quay_storage() {
+  local ns=$1 user pass
+  user="$(minio_credential "${ns}" MINIO_ROOT_USER 2>/dev/null || minio_credential "${ns}" MINIO_ACCESS_KEY 2>/dev/null || true)"
+  pass="$(minio_credential "${ns}" MINIO_ROOT_PASSWORD 2>/dev/null || minio_credential "${ns}" MINIO_SECRET_KEY 2>/dev/null || true)"
+  if [[ -z "${user}" || -z "${pass}" ]]; then
+    echo "Error: could not read MinIO credentials from deployment/minio in ${ns}." >&2
+    return 1
+  fi
+  local port host
+  port="$(oc -n "${ns}" get svc minio -o jsonpath='{.spec.ports[0].port}' 2>/dev/null || true)"
+  port="${port:-9000}"
+  host="minio.${ns}.svc"
+  ensure_minio_bucket "${ns}" "${user}" "${pass}" "${host}" "${port}" || return 1
+  ensure_quay_storage_signature "${ns}" || return 1
+}
+
 # QuayRegistry "registry" publishes route registry-quay, which the lab expects.
 ensure_quay_registry() {
   local ns=$1
@@ -713,11 +879,7 @@ ensure_quay_registry() {
   port="${port:-9000}"
   host="${svc}.${ns}.svc"
 
-  echo "Ensuring MinIO bucket quay"
-  oc -n "${ns}" exec deploy/minio -- env \
-    MINIO_USER="${user}" MINIO_PASS="${pass}" \
-    sh -c 'mc alias set local http://127.0.0.1:9000 "$MINIO_USER" "$MINIO_PASS" >/dev/null && mc mb --ignore-existing local/quay' \
-    || echo "Warning: could not create the MinIO bucket with mc; Quay will try to use bucket quay."
+  ensure_minio_bucket "${ns}" "${user}" "${pass}" "${host}" "${port}" || return 1
 
   local cfg
   cfg="$(mktemp)"
@@ -752,6 +914,8 @@ DISTRIBUTED_STORAGE_CONFIG:
       is_secure: false
       port: {port}
       storage_path: /datastorage/registry
+      signature_version: s3v4
+      region_name: us-east-1
 """)
 ' > "${cfg}"
   oc -n "${ns}" create secret generic quay-config-bundle \
@@ -811,7 +975,8 @@ do_ensure_quay() {
   echo "Checking Quay in namespace ${ns}"
 
   if quay_v2_ready; then
-    echo "Quay is up at $(detect_quay_url); MinIO image left unchanged."
+    echo "Quay is up at $(detect_quay_url)."
+    repair_quay_storage "${ns}" || return 1
     return 0
   fi
 
@@ -833,6 +998,7 @@ do_ensure_quay() {
     host="$(detect_quay_url 2>/dev/null || true)"
     if [[ -n "${host}" ]]; then
       wait_for_quay "${host}" || return 1
+      repair_quay_storage "${ns}" || return 1
       echo "Quay is up at ${host}"
       return 0
     fi

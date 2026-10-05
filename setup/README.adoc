@@ -85,7 +85,7 @@ Attendees clone `ocp5-rhacs-showroom`, then run `setup/lab-environment.sh`. Clus
 ----
 git clone https://github.com/rhpds/ocp5-rhacs-showroom.git
 cd ocp5-rhacs-showroom
-bash setup/lab-environment.sh --quay-user QUAYADMIN --quay-password 'password'
+bash setup/lab-environment.sh
 bash setup/lab-environment.sh --deploy-skupper-only
 ----
 

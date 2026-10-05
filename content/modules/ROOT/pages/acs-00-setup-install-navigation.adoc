@@ -53,13 +53,14 @@ Let's ensure that you have access to the Quay User Interface.
 image::00-quay-login.png[Quay Console,link=self, window=blank, width=100%]
 
 [start=2]
-. Enter the Quay credentials:
+. The setup script creates the Quay admin user and saves it in `~/.bashrc`. Run the lab environment setup below first, then print the account:
 
-[cols="1,1"]
-|===
-| *Quay Console Username:* | {quay_admin_username}
-| *Quay Console Password:* | {quay_admin_password}
-|===
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+source ~/.bashrc
+echo "Username: $QUAY_USER"
+echo "Password: $QUAY_PASSWORD"
+----
 
 [[deploy-the-workshop-apps]]
 
@@ -70,7 +71,7 @@ The setup script below is the remaining *bastion* work: RHACS CLI variables, a l
 Variables persisted to `~/.bashrc`:
 
 * `TUTORIAL_HOME` — cloned `demo-apps` repository
-* `QUAY_USER` / `QUAY_URL` — your Quay registry credentials and hostname
+* `QUAY_USER` / `QUAY_PASSWORD` / `QUAY_URL` — Quay admin account created by this script, and the registry hostname
 * `ROX_CENTRAL_ADDRESS` / `ROX_PASSWORD` / `ROX_API_TOKEN` — RHACS Central host, admin password, and generated API token
 * `APP_HOME` — set when you deploy the patient-portal application (second script step)
 
@@ -86,9 +87,7 @@ RHACS CLI setup, TSSC CLIs, and image builds for the roadshow workshop.
 ----
 git clone https://github.com/rhpds/ocp5-rhacs-showroom.git
 cd ocp5-rhacs-showroom
-bash setup/lab-environment.sh \
-  --quay-user {quay_admin_username} \
-  --quay-password '{quay_admin_password}'
+bash setup/lab-environment.sh
 ----
 
 [.console-output]
@@ -137,11 +136,14 @@ Red Hat Quay is an enterprise-quality registry for building, securing, and servi
 
 Your Red Hat Quay console is available at: {quay_console_url}[window=blank]
 
-[cols="1,1"]
-|===
-| *Quay Console Username:* | {quay_admin_username}
-| *Quay Console Password:* | {quay_admin_password}
-|===
+The setup script saved the account in `~/.bashrc`.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+source ~/.bashrc
+echo "Username: $QUAY_USER"
+echo "Password: $QUAY_PASSWORD"
+----
 
 [[navigating-the-registry]]
 
