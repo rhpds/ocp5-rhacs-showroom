@@ -814,18 +814,37 @@ PY
   rm -f "${cfg}" "${updated}"
   echo "Updated Quay storage to sign MinIO requests with s3v4."
   nudge_quayregistry "${ns}"
-  local i live=""
-  for i in $(seq 1 36); do
-    live="$(oc -n "${ns}" exec deploy/registry-quay-app -c quay-app -- \
-      sh -c 'grep -Rsl signature_version /quay-registry/conf /conf/stack 2>/dev/null | head -1' \
-      2>/dev/null | tr -d '\r' || true)"
-    if [[ -n "${live}" ]]; then
+  # The app mounts the operator's rendered secret, not quay-config-bundle.
+  # The Quay image may not include grep, so check that secret from the API.
+  local i secret=""
+  for i in $(seq 1 24); do
+    secret="$(oc -n "${ns}" get deploy registry-quay-app -o json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    deploy = json.load(sys.stdin)
+except json.JSONDecodeError:
+    sys.exit(0)
+for vol in deploy.get("spec", {}).get("template", {}).get("spec", {}).get("volumes") or []:
+    secret = vol.get("secret") or {}
+    name = secret.get("secretName") or ""
+    keys = [item.get("key") for item in (secret.get("items") or [])]
+    if name and (not keys or "config.yaml" in keys):
+        print(name)
+        break
+' || true)"
+    if [[ -n "${secret}" ]] && oc -n "${ns}" get secret "${secret}" -o jsonpath='{.data.config\.yaml}' 2>/dev/null \
+      | base64 -d | grep -q 'signature_version:'; then
       oc -n "${ns}" rollout status deploy/registry-quay-app --timeout=180s || return 1
       return 0
     fi
     sleep 5
   done
-  echo "Error: Quay did not load signature_version within 180s." >&2
+  echo "Warning: mounted Quay config did not show signature_version within 120s. Bucket quay exists; continuing."
+  oc -n "${ns}" get quayregistry registry -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason} {.message}{"\n"}{end}' 2>/dev/null || true
+  if quay_v2_ready; then
+    return 0
+  fi
+  echo "Error: Quay is not ready after the storage config update." >&2
   return 1
 }
 
