@@ -7,16 +7,14 @@ xref:index.adoc[← Back to HOME]
 
 == Overview
 
-These labs walk the link:https://www.redhat.com/en/resources/openshift-virtualization-hardening-guide[Red Hat OpenShift Virtualization hardening guide^] (December 2025) on a cluster that already has OpenShift Virtualization installed. You audit every control, compare it to the secure default, and record what you would change to reach a hardened baseline.
+These labs walk the link:https://www.redhat.com/en/resources/openshift-virtualization-hardening-guide[Red Hat OpenShift Virtualization hardening guide^] on a cluster that already has OpenShift Virtualization installed. You audit every control, compare it to the secure default, and record what you would change to reach a hardened baseline.
 
 This is a product deep-dive, not a 101/201/301 skill level. Harden the OpenShift platform first (xref:101-10-security-compliance-addons.adoc[101-10], xref:201-07-compliance-tailoring.adoc[201-07]). Guest operating system CIS/STIG work inside the VM is out of scope.
 
-Kata sandboxed *pods* are xref:201-09-sandboxed-containers-intro.adoc[201-09]; this pathway is full virtual machines on the `kubevirt-hyperconverged` stack.
-
-Audience and prerequisites:
+Lab details and prerequisites:
 
 * OpenShift cluster with OpenShift Virtualization (CNV) in `openshift-cnv`
-* Cluster-admin (or equivalent) for HyperConverged, RBAC `who-can`, and node debug
+* Cluster-admin (or equivalent) for HyperConverged, RBAC `who-can`, and node debug 
 * A running VM to inspect: this environment uses `rhel-webserver` in project `rhel-webserver`
 * Credentials and console links are on the xref:index.adoc[home page]
 

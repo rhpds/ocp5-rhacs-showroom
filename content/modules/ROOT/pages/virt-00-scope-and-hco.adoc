@@ -8,7 +8,7 @@
 **Duration:** ~15 minutes
 
 == Overview
-Red Hat OpenShift Virtualization is an extension on top of an already-hardened OpenShift cluster. The link:https://www.redhat.com/en/resources/openshift-virtualization-hardening-guide[OpenShift Virtualization hardening guide^] (December 2025) tells you what to lock on the hypervisor, not how to STIG the guest OS and not how to replace xref:101-10-security-compliance-addons.adoc[Compliance Operator] profiles for OpenShift and RHCOS.
+Red Hat OpenShift Virtualization is an extension on top of an already-hardened OpenShift cluster. The link:https://www.redhat.com/en/resources/openshift-virtualization-hardening-guide[OpenShift Virtualization hardening guide^] tells you what to lock on the hypervisor, not how to STIG the guest OS and not how to replace xref:101-10-security-compliance-addons.adoc[Compliance Operator] profiles for OpenShift and RHCOS.
 
 This module confirms CNV is installed, shows the one object you will audit for the rest of the pathway (`HyperConverged/kubevirt-hyperconverged` in `openshift-cnv`), and orients you to the running `rhel-webserver` VM. Later modules do not reinstall anything; they read and, only when a control has already drifted, remediate.
 

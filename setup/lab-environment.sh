@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Provision the ACS roadshow lab environment on the bastion host.
-# Runs RHACS CLI token setup, clones demo-apps (for Dockerfiles), and
-# builds/pushes Quay images. Cluster-wide RHACS/Compliance/demo-app
-# deploy is owned by OpenShift GitOps (roadshow-prereqs + roadshow-demo-apps).
+# Configures Quay first (repairs a MinIO ImagePullBackOff when the public
+# quay.io/minio/minio image cannot be pulled), then runs RHACS CLI token
+# setup, clones demo-apps (for Dockerfiles), and builds/pushes Quay images.
+# Cluster-wide RHACS/Compliance/demo-app deploy is owned by OpenShift GitOps
+# (roadshow-prereqs + roadshow-demo-apps).
 #
 # Quiet by default (progress bar + current step). Use --verbose for full logs.
 #
@@ -38,6 +40,11 @@ ROADSHOW_ENV_FILE="${HOME}/.acs-roadshow/env"
 # current Alpine (3.24.1 today); catalog Clair indexes it but leaves version_id
 # empty, so Quay's Security Scan column shows Passed / namespace "".
 PYTHON_ALPINE_BASE="${PYTHON_ALPINE_BASE:-docker.io/library/python:3.12-alpine3.20}"
+# quay.io/minio/minio and docker.io/minio/minio reject anonymous pulls.
+# pgsty/minio is a public fork frozen at this tag. It keeps /usr/bin/minio and
+# /usr/bin/docker-entrypoint.sh, so the Quay MinIO deployment's existing
+# command and args still start the server. Override with MINIO_REPLACEMENT_IMAGE.
+MINIO_REPLACEMENT_IMAGE="${MINIO_REPLACEMENT_IMAGE:-docker.io/pgsty/minio:RELEASE.2026-08-04T00-00-00Z}"
 # TSSC CLIs: same registry.redhat.io pins as Lightwell Showroom (no github.com).
 COSIGN_IMAGE="${COSIGN_IMAGE:-registry.redhat.io/rhtas/cosign-rhel9:1.3.0}"
 OC_MIRROR_IMAGE="${OC_MIRROR_IMAGE:-registry.redhat.io/openshift4/oc-mirror-plugin-rhel9:v4.20}"
@@ -101,6 +108,11 @@ Options:
   --verbose                 Stream detailed command output
   --work-dir DIR            Base directory for clones (default: $HOME)
   -h, --help                Show this help
+
+Environment:
+  MINIO_REPLACEMENT_IMAGE   Public image used when Quay's MinIO pod cannot pull
+                            quay.io/minio/minio. Default:
+                            docker.io/pgsty/minio:RELEASE.2026-08-04T00-00-00Z
 EOF
 }
 
@@ -282,7 +294,7 @@ fi
 
 # Count top-level lab steps (cluster RHACS/Compliance/apps come from GitOps)
 TOTAL=0
-TOTAL=$((TOTAL + 3)) # admin + tssc clis + wait central
+TOTAL=$((TOTAL + 4)) # admin + configure quay + tssc clis + wait central
 [[ "${SKIP_RHACS_CONFIGURE}" != true ]] && TOTAL=$((TOTAL + 1))
 TOTAL=$((TOTAL + 2)) # CLI vars + verify API
 [[ "${SKIP_DEMO_APPS}" != true ]] && TOTAL=$((TOTAL + 1)) # clone
@@ -548,7 +560,133 @@ do_frontend_image() {
   podman push "${QUAY_URL}/${QUAY_USER}/frontend:0.1" --remove-signatures
 }
 
+# True when a MinIO server container is waiting on a pull of minio/minio.
+minio_pull_failed() {
+  local ns=$1
+  local count
+  count="$(oc -n "${ns}" get pods -o json | jq '
+    [ .items[]
+      | ((.status.containerStatuses // []) + (.status.initContainerStatuses // []))[]
+      | select(.state.waiting.reason == "ImagePullBackOff" or .state.waiting.reason == "ErrImagePull")
+      | select((.image // "") | test("minio/minio"))
+    ] | length
+  ')"
+  [[ "${count}" -gt 0 ]]
+}
+
+# Namespace that holds the roadshow Quay install.
+quay_namespace() {
+  local ns
+  for ns in quay quay-enterprise; do
+    if oc get namespace "${ns}" >/dev/null 2>&1; then
+      printf '%s\n' "${ns}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Point MinIO workloads that still reference minio/minio at the public image.
+# Returns 0 when at least one workload was updated and became ready.
+repoint_minio_image() {
+  local ns=$1
+  local kind name container image kind_lc workload
+  local -a workloads=()
+  local seen=" "
+
+  while IFS=$'\t' read -r kind name container image; do
+    [[ -z "${kind}" ]] && continue
+    echo "Quay MinIO cannot pull ${image}"
+    echo "Using public image ${MINIO_REPLACEMENT_IMAGE} for ${kind}/${name} container ${container}"
+    kind_lc="$(printf '%s' "${kind}" | tr '[:upper:]' '[:lower:]')"
+    oc -n "${ns}" set image "${kind_lc}/${name}" "${container}=${MINIO_REPLACEMENT_IMAGE}" || return 1
+    workloads+=("${kind_lc}/${name}")
+  done < <(oc -n "${ns}" get deploy,sts -o json | jq -r '
+    .items[]?
+    | .kind as $kind
+    | .metadata.name as $name
+    | ((.spec.template.spec.containers // []) + (.spec.template.spec.initContainers // []))[]
+    | select((.image // "") | test("minio/minio"))
+    | [$kind, $name, .name, .image] | @tsv
+  ')
+
+  if [[ "${#workloads[@]}" -eq 0 ]]; then
+    echo "Error: MinIO is in ImagePullBackOff but no Deployment or StatefulSet uses a minio/minio image." >&2
+    oc -n "${ns}" get pods -o wide >&2 || true
+    oc -n "${ns}" get events --sort-by='.lastTimestamp' >&2 | tail -n 20 || true
+    return 1
+  fi
+
+  for workload in "${workloads[@]}"; do
+    [[ "${seen}" == *" ${workload} "* ]] && continue
+    seen+="${workload} "
+    oc -n "${ns}" rollout restart "${workload}" >/dev/null || return 1
+    if ! oc -n "${ns}" rollout status "${workload}" --timeout=300s; then
+      echo "Error: ${workload} did not become ready with ${MINIO_REPLACEMENT_IMAGE}" >&2
+      oc -n "${ns}" get pods -o wide >&2 || true
+      oc -n "${ns}" get events --sort-by='.lastTimestamp' >&2 | tail -n 20 || true
+      return 1
+    fi
+  done
+}
+
+# Same ready signal as wait_for_quay: registry /v2/ returns 200 or 401.
+quay_v2_ready() {
+  local host code
+  host="$(detect_quay_url 2>/dev/null || true)"
+  [[ -n "${host}" ]] || return 1
+  code="$(curl -sk -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 15 "https://${host}/v2/" || true)"
+  [[ "${code}" == "401" || "${code}" == "200" ]]
+}
+
+# Repair Quay object storage before the rest of the lab. A healthy registry
+# is left alone. A MinIO ImagePullBackOff is switched to MINIO_REPLACEMENT_IMAGE.
+do_ensure_quay() {
+  local ns host repaired=false
+  ns="$(quay_namespace)" || {
+    echo "Error: Quay namespace not found (tried quay, quay-enterprise)." >&2
+    return 1
+  }
+  echo "Checking Quay in namespace ${ns}"
+
+  if ! minio_pull_failed "${ns}"; then
+    if quay_v2_ready; then
+      echo "Quay is up at $(detect_quay_url); MinIO image left unchanged."
+      return 0
+    fi
+    echo "Quay is not healthy yet, and MinIO is not failing an image pull."
+    echo "Waiting for the registry..."
+  else
+    echo "Quay is down: MinIO is in ImagePullBackOff."
+    echo "Public replacement: ${MINIO_REPLACEMENT_IMAGE}"
+    repoint_minio_image "${ns}" || return 1
+    repaired=true
+  fi
+
+  local deadline=$((SECONDS + 180))
+  while (( SECONDS < deadline )); do
+    host="$(detect_quay_url 2>/dev/null || true)"
+    if [[ -n "${host}" ]]; then
+      wait_for_quay "${host}" || return 1
+      echo "Quay is up at ${host}"
+      return 0
+    fi
+    echo "Waiting for a Quay route..."
+    sleep 5
+  done
+
+  echo "Error: Quay route did not appear within 180s (namespace ${ns})." >&2
+  if [[ "${repaired}" == true ]]; then
+    echo "MinIO was switched to ${MINIO_REPLACEMENT_IMAGE}" >&2
+  fi
+  oc -n "${ns}" get pods -o wide >&2 || true
+  oc -n "${ns}" get quayregistry,route,deploy >&2 || true
+  oc -n "${ns}" get events --sort-by='.lastTimestamp' >&2 | tail -n 30 || true
+  return 1
+}
+
 progress_run "Verify OpenShift access" do_verify_admin
+progress_run "Configure Quay" do_ensure_quay
 progress_run "Install TSSC CLIs (cosign, oc-mirror, ec)" do_tssc_clis
 progress_run "Wait for RHACS Central" do_wait_central
 
@@ -620,6 +758,7 @@ progress_done "Lab environment setup complete"
 load_roadshow_env
 
 progress_success_banner "Lab environment setup completed successfully" \
+  "Quay registry reachable" \
   "RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)" \
   "TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)" \
   "demo-apps cloned for image builds (cluster deploy is GitOps)" \

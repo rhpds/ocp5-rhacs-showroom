@@ -17,7 +17,7 @@ This course offers hands-on experience with Kubernetes-native security on Red Ha
 [[environment-setup]]
 == Environment setup
 
-Cluster-wide install (RHACS, Quay, GitOps, Compliance Operator, demo apps) is already applied by OpenShift GitOps. From the *Terminal* tab, run the remaining bastion steps: RHACS CLI access, workshop images, and TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
+Cluster-wide install (RHACS, Quay, GitOps, Compliance Operator, demo apps) is already applied by OpenShift GitOps. From the *Terminal* tab, run the remaining bastion steps. The script checks Quay first and, if MinIO cannot pull `quay.io/minio/minio`, switches it to `docker.io/pgsty/minio:RELEASE.2026-08-04T00-00-00Z`. It then sets up RHACS CLI access, workshop images, and TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----

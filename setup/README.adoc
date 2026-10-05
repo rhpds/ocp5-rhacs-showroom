@@ -79,7 +79,7 @@ Attendees use the Showroom attribute `{workshop_user_suffix}` matching their ass
 
 == Attendee lab environment (bastion)
 
-Attendees clone `ocp5-rhacs-showroom`, then run `setup/lab-environment.sh`. Cluster-wide RHACS, Compliance Operator, collector networking, Central settings, and demo-apps are already synced by OpenShift GitOps. The bastion script configures the RHACS CLI token and builds/pushes Quay images:
+Attendees clone `ocp5-rhacs-showroom`, then run `setup/lab-environment.sh`. Cluster-wide RHACS, Compliance Operator, collector networking, Central settings, and demo-apps are already synced by OpenShift GitOps. The bastion script configures Quay first (if the MinIO pod is in `ImagePullBackOff`, it switches the deployment to `docker.io/pgsty/minio:RELEASE.2026-08-04T00-00-00Z`), then configures the RHACS CLI token and builds/pushes Quay images:
 
 [source,bash]
 ----

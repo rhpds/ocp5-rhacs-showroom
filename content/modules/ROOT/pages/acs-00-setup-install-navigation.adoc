@@ -76,6 +76,8 @@ Variables persisted to `~/.bashrc`:
 
 === Run the setup script
 
+The script checks Quay first. If the MinIO pod is in `ImagePullBackOff` because `quay.io/minio/minio` cannot be pulled, it switches that workload to the public image `docker.io/pgsty/minio:RELEASE.2026-08-04T00-00-00Z` and waits until the registry answers. RHACS CLI setup, TSSC CLIs, and image builds run after that.
+
 *Procedure*
 
 [start=1]
@@ -96,12 +98,13 @@ bash setup/lab-environment.sh \
 Lab environment setup
 Details: /home/lab-user/.acs-roadshow/lab-environment-YYYYMMDD-HHMMSS.log
 
-[############################] 9/9  Lab environment setup complete
+[############################] 10/10  Lab environment setup complete
 
 ================================================================
   SUCCESS: Lab environment setup completed successfully
 ================================================================
 
+  ✓ Quay registry reachable
   ✓ RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)
   ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)
   ✓ demo-apps cloned for image builds (cluster deploy is GitOps)
