@@ -1,32 +1,65 @@
-[WARNING]
-====
-Do not order this item unless you are a developer and are working on the CI.
-====
-
-The OpenShift Security Roadshow is a hands-on lab for field and technical teams to demonstrate Kubernetes-native security on a pre-configured OpenShift cluster. Each module ends with a practical task so you apply what you learned before moving on.
-
-* 101 — *Foundations* — OpenShift secure-by-default posture
-* 201 — *Intermediate* — Hardening and shift-left
-* 301 — *Advanced* — Enterprise and zero trust
-* *RHACS (acs-00–acs-07)* — Full application lifecycle with Advanced Cluster Security
-* *OpenShift Virtualization (virt-00–virt-07)* — Hypervisor hardening from the OpenShift Virtualization hardening guide
-* *Lightwell TSSC (tssc-01–tssc-18)* — Hummingbird, Lightwell remediations, hermetic build, keyless signing, GitOps admission, TPA, and ACS
+Red Hat OpenShift Container Platform 5.0 Preview and Red Hat Advanced Cluster Security give field and technical teams a hands-on environment for Kubernetes-native security. AgnosticD V2 provisions the cluster with 3 control-plane nodes and 3 worker nodes, and certificates are enabled on the ingress controllers. Learners work foundations, hardening, and zero-trust modules, then product paths for Advanced Cluster Security, OpenShift Virtualization, and Lightwell Trusted Software Supply Chain. Each module ends with a practical task.
 
 == Lab Guide
 
-Follow the interactive lab guide in the Showroom environment. All of the modules are self-contained so you can start anywhere. The modules can be found in this document:https://docs.google.com/document/d/12x5Mil2ifvJ-fg0t0Sut20H-GV-lSB05enndCYAzK0c/edit?usp=sharing[module tracker^].
+You can find a preview version of the link:https://rhpds.github.io/ocp5-rhacs-showroom[lab guide^] here.
 
 == Featured Technology and Products
 
-* Red Hat OpenShift Container Platform 4.20
-* Red Hat Advanced Cluster Management 2.16
-* Red Hat Advanced Cluster Security 4.10
-* Red Hat OpenShift GitOps
-* Red Hat Quay 3.16 
-* Red Hat Trusted Artifact Signer
-* Red Hat Trusted Profile Analyzer
-* Red Hat OpenShift Pipelines
-* Lightwell Network
+The following components are pre-installed:
+
+* Red Hat OpenShift Container Platform 5.0
+* Red Hat Advanced Cluster Security (ACS)
+* Red Hat OpenShift GitOps (Argo CD)
+* Red Hat OpenShift Virtualization with a Red Hat Enterprise Linux 9 virtual machine
+* Red Hat OpenShift Lightspeed with MCP server integration
+* Lightspeed Agentic Operator
+* Cluster Observability Operator with Perses dashboards
+* MCP Gateway (Red Hat Connectivity Link)
+
+== Specifications
+
+* Deployer: AgnosticD V2
+* 3 control-plane nodes
+* 3 worker nodes
+* Cluster version: 5.0
+* Certificates enabled on ingress controllers
+
+== Detailed Overview
+
+* *101 Foundations*
+** OpenShift secure-by-default posture
+** Projects, RBAC, SCC guardrails, and NetworkPolicy
+** Secrets, image provenance, etcd encryption, and audit logging
+
+* *201 Intermediate*
+** Custom RBAC, workload hardening, and file integrity monitoring
+** Shift-left pipelines, external secrets, and compliance tailoring
+** Admission governance and a STRIDE control map
+
+* *301 Advanced*
+** Platform policy governance and GitOps of a digest-pinned image
+** AdminNetworkPolicy, runtime enforcement, and incident response
+** Supply-chain admission, encryption inventory, and SPIFFE workload identity
+
+* *Advanced Cluster Security*
+** Vulnerability management, policy, and deploy-time enforcement
+** CI/CD gates, compliance, notifications, and API
+** Network and runtime security, plus ACS 5 capabilities (VM scanning, file activity monitoring, MCP, and init containers)
+
+* *OpenShift Virtualization Security*
+** HyperConverged feature gates and virtualization RBAC
+** VM, storage, and network isolation
+** Host firmware and kernel controls from the OpenShift Virtualization hardening guide
+
+* *Lightwell and Trusted Software Supply Chain*
+** Hummingbird verification and Lightwell remediated pins
+** Hermetic build, keyless signing, and GitOps admission
+** Trusted Profile Analyzer and ACS compliance
+
+== Authors
+
+* Michael Foster
 
 == Support
 
