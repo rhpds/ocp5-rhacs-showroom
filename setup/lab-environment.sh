@@ -40,11 +40,11 @@ ROADSHOW_ENV_FILE="${HOME}/.acs-roadshow/env"
 # current Alpine (3.24.1 today); catalog Clair indexes it but leaves version_id
 # empty, so Quay's Security Scan column shows Passed / namespace "".
 PYTHON_ALPINE_BASE="${PYTHON_ALPINE_BASE:-docker.io/library/python:3.12-alpine3.20}"
-# quay.io/minio/minio and docker.io/minio/minio reject anonymous pulls.
-# pgsty/minio is a public fork frozen at this tag. It keeps /usr/bin/minio and
-# /usr/bin/docker-entrypoint.sh, so the Quay MinIO deployment's existing
-# command and args still start the server. Override with MINIO_REPLACEMENT_IMAGE.
-MINIO_REPLACEMENT_IMAGE="${MINIO_REPLACEMENT_IMAGE:-docker.io/pgsty/minio:RELEASE.2026-08-04T00-00-00Z}"
+# quay.io/minio/minio rejects anonymous pulls. quay.io/thanos/minio keeps the
+# original RELEASE.2025-09-07T16-13-09Z image (there is no "latest" tag).
+# Same entrypoint and /usr/bin/minio as the image Quay was already running.
+# Override with MINIO_REPLACEMENT_IMAGE.
+MINIO_REPLACEMENT_IMAGE="${MINIO_REPLACEMENT_IMAGE:-quay.io/thanos/minio:RELEASE.2025-09-07T16-13-09Z}"
 # TSSC CLIs: same registry.redhat.io pins as Lightwell Showroom (no github.com).
 COSIGN_IMAGE="${COSIGN_IMAGE:-registry.redhat.io/rhtas/cosign-rhel9:1.3.0}"
 OC_MIRROR_IMAGE="${OC_MIRROR_IMAGE:-registry.redhat.io/openshift4/oc-mirror-plugin-rhel9:v4.20}"
@@ -112,7 +112,7 @@ Options:
 Environment:
   MINIO_REPLACEMENT_IMAGE   Public image used when Quay's MinIO pod cannot pull
                             quay.io/minio/minio. Default:
-                            docker.io/pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+                            quay.io/thanos/minio:RELEASE.2025-09-07T16-13-09Z
 EOF
 }
 
@@ -560,15 +560,17 @@ do_frontend_image() {
   podman push "${QUAY_URL}/${QUAY_USER}/frontend:0.1" --remove-signatures
 }
 
-# True when a MinIO server container is waiting on a pull of minio/minio.
-minio_pull_failed() {
+# True when a MinIO workload is still on an image other than the public mirror.
+# Covers ImagePullBackOff of quay.io/minio/minio and a running-but-unready
+# replacement such as pgsty/minio.
+minio_needs_public_image() {
   local ns=$1
   local count
-  count="$(oc -n "${ns}" get pods -o json | jq '
-    [ .items[]
-      | ((.status.containerStatuses // []) + (.status.initContainerStatuses // []))[]
-      | select(.state.waiting.reason == "ImagePullBackOff" or .state.waiting.reason == "ErrImagePull")
-      | select((.image // "") | test("minio/minio"))
+  count="$(oc -n "${ns}" get deploy,sts -o json | jq --arg replacement "${MINIO_REPLACEMENT_IMAGE}" '
+    [ .items[]?
+      | ((.spec.template.spec.containers // []) + (.spec.template.spec.initContainers // []))[]
+      | select(.name == "minio" or ((.image // "") | test("minio/minio|pgsty/minio|/minio:")))
+      | select(.image != $replacement)
     ] | length
   ')"
   [[ "${count}" -gt 0 ]]
@@ -586,7 +588,7 @@ quay_namespace() {
   return 1
 }
 
-# Point MinIO workloads that still reference minio/minio at the public image.
+# Point MinIO workloads that are not already on the public mirror at that image.
 # Returns 0 when at least one workload was updated and became ready.
 repoint_minio_image() {
   local ns=$1
@@ -596,23 +598,25 @@ repoint_minio_image() {
 
   while IFS=$'\t' read -r kind name container image; do
     [[ -z "${kind}" ]] && continue
-    echo "Quay MinIO cannot pull ${image}"
+    echo "Quay MinIO is not using a pullable image (${image})"
     echo "Using public image ${MINIO_REPLACEMENT_IMAGE} for ${kind}/${name} container ${container}"
     kind_lc="$(printf '%s' "${kind}" | tr '[:upper:]' '[:lower:]')"
     oc -n "${ns}" set image "${kind_lc}/${name}" "${container}=${MINIO_REPLACEMENT_IMAGE}" || return 1
     workloads+=("${kind_lc}/${name}")
-  done < <(oc -n "${ns}" get deploy,sts -o json | jq -r '
+  done < <(oc -n "${ns}" get deploy,sts -o json | jq -r --arg replacement "${MINIO_REPLACEMENT_IMAGE}" '
     .items[]?
     | .kind as $kind
     | .metadata.name as $name
     | ((.spec.template.spec.containers // []) + (.spec.template.spec.initContainers // []))[]
-    | select((.image // "") | test("minio/minio"))
+    | select(.name == "minio" or ((.image // "") | test("minio/minio|pgsty/minio|/minio:")))
+    | select(.image != $replacement)
     | [$kind, $name, .name, .image] | @tsv
   ')
 
   if [[ "${#workloads[@]}" -eq 0 ]]; then
-    echo "Error: MinIO is in ImagePullBackOff but no Deployment or StatefulSet uses a minio/minio image." >&2
+    echo "Error: Quay MinIO is down but no Deployment or StatefulSet container could be retargeted." >&2
     oc -n "${ns}" get pods -o wide >&2 || true
+    oc -n "${ns}" logs deploy/minio --tail=40 >&2 || true
     oc -n "${ns}" get events --sort-by='.lastTimestamp' >&2 | tail -n 20 || true
     return 1
   fi
@@ -624,6 +628,7 @@ repoint_minio_image() {
     if ! oc -n "${ns}" rollout status "${workload}" --timeout=300s; then
       echo "Error: ${workload} did not become ready with ${MINIO_REPLACEMENT_IMAGE}" >&2
       oc -n "${ns}" get pods -o wide >&2 || true
+      oc -n "${ns}" logs "${workload}" --tail=40 >&2 || true
       oc -n "${ns}" get events --sort-by='.lastTimestamp' >&2 | tail -n 20 || true
       return 1
     fi
@@ -640,7 +645,8 @@ quay_v2_ready() {
 }
 
 # Repair Quay object storage before the rest of the lab. A healthy registry
-# is left alone. A MinIO ImagePullBackOff is switched to MINIO_REPLACEMENT_IMAGE.
+# is left alone. A MinIO pod that cannot pull, or is not already on the
+# public mirror, is switched to MINIO_REPLACEMENT_IMAGE.
 do_ensure_quay() {
   local ns host repaired=false
   ns="$(quay_namespace)" || {
@@ -649,18 +655,18 @@ do_ensure_quay() {
   }
   echo "Checking Quay in namespace ${ns}"
 
-  if ! minio_pull_failed "${ns}"; then
-    if quay_v2_ready; then
-      echo "Quay is up at $(detect_quay_url); MinIO image left unchanged."
-      return 0
-    fi
-    echo "Quay is not healthy yet, and MinIO is not failing an image pull."
-    echo "Waiting for the registry..."
-  else
-    echo "Quay is down: MinIO is in ImagePullBackOff."
-    echo "Public replacement: ${MINIO_REPLACEMENT_IMAGE}"
+  if quay_v2_ready; then
+    echo "Quay is up at $(detect_quay_url); MinIO image left unchanged."
+    return 0
+  fi
+
+  if minio_needs_public_image "${ns}"; then
+    echo "Quay is down. MinIO will use ${MINIO_REPLACEMENT_IMAGE}"
     repoint_minio_image "${ns}" || return 1
     repaired=true
+  else
+    echo "Quay is not healthy yet. MinIO is already on ${MINIO_REPLACEMENT_IMAGE}."
+    echo "Waiting for the registry..."
   fi
 
   local deadline=$((SECONDS + 180))
