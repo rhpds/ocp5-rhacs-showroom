@@ -7,13 +7,13 @@
 
 You sign the application digest you built in xref:tssc-11-build-sbom.adoc[4.4] with keyless Red Hat Trusted Artifact Signer. Fulcio issues the short-lived certificate, Rekor records the signature, and TUF distributes the trust root. Then you run `cosign verify` on *that* digest.
 
-This is not the Hummingbird runtime signature from Track 1. It is not Lightwell’s signed libraries. Key-based sign and `--key` verify are xref:tssc-14-disconnected-verify.adoc[5.3]. Do not treat keyless-only as Track 5 done.
+This is not the Hummingbird runtime signature from Track 1. It is not Lightwell's signed libraries. Key-based sign and `--key` verify are xref:tssc-14-disconnected-verify.adoc[5.3]. Do not treat keyless-only as Track 5 done.
 
 The seeded pipeline already includes task `cosign-sign-keyless`. Placeholders in the PipelineRun fail that task until you fill live in-cluster Fulcio, Rekor, and TUF URLs (`fulcio_internal_url` and the matching keys). Route hints (`fulcio_url_hint`) are for Showroom `cosign verify` only. After 4.3 the build namespace cannot reach those Routes.
 
 == Why it matters
 
-Integrity is a signature on *your* application image. That is distinct from Red Hat’s Hummingbird key and from Lightwell’s signed libraries. Until the app digest verifies, later admission and promotion sit on an unsigned artifact.
+Integrity is a signature on *your* application image. That is distinct from Red Hat’s Hummingbird key and from Lightwell's signed libraries. Until the app digest verifies, later admission and promotion sit on an unsigned artifact.
 
 You use in-cluster Fulcio, Rekor, and TUF URLs so the pipeline still signs after hermetic egress. A Hummingbird key, a fake issuer, or a Route URL after 4.3 is not this control. Admission in Track 6 still needs the 5.3 public key for native ImagePolicy. Keep both signatures.
 

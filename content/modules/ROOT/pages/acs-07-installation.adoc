@@ -69,7 +69,7 @@ IMPORTANT: You should be redirected to your ACS instance at a page that looks li
 
 == Uninstall the "On-Prem" RHACS Operator
 
-While you're waiting for the Central Services to spin up, head over to the OpenShift console to unstall the existing operator. 
+While you're waiting for the Central Services to spin up, head over to the OpenShift console to uninstall the existing operator. 
 
 *Procedure*
 
@@ -93,7 +93,7 @@ image::11-uninstall-02.png[link=self, window=blank, width=100%]
 
 image::11-uninstall-03.png[link=self, window=blank, width=100%]
 
-IMPORTANT: If successfull, you will have no access to the RHACS console at `{acs_route}`
+IMPORTANT: If successful, you will have no access to the RHACS console at `{acs_route}`
 
 image::11-uninstall-04.png[link=self, window=blank, width=100%]
 
@@ -206,7 +206,7 @@ image::11-cs-08.png[link=self, window=blank, width=100%]
 
 [start=8]
 . Use all of the defaults but change the cluster name to *new-cluster*
-. Add the *Central Endpoint* of your ACS Cloud Service. This can be foudn in the console.openshift or the URL at the top of the page.  
+. Add the *Central Endpoint* of your ACS Cloud Service. This can be found in the console.openshift or the URL at the top of the page.  
 . Click "Install"
 
 image::11-cs-09.png[link=self, window=blank, width=100%]

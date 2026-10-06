@@ -147,7 +147,15 @@
       ]
     }
   ],
+  "dictionaryDefinitions": [
+    {
+      "name": "project-words",
+      "path": "./cspell-words.txt",
+      "addWords": true
+    }
+  ],
   "dictionaries": [
+    "project-words",
     "softwareTerms",
     "node",
     "typescript",

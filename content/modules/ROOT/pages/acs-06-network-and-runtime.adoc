@@ -351,7 +351,7 @@ What is the CIS compliance standard percentage now?
 
 *LAST ONE*
 
-run the following commands to create a publically available applications. You task is to use the network graph and find the external IP address of the redhat.com loadbalancer.
+run the following commands to create a publicly available applications. You task is to use the network graph and find the external IP address of the redhat.com loadbalancer.
 
 ----
 git clone https://github.com/shaneboulden/tailspin-argocd-cd.git netcoreapp

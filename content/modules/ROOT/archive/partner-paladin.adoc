@@ -29,14 +29,14 @@ Another piece of useful information is the Out of SLA number. This shows the num
 
 image:misc-paladin-04.gif[]
 
-With the Out of SLA number, it becomes easy to find which violations should be adressed first. Clicking an Out of SLA number will take you to the violations page for open, out of SLA violagions of that severity. 
+With the Out of SLA number, it becomes easy to find which violations should be addressed first. Clicking an Out of SLA number will take you to the violations page for open, out of SLA violations of that severity. 
 
 image:misc-paladin-05.gif[]
 
 
 === The Asset Graph
 
-The Asset Graph shows the utilization of your environment. This information can be useful to understand, not only the cadance of your environment, but also anomolies within your environment. For example, a sudden, unexpected spike in utilization could be representative of a bad actor deploying unapproved workloads. 
+The Asset Graph shows the utilization of your environment. This information can be useful to understand, not only the cadence of your environment, but also anomalies within your environment. For example, a sudden, unexpected spike in utilization could be representative of a bad actor deploying unapproved workloads. 
 
 image::misc-paladin-06.png[]
 

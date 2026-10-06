@@ -7,12 +7,14 @@ on:
       - 'content/**/*.adoc'
       - '.github/workflows/spell-check.yml'
       - '.github/workflows/.cspell.json'
+      - '.github/workflows/cspell-words.txt'
   push:
     branches: [ main ]
     paths:
       - 'content/**/*.adoc'
       - '.github/workflows/spell-check.yml'
       - '.github/workflows/.cspell.json'
+      - '.github/workflows/cspell-words.txt'
 
 jobs:
   spell-check:
@@ -56,7 +58,7 @@ jobs:
 
               Please review the spell check errors above and either:
               - Fix the spelling errors
-              - Add technical terms to the project dictionary in \`.github/workflows/.cspell.json\`
+              - Add technical terms to \`.github/workflows/cspell-words.txt\`
 
               Re-run the spell check locally with:
               \`\`\`bash
@@ -71,7 +73,7 @@ jobs:
           echo "❌ Spell check failed!"
           echo "Please review the spell check errors above and either:"
           echo "- Fix the spelling errors"
-          echo "- Add technical terms to the project dictionary in .github/workflows/.cspell.json"
+          echo "- Add technical terms to .github/workflows/cspell-words.txt"
           echo ""
           echo "Re-run the spell check locally with:"
           echo "npx cspell --config ./.github/workflows/.cspell.json \"content/**/*.adoc\""

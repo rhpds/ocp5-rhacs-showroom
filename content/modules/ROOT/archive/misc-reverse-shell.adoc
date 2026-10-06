@@ -185,7 +185,7 @@ EOF
 ----
 
 [start=4]
-. Deploy the struts deployment into your new projecct by using the 'oc' CLI
+. Deploy the struts deployment into your new project by using the 'oc' CLI
 
 [source,bash,role="execute"]
 ----
@@ -345,9 +345,9 @@ image::../assets/images/01-rhacs-console-dashboard.png[RHACS console]
 
 === Find the struts vulnerability in RHACS dashboard. 
 
-The next step is to use the ACS dashboard to locate the Log4shell vulnerability. The following gif will showcase how to locate the vulnerability witht the exact steps outlines below. 
+The next step is to use the ACS dashboard to locate the Log4shell vulnerability. The following gif will showcase how to locate the vulnerability with the exact steps outlines below. 
 
-NOTE: CVE-2021-44228 & CVE-2021-45046 can both be used to find the log4shell vulnerabiulity in the dashboard. 
+NOTE: CVE-2021-44228 & CVE-2021-45046 can both be used to find the log4shell vulnerability in the dashboard. 
 
 image:../assets/images/misc-log-1.gif[]
 
@@ -420,7 +420,7 @@ In case of emergency, add the annotation {"admission.stackrox.io/break-glass": "
 ====
 You might get a different message, detailed below.
 RHACS has not yet scanned the image, and is blocking unscanned images from deployment.
-If that is the case, simpley run the `oc create -f ./deploy.yaml` again and it will have scanned the image.
+If that is the case, simply run the `oc create -f ./deploy.yaml` again and it will have scanned the image.
 Now the deployment will trigger the log4j violations above.
 ----
 Error from server (Failed currently enforced policies from StackRox): error when creating "./deploy.yaml": admission webhook "policyeval.stackrox.io" denied the request:
