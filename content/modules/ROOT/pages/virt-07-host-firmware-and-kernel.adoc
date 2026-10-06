@@ -3,6 +3,7 @@
 :skills: Intel TXT, Nested Virtualization, schedstats, CPU Mitigations
 :labid: LAB-VIRT-07
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~25 minutes

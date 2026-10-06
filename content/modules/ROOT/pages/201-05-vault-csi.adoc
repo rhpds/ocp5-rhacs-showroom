@@ -3,6 +3,7 @@
 :skills: Vault CSI, Dynamic Secrets, Rotation
 :labid: LAB-201-05
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~25 minutes

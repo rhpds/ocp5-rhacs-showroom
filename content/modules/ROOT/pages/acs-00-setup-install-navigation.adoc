@@ -1,5 +1,6 @@
 = Setup and Navigation
 :toc:
+:toclevels: 1
 :sectnums:
 :icons: font
 
@@ -37,43 +38,12 @@ image::01-rhacs-login.png[RHACS console,link=self, window=blank, width=100%]
 
 image::01-rhacs-console-dashboard.png[RHACS console,link=self, window=blank, width=100%]
 
-=== Access the Red Hat^(R)^ Quay UI
-
-Red Hat Quay is an enterprise-grade container registry that provides a secure, scalable, and highly available solution for storing and managing container images. It offers integrated security scanning, access controls, and image signing to help ensure the integrity and security of containerized applications across hybrid and multi-cloud environments, including Red Hat OpenShift, AWS, Azure, and Google Cloud.
-
----
-
-Let's ensure that you have access to the Quay User Interface.
-
-*Procedure*
-
-[start=1]
-. Log into the Quay console at `{quay_console_url}[{quay_console_url}^]`
-
-image::00-quay-login.png[Quay Console,link=self, window=blank, width=100%]
-
-[start=2]
-. The setup script creates the Quay admin user and saves it in `~/.bashrc`. Run the lab environment setup below first, then print the account:
-
-[source,bash,subs="+macros,+attributes",role=execute]
-----
-source ~/.bashrc
-echo "Username: $QUAY_USER"
-echo "Password: $QUAY_PASSWORD"
-----
-
-[[deploy-the-workshop-apps]]
 
 == Lab environment setup
 
 The setup script below is the remaining *bastion* work: RHACS CLI variables, a local clone of `demo-apps` (for Dockerfiles), and the Quay image builds. Vulnerable demo apps, Compliance Operator, collector networking, and RHACS Central settings are deployed by OpenShift GitOps.
 
-Variables persisted to `~/.bashrc`:
-
-* `TUTORIAL_HOME` — cloned `demo-apps` repository
-* `QUAY_USER` / `QUAY_PASSWORD` / `QUAY_URL` — Quay admin account created by this script, and the registry hostname
-* `ROX_CENTRAL_ADDRESS` / `ROX_PASSWORD` / `ROX_API_TOKEN` — RHACS Central host, admin password, and generated API token
-* `APP_HOME` — set when you deploy the patient-portal application (second script step)
+IMPORTANT: This will run quickly if it has already been run as part of the initial setup.4
 
 === Run the setup script
 
@@ -85,7 +55,10 @@ RHACS CLI setup, TSSC CLIs, and image builds for the roadshow workshop.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-git clone https://github.com/rhpds/ocp5-rhacs-showroom.git
+cd ~/
+if [ ! -d "ocp5-rhacs-showroom" ]; then
+    git clone https://github.com/rhpds/ocp5-rhacs-showroom.git
+fi
 cd ocp5-rhacs-showroom
 bash setup/lab-environment.sh
 ----
@@ -111,8 +84,6 @@ Details: /home/lab-user/.acs-roadshow/lab-environment-YYYYMMDD-HHMMSS.log
   ✓ Detailed log: /home/lab-user/.acs-roadshow/lab-environment-....log
 ----
 
-NOTE: Vulnerable demo apps are synced by the `roadshow-demo-apps` Argo CD Application. PodSecurity warnings on those workloads are expected.
-
 [start=2]
 . The script prints progress for each phase. When it completes, reload your shell environment:
 
@@ -125,6 +96,15 @@ echo "ROX_CENTRAL_ADDRESS=$ROX_CENTRAL_ADDRESS"
 test -n "$ROX_API_TOKEN" && echo "ROX_API_TOKEN is set" || echo "ROX_API_TOKEN is missing"
 ----
 
+[.console-output]
+[source,bash,subs="+macros,+attributes"]
+----
+TUTORIAL_HOME=/home/lab-user/demo-apps
+QUAY_URL=registry-quay-quay.apps.cluster-tkwxg.dyn.redhatworkshops.io
+ROX_CENTRAL_ADDRESS=central-reencrypt-stackrox.apps.cluster-tkwxg.dyn.redhatworkshops.io
+ROX_API_TOKEN is set
+----
+
 [[quay]]
 [[build-a-container-image]]
 
@@ -134,16 +114,26 @@ Red Hat Quay is an enterprise-quality registry for building, securing, and servi
 
 === Accessing Quay
 
-Your Red Hat Quay console is available at: {quay_console_url}[window=blank]
-
-The setup script saved the account in `~/.bashrc`.
+. Run the following to get the route, username and password for the Quay console:
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 source ~/.bashrc
+echo "Quay URL: $QUAY_URL"
 echo "Username: $QUAY_USER"
 echo "Password: $QUAY_PASSWORD"
 ----
+
+[.console-output]
+[source,bash,subs="+macros,+attributes"]
+----
+Quay URL: registry-quay-quay.apps.cluster-tkwxg.dyn.redhatworkshops.io
+Username: admin
+Password: e0bb6fc35b324b524578a1b0
+----
+
+[start=2]
+. Open the Quay console by using the URL in the output above in a new browser tab.
 
 [[navigating-the-registry]]
 

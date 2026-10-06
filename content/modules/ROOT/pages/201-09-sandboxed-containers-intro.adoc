@@ -3,6 +3,7 @@
 :skills: Kata Containers, RuntimeClass, Sandboxed Workloads
 :labid: LAB-201-09
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~15 minutes

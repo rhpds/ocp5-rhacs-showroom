@@ -3,6 +3,7 @@
 :skills: Compliance Operator, Tailored Profiles, CIS, Audit Logging
 :labid: LAB-201-07
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~25 minutes

@@ -5,6 +5,7 @@
 :audit-evidence: "Port 80 start and runAsUser=0 fail under restricted; after anyuid grant pod runs as UID 0 illustrating risky exception. LimitRange injects default requests/limits; quota denies excessive replicas and oversized limits with observable FailedCreate/quota events."
 :cis-mitre-codes: '{"cisMapping":{"primary":["5.2.6","4.2.8"],"related":[]},"mitre":{"techniques":["T1611","T1499"],"tactics":["TA0004","TA0040"],"mitigations":["M1048","M1026","M1037"]}}'
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~20 minutes

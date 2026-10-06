@@ -3,6 +3,7 @@
 :skills: HCO Feature Gates, Insecure Registries, jsonpatch Annotations
 :labid: LAB-VIRT-01
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~25 minutes

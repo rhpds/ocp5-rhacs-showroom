@@ -1,6 +1,6 @@
 = Appendix: internal enablement checklist
 :toc:
-:toclevels: 2
+:toclevels: 1
 
 This page is the *enablement metric* (Q20). It is scored *after* the workshop. It is not a Check on the claim, not a Validate Job, and not a live customer proof-of-value.
 

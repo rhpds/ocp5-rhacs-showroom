@@ -3,6 +3,7 @@
 :cis-summary: "Enable etcd encryption at rest and implement basic control plane security hardening."
 :mitre-summary: "Prevents data exposure through encryption at rest and reduces control plane attack surface."
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~25 minutes (most of that is waiting if the cluster still has to encrypt)

@@ -3,6 +3,7 @@
 :skills: permittedHostDevices, KSM, virt-handler Permissions
 :labid: LAB-VIRT-02
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~25 minutes

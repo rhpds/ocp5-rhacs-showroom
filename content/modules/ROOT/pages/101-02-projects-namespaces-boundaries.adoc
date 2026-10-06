@@ -3,6 +3,7 @@
 :cis-summary: "Use OpenShift projects and namespaces as security boundaries for multi-tenancy and resource isolation."
 :mitre-summary: "Prevents unauthorized access and resource conflicts by establishing namespace-level security boundaries."
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~15 minutes

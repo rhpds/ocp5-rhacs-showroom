@@ -1,6 +1,6 @@
 = Appendix: instructor two-day grouping
 :toc:
-:toclevels: 2
+:toclevels: 1
 
 This page is for *instructors* running a two-day event. It is not an exercise. Nothing to pass here.
 

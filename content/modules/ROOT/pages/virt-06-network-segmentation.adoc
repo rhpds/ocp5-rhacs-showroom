@@ -3,6 +3,7 @@
 :skills: NAD VLAN, MAC SpoofChk, MultiNetworkPolicy
 :labid: LAB-VIRT-06
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~30 minutes

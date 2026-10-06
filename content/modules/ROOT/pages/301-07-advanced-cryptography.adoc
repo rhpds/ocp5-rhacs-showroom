@@ -3,6 +3,7 @@
 :skills: etcd Encryption, Route TLS, No Secret-as-Env, Vault Pointer
 :labid: LAB-301-07
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~20 minutes

@@ -1,5 +1,6 @@
 = Notifications, API, and Integrations
 :toc:
+:toclevels: 1
 :sectnums:
 :icons: font
 

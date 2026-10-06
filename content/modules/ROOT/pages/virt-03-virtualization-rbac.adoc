@@ -3,6 +3,7 @@
 :skills: VMIM RBAC, kubevirt exec, VNC Tokens, InstanceTypes, CDI
 :labid: LAB-VIRT-03
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~30 minutes

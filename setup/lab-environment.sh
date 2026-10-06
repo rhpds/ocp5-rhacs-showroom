@@ -816,7 +816,10 @@ except ClientError as exc:
 
 # Quay's config tool defaults signature_version to s3v2, which botocore rejects,
 # and a missing region makes the signed MinIO call fail. Either one becomes
-# HTTP 500 on blob upload. The registry process only reads config.yaml at start.
+# HTTP 500 on blob upload. Omitting DISTRIBUTED_STORAGE_PREFERENCE leaves
+# Quay's built-in default of local_us, which is KeyError on blob upload when
+# the only configured location is named default. The registry process only
+# reads config.yaml at start.
 quay_loaded_storage_config() {
   local ns=$1 py
   py="$(oc -n "${ns}" exec deploy/registry-quay-app -c quay-app -- \
@@ -833,7 +836,39 @@ for path in paths:
         if "DISTRIBUTED_STORAGE_CONFIG" in data:
             text = data
             break
-sys.exit(0 if ("signature_version: s3v4" in text and "region_name:" in text) else 1)
+ids = []
+prefs = []
+in_cfg = False
+in_pref = False
+for line in text.splitlines():
+    if line.startswith("DISTRIBUTED_STORAGE_PREFERENCE:"):
+        inline = line.split(":", 1)[1].strip()
+        if inline.startswith("[") and inline.endswith("]") and inline[1:-1].strip():
+            prefs.extend([part.strip() for part in inline[1:-1].split(",") if part.strip()])
+        elif inline:
+            prefs.append(inline)
+        in_pref = True
+        in_cfg = False
+        continue
+    if line.startswith("DISTRIBUTED_STORAGE_CONFIG:"):
+        in_cfg = True
+        in_pref = False
+        continue
+    if in_pref:
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            prefs.append(stripped[2:].strip())
+            continue
+        if line.strip() == "":
+            continue
+        in_pref = False
+    if in_cfg:
+        if line.startswith("  ") and not line.startswith("   ") and line.rstrip().endswith(":"):
+            ids.append(line.strip()[:-1])
+        elif line and not line.startswith(" "):
+            in_cfg = False
+preference_ok = bool(ids) and bool(prefs) and prefs[0] in ids
+sys.exit(0 if ("signature_version: s3v4" in text and "region_name:" in text and preference_ok) else 1)
 '
 }
 
@@ -857,39 +892,78 @@ ensure_quay_storage_signature() {
   cfg="$(mktemp)"
   updated="$(mktemp)"
   oc -n "${ns}" get secret quay-config-bundle -o jsonpath='{.data.config\.yaml}' | base64 -d > "${cfg}"
-  if ! grep -q 'signature_version: s3v4' "${cfg}" || ! grep -q 'region_name:' "${cfg}"; then
-    python3 - "${cfg}" "${updated}" <<'PY'
+  py_rc=0
+  python3 - "${cfg}" "${updated}" <<'PY' || py_rc=$?
 import pathlib, sys
 src, dst = sys.argv[1], sys.argv[2]
-text = pathlib.Path(src).read_text()
-lines = []
-saw_sig = False
-saw_region = False
-for line in text.splitlines(True):
-    stripped = line.strip()
-    if stripped.startswith("signature_version:"):
-        indent = line[:len(line) - len(line.lstrip())]
-        lines.append(f"{indent}signature_version: s3v4\n")
-        saw_sig = True
+rows = pathlib.Path(src).read_text().splitlines()
+
+def storage_ids(lines):
+    ids = []
+    in_cfg = False
+    for raw in lines:
+        if raw.startswith("DISTRIBUTED_STORAGE_CONFIG:"):
+            in_cfg = True
+            continue
+        if not in_cfg:
+            continue
+        if raw.startswith("  ") and not raw.startswith("   ") and raw.rstrip().endswith(":"):
+            ids.append(raw.strip()[:-1])
+            continue
+        if raw and not raw.startswith(" "):
+            in_cfg = False
+    return ids
+
+ids = storage_ids(rows)
+has_sig = any(line.strip().startswith("signature_version:") for line in rows)
+has_region = any(line.strip().startswith("region_name:") for line in rows)
+out = []
+i = 0
+while i < len(rows):
+    line = rows[i]
+    if line.startswith("DISTRIBUTED_STORAGE_PREFERENCE:"):
+        i += 1
+        while i < len(rows) and (rows[i].strip() == "" or rows[i].strip().startswith("- ")):
+            i += 1
         continue
-    lines.append(line)
-    if stripped.startswith("region_name:"):
-        saw_region = True
-    if stripped.startswith("storage_path:") and not saw_sig:
+    if line.strip().startswith("signature_version:"):
         indent = line[:len(line) - len(line.lstrip())]
-        lines.append(f"{indent}signature_version: s3v4\n")
-        saw_sig = True
-if saw_sig and not saw_region:
-    lines.append("      region_name: us-east-1\n")
-    saw_region = True
-if not saw_sig or not saw_region:
+        out.append(f"{indent}signature_version: s3v4")
+        i += 1
+        continue
+    out.append(line)
+    if not has_sig and line.strip().startswith("storage_path:"):
+        indent = line[:len(line) - len(line.lstrip())]
+        out.append(f"{indent}signature_version: s3v4")
+        has_sig = True
+    i += 1
+if has_sig and not has_region:
+    out.append("      region_name: us-east-1")
+    has_region = True
+if not has_sig or not has_region or not ids:
     sys.exit(2)
-pathlib.Path(dst).write_text("".join(lines))
+inserted = []
+placed = False
+for line in out:
+    if not placed and line.startswith("DISTRIBUTED_STORAGE_CONFIG:"):
+        inserted.append("DISTRIBUTED_STORAGE_PREFERENCE:")
+        inserted.append(f"  - {ids[0]}")
+        placed = True
+    inserted.append(line)
+if not placed:
+    sys.exit(2)
+pathlib.Path(dst).write_text("\n".join(inserted) + "\n")
 PY
+  if [[ "${py_rc}" -ne 0 ]]; then
+    echo "Error: Quay config.yaml has no usable DISTRIBUTED_STORAGE_CONFIG entry." >&2
+    rm -f "${cfg}" "${updated}"
+    return 1
+  fi
+  if ! cmp -s "${cfg}" "${updated}"; then
     oc -n "${ns}" create secret generic quay-config-bundle \
       --from-file=config.yaml="${updated}" \
       --dry-run=client -o yaml | oc apply -f - >/dev/null
-    echo "Updated Quay storage to sign MinIO requests with s3v4 in us-east-1."
+    echo "Updated Quay storage: s3v4 signature and preference matching the configured location."
     nudge_quayregistry "${ns}"
   fi
   rm -f "${cfg}" "${updated}"
@@ -906,9 +980,15 @@ PY
     oc -n "${ns}" annotate deploy/registry-quay-app \
       "roadshow/storage-config-restarted=${config_rv}" --overwrite >/dev/null || true
   fi
-  if quay_loaded_storage_config "${ns}"; then
-    return 0
-  fi
+  # The operator copies the bundle into the pod secret on its own rollout.
+  # Wait until that file names the configured location, or blob upload 500s.
+  local attempt
+  for attempt in 1 2 3 4 5 6; do
+    if quay_loaded_storage_config "${ns}"; then
+      return 0
+    fi
+    sleep 10
+  done
   echo "Quay did not load region_name from config.yaml. Setting AWS_DEFAULT_REGION on the registry."
   oc -n "${ns}" set env deploy/registry-quay-app -c quay-app \
     AWS_DEFAULT_REGION=us-east-1 AWS_REGION=us-east-1 >/dev/null
@@ -918,10 +998,16 @@ PY
   if [[ -n "${host}" ]]; then
     wait_for_quay "${host}" || return 1
   fi
+  if quay_loaded_storage_config "${ns}"; then
+    return 0
+  fi
+  echo "Error: Quay did not load a storage preference that matches DISTRIBUTED_STORAGE_CONFIG." >&2
+  return 1
 }
 
-# Blob upload returns HTTP 500 when bucket quay is missing or MinIO rejects
-# the request signature. Repair both even if /v2/ is already answering.
+# Blob upload returns HTTP 500 when bucket quay is missing, MinIO rejects
+# the request signature, or DISTRIBUTED_STORAGE_PREFERENCE still says local_us.
+# Repair all three even if /v2/ is already answering.
 repair_quay_storage() {
   local ns=$1 user pass
   user="$(minio_credential "${ns}" MINIO_ROOT_USER 2>/dev/null || minio_credential "${ns}" MINIO_ACCESS_KEY 2>/dev/null || true)"
@@ -995,6 +1081,8 @@ TAG_EXPIRATION_OPTIONS:
   - 2w
 TEAM_RESYNC_STALE_TIME: 60m
 TESTING: false
+DISTRIBUTED_STORAGE_PREFERENCE:
+  - default
 DISTRIBUTED_STORAGE_CONFIG:
   default:
     - RadosGWStorage

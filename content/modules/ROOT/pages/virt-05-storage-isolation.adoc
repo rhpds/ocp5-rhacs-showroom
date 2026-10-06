@@ -3,6 +3,7 @@
 :skills: DataVolume Clone RBAC, Shareable Disks, errorPolicy
 :labid: LAB-VIRT-05
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~25 minutes

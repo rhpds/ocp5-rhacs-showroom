@@ -3,6 +3,7 @@
 :skills: Security Operating Model, RHACM PolicySet, NIST 800-53, DISA STIG
 :labid: LAB-301-01
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~25 minutes

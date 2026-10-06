@@ -3,6 +3,7 @@
 :skills: OpenShift Virtualization, HyperConverged, Hardening Scope
 :labid: LAB-VIRT-00
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~15 minutes

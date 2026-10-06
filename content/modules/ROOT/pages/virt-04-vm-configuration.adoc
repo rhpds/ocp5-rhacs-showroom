@@ -3,6 +3,7 @@
 :skills: VM hostDevices, GPU Pass-through, overcommitGuestOverhead
 :labid: LAB-VIRT-04
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~20 minutes

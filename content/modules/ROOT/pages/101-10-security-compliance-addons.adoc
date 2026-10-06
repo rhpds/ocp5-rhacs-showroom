@@ -5,6 +5,7 @@
 :audit-evidence: "ocp4-cis scan results filtered to audit-log rules; FAIL rows printed with instructions for what to change."
 :cis-mitre-codes: '{"cisMapping":{"primary":["3.2.1","1.2.22"],"related":["1.2.23","1.2.24","1.2.25","3.2.2","5.7.2"]},"mitre":{"techniques":["T1543","T1195"],"tactics":["TA0003","TA0004","TA0001"],"mitigations":["M1026","M1047","M1016"]}}'
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~20 minutes

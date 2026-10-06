@@ -5,6 +5,7 @@
 :audit-evidence: "Root-based httpd on port 80 fails; UBI httpd on 8080 runs with random non-root UID and accessible route."
 :cis-mitre-codes: '{"cisMapping":{"primary":["5.2.5","5.2.6"],"related":["5.2.1","5.2.10"]},"mitre":{"techniques":["T1611"],"tactics":["TA0004"],"mitigations":["M1026","M1048"]}}'
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~10 minutes

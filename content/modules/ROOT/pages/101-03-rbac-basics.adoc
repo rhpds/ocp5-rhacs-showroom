@@ -5,6 +5,7 @@
 :audit-evidence: "'oc auth can-i' shows view read-only, edit mutates without RBAC changes, admin adds RoleBinding and secret management."
 :cis-mitre-codes: '{"cisMapping":{"primary":["5.1.1"],"supporting":["5.1.2","5.1.5","5.1.8"]},"mitre":{"techniques":["T1078","T1098"],"tactics":["TA0001","TA0003","TA0004"],"mitigations":["M1026","M1012","M1018"]}}'
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~15 minutes

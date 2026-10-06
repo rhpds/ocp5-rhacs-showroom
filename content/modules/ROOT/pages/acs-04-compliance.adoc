@@ -1,5 +1,6 @@
 = Compliance
 :toc:
+:toclevels: 1
 :sectnums:
 :icons: font
 

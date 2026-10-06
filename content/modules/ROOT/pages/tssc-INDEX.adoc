@@ -1,6 +1,6 @@
 = Lightwell and Trusted Software Supply Chain Labs Overview
 :toc:
-:toclevels: 2
+:toclevels: 1
 :icons: font
 
 xref:index.adoc[← Back to HOME]

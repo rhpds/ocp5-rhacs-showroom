@@ -3,6 +3,7 @@
 :skills: Splunk, ClusterLogForwarder, RHACS Violations, Timeline Reconstruction
 :labid: LAB-301-05
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~25 minutes

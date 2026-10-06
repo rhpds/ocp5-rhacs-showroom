@@ -2,7 +2,7 @@
 
 include::partial$_attributes.adoc[]
 
-:page-toclevels: 2
+:page-toclevels: 1
 
 == Feature Overview
 

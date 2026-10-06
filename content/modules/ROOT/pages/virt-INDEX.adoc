@@ -1,5 +1,6 @@
 = OpenShift Virtualization Security Labs Overview
 :toc:
+:toclevels: 1
 :icons: font
 
 xref:index.adoc[← Back to HOME]

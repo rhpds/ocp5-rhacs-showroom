@@ -3,6 +3,7 @@
 :cis-summary: "Implement automated certificate management and mutual TLS (mTLS) using cert-manager Operator."
 :mitre-summary: "Prevents man-in-the-middle attacks and ensures secure service-to-service communication through automated certificate lifecycle management."
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~30 minutes

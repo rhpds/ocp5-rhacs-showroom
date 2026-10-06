@@ -3,6 +3,7 @@
 :skills: Audit Logs, Correlation, Monitoring, Threat Detection, Splunk, ClusterLogForwarder
 :labid: LAB-201-06
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~30 minutes

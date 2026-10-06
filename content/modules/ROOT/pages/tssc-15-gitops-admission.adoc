@@ -1,7 +1,7 @@
 = 6.1 GitOps + admission
 :source-highlighter: rouge
 :toc:
-:toclevels: 2
+:toclevels: 1
 
 == Overview
 

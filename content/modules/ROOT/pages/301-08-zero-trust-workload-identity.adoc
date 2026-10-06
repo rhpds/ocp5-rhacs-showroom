@@ -3,6 +3,7 @@
 :skills: Workload Identity Frameworks, Confidential Execution Runtimes, Hardware-Backed Attestation
 :labid: LAB-301-08
 :toc:
+:toclevels: 1
 :icons: font
 :page-toclevels: 1
 

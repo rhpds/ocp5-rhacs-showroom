@@ -1,5 +1,6 @@
 = Policy and Risk
 :toc:
+:toclevels: 1
 :sectnums:
 :icons: font
 

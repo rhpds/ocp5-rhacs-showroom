@@ -1,5 +1,6 @@
 = Network and Runtime Security
 :toc:
+:toclevels: 1
 :sectnums:
 :icons: font
 

@@ -3,6 +3,7 @@
 :skills: RHACS Runtime Policies, Process Enforcement, STRIDE Elevation of Privilege
 :labid: LAB-301-04
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~25 minutes

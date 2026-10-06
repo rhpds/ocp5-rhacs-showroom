@@ -5,6 +5,7 @@
 :audit-evidence: "Rebuilt UBI image deploys under restricted SCC; id shows random non-root UID; service exposed without anyuid exception."
 :cis-mitre-codes: '{"cisMapping":{"primary":["5.2.6"]},"mitre":{"techniques":["T1611"],"tactics":["TA0004"],"mitigations":["M1026","M1048"]}}'
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~25 minutes

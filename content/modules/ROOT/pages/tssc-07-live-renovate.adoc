@@ -1,7 +1,7 @@
 = 3.3 Live Renovate
 :source-highlighter: rouge
 :toc:
-:toclevels: 2
+:toclevels: 1
 
 == Overview
 

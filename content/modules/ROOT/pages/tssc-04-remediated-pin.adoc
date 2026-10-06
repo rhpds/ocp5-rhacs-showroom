@@ -1,7 +1,7 @@
 = 2.2 Remediated pin
 :source-highlighter: rouge
 :toc:
-:toclevels: 2
+:toclevels: 1
 
 == Overview
 

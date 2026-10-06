@@ -1,6 +1,6 @@
 = Appendix: Konflux mapping
 :toc:
-:toclevels: 2
+:toclevels: 1
 
 This page maps *Konflux and related product names used in client engagements* to what this claim actually runs. Quote the table. Do *not* install Konflux. Do *not* rename cluster APIs or Task names to Konflux product names.
 

@@ -1,6 +1,6 @@
 = Appendix: consultant delivery map
 :toc:
-:toclevels: 2
+:toclevels: 1
 
 This page maps *expected client engagement activities* to what this claim actually does. Each gated module also has a short *Delivery note* for the talking point in the room.
 

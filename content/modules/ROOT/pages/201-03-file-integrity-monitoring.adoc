@@ -7,6 +7,7 @@
 :cis-summary: "Implement file integrity monitoring and node-level security hardening using the File Integrity Operator."
 :mitre-summary: "Detects unauthorized file system changes and implements node-level security controls."
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~30 minutes

@@ -3,6 +3,7 @@
 :skills: Digest Pinning, Image Signatures, SBOM Evidence, Admission
 :labid: LAB-301-06
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~25 minutes

@@ -1,7 +1,7 @@
 = 3.2 Bind base and deps in source
 :source-highlighter: rouge
 :toc:
-:toclevels: 2
+:toclevels: 1
 
 == Overview
 

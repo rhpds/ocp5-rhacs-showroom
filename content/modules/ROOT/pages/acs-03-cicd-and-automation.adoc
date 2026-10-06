@@ -1,5 +1,6 @@
 = CI/CD and Automation
 :toc:
+:toclevels: 1
 :sectnums:
 :icons: font
 

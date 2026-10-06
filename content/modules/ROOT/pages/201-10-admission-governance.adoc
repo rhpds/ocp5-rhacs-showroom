@@ -3,6 +3,7 @@
 :skills: RHACM Policy, ConfigurationPolicy, NIST 800-53, DISA STIG, DoD CC SRG
 :labid: LAB-201-10
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~25 minutes

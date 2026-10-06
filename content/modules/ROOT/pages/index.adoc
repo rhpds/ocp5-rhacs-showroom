@@ -9,15 +9,16 @@ This course offers hands-on experience with Kubernetes-native security on Red Ha
 * *This page is home* — Credentials and console links live here. Use the home button anytime you get lost.
 * *Navigate with the table of contents* — Modules are in the left table of contents, or use *Next* at the bottom of each page.
 * *Use consoles in Showroom, or open them in a new tab* — Keep this guide open. Prefer the console tabs on the right of the lab UI. To open a link in a new browser tab: on a Mac, *<cmd> click*; on Windows/Linux, *<ctrl> click* or right-click → "Open in new tab."
-* *Use the bastion* — Run `oc`, `roxctl`, and `podman` on the RHEL bastion.
-* *Cluster services come from GitOps* — RHACS, Quay, GitOps, Compliance Operator, and the vulnerable demo apps are already synced by Argo CD.
-* *Run the bastion setup script* — That step configures your CLI token, workshop images in Quay, and TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
-* *Work the catalog in order, or jump in* — 101 → 201 → 301, then the product deep-dives (RHACS, Virtualization, Lightwell TSSC).
+* *Use the terminal tab for command line work* — Run `oc`, `roxctl`, and `podman` on the RHEL bastion.
+* *Cluster setup and services are managed by GitOps* — RHACS, Quay, GitOps, Compliance Operator, and the vulnerable demo apps are already synced by Argo CD. Deleting resources by accident is no problem, as they will be recreated by GitOps.
+* *You can go through the catalog in order, or jump in. The modules are designed to not be influenced by each other.* — 101 → 201 → 301, then the product deep-dives (RHACS, Virtualization, Lightwell TSSC).
+
+IMPORTANT: * Make sure to run the setup script below! That step configures your CLI token, workshop images in Quay, and TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
 
 [[environment-setup]]
 == Environment setup
 
-Cluster-wide install (RHACS, Quay, GitOps, Compliance Operator, demo apps) is already applied by OpenShift GitOps. From the *Terminal* tab, run the remaining bastion steps. The script checks Quay first and, if MinIO cannot pull `quay.io/minio/minio`, switches it to `quay.io/thanos/minio:RELEASE.2025-09-07T16-13-09Z`. It creates the Quay admin user and writes `QUAY_USER` and `QUAY_PASSWORD` to `~/.bashrc`, then sets up RHACS CLI access, workshop images, and TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
+Cluster-wide install (RHACS, Quay, GitOps, Compliance Operator, demo apps) is already applied by OpenShift GitOps. Then the bastion setup script sets up RHACS CLI access, workshop images, and TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----

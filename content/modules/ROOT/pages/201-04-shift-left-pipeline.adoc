@@ -3,6 +3,7 @@
 :skills: Tekton, Image Scanning, Signing, Admission Gating
 :labid: LAB-201-04
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~25 minutes

@@ -1,7 +1,7 @@
 = 7.2 VEX blast radius + ACS
 :source-highlighter: rouge
 :toc:
-:toclevels: 2
+:toclevels: 1
 
 == Overview
 

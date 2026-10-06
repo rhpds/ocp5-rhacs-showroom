@@ -3,6 +3,7 @@
 :skills: AdminNetworkPolicy, OVN-Kubernetes, Tenant NetworkPolicy, Zero-Trust
 :labid: LAB-301-03
 :toc:
+:toclevels: 1
 :icons: font
 
 **Duration:** ~30 minutes
