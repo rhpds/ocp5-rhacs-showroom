@@ -94,20 +94,12 @@ subjects:
     name: system:kube-apiserver
 EOF
 
-echo "==> Increasing audit log retention..."
-oc apply --filename - <<'EOF'
-apiVersion: operator.openshift.io/v1
-kind: KubeAPIServer
-metadata:
-  name: cluster
-spec:
-  unsupportedConfigOverrides:
-    apiServerArguments:
-      audit-log-maxsize:
-        - "2048"
-      audit-log-maxbackup:
-        - "3"
-EOF
+echo "==> Removing unsupported kube-apiserver overrides..."
+current=$(oc get kubeapiserver cluster -o jsonpath='{.spec.unsupportedConfigOverrides}' 2>/dev/null || true)
+if [[ -n "${current}" && "${current}" != "<no value>" ]]; then
+  oc patch kubeapiserver cluster --type json \
+    -p '[{"op":"remove","path":"/spec/unsupportedConfigOverrides"}]'
+fi
 
 echo "==> Running RHACS demo configure (01–08, monitoring, MCP, Lightspeed helpers)..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
