@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Provision the ACS roadshow lab environment on the bastion host.
-# Configures Quay first (repairs a MinIO ImagePullBackOff when the public
-# quay.io/minio/minio image cannot be pulled), then runs RHACS CLI token
-# setup, clones demo-apps (for Dockerfiles), and builds/pushes Quay images.
+# Quay, MinIO, workshop images, and the Central Quay integration are applied
+# by OpenShift GitOps. This script stores the shared Lightspeed token, reads
+# Quay and RHACS credentials into the shell, and installs TSSC CLIs.
 # Cluster-wide RHACS/Compliance/demo-app deploy is owned by OpenShift GitOps
 # (roadshow-prereqs + roadshow-demo-apps).
 #
@@ -11,9 +11,8 @@
 # Usage:
 #   bash setup/lab-environment.sh
 #
-# The script creates the Quay admin user and writes QUAY_USER and QUAY_PASSWORD
-# to ~/.acs-roadshow/env and ~/.bashrc. Optional --quay-user / --quay-password
-# override that account.
+# Quay admin credentials are read from the quay-admin-password secret.
+# Optional --quay-user / --quay-password are ignored; GitOps owns that account.
 #
 # After making the frontend repository public in Quay UI:
 #   bash setup/lab-environment.sh --deploy-skupper-only
@@ -98,8 +97,8 @@ usage() {
 Usage: lab-environment.sh [options]
 
 Options:
-  --quay-user USER          Quay admin username (default: admin, or the value already in ~/.bashrc)
-  --quay-password PASS      Quay admin password (default: create one and save it to ~/.bashrc)
+  --quay-user USER          Ignored. Quay admin comes from the GitOps secret
+  --quay-password PASS      Ignored. Quay admin comes from the GitOps secret
   --deploy-skupper-only     Deploy patient-portal after frontend repo is public in Quay
   --install-tssc-clis-only  Install cosign, oc-mirror, and ec into ~/.local/bin, then exit
   --skip-demo-apps          Skip cloning the demo-apps repository
@@ -283,40 +282,136 @@ if [[ "${INSTALL_TSSC_CLIS_ONLY}" == true ]]; then
   exit 0
 fi
 
-# Flags win over a previous run. Otherwise reuse ~/.acs-roadshow/env so a rerun
-# keeps the same account, then create one and store it in ~/.bashrc.
-cli_quay_user="${QUAY_USER}"
-cli_quay_password="${QUAY_PASSWORD}"
+# Quay, workshop images, and the Central registry integration come from GitOps.
+# This script only writes the shared Lightspeed token, local CLI env, and TSSC binaries.
 load_roadshow_env
-[[ -n "${cli_quay_user}" ]] && QUAY_USER="${cli_quay_user}"
-[[ -n "${cli_quay_password}" ]] && QUAY_PASSWORD="${cli_quay_password}"
-if [[ -z "${QUAY_USER}" ]]; then
-  QUAY_USER="admin"
-fi
-if [[ -z "${QUAY_PASSWORD}" ]]; then
-  QUAY_PASSWORD="$(openssl rand -hex 12)"
-  echo "Created a Quay admin password. It will be saved to ~/.bashrc as QUAY_PASSWORD."
-fi
-if [[ "${QUAY_USER}" == *'{'* || "${QUAY_PASSWORD}" == *'{'* ]]; then
-  echo "Error: Quay username or password still contains a Showroom placeholder." >&2
-  exit 1
-fi
-persist_var QUAY_USER "${QUAY_USER}"
-persist_var QUAY_PASSWORD "${QUAY_PASSWORD}"
 
-# Count top-level lab steps (cluster RHACS/Compliance/apps come from GitOps)
+# Count top-level lab steps.
 TOTAL=0
-TOTAL=$((TOTAL + 5)) # admin + configure quay + tssc clis + wait central + quay route map
+TOTAL=$((TOTAL + 6)) # admin + lightspeed token + quay env + tssc clis + CLI vars + verify API
 [[ "${SKIP_RHACS_CONFIGURE}" != true ]] && TOTAL=$((TOTAL + 1))
-TOTAL=$((TOTAL + 2)) # CLI vars + verify API
 [[ "${SKIP_DEMO_APPS}" != true ]] && TOTAL=$((TOTAL + 1)) # clone
 [[ "${SKIP_DEMO_APPS}" != true && "${SKIP_DEMO_APPLY}" != true ]] && TOTAL=$((TOTAL + 1)) # apply
-[[ "${SKIP_IMAGES}" != true ]] && TOTAL=$((TOTAL + 3)) # quay login + golden + frontend
 
 LOG_DIR="${HOME}/.acs-roadshow"
 mkdir -p "${LOG_DIR}"
 LOG_FILE="${LOG_DIR}/lab-environment-$(date +%Y%m%d-%H%M%S).log"
 progress_init "${TOTAL}" "${LOG_FILE}" "Lab environment setup"
+
+# Ask for the shared Lightspeed token and store it in the secrets Argo already ignores.
+configure_lightspeed_token() {
+  local ns="openshift-lightspeed"
+  local token="${LIGHTSPEED_API_TOKEN:-}"
+  local url="${LIGHTSPEED_API_URL:-}"
+  local provider="${LIGHTSPEED_PROVIDER:-openai}"
+  local model="${LIGHTSPEED_MODEL:-}"
+  if ! oc get namespace "${ns}" >/dev/null 2>&1; then
+    echo "Error: namespace ${ns} is missing. Wait for the OpenShift Lightspeed GitOps application." >&2
+    return 1
+  fi
+  if [[ -z "${token}" ]]; then
+    if [[ -t 0 ]]; then
+      read -r -s -p "Paste the shared Lightspeed API token: " token
+      echo
+    fi
+  fi
+  if [[ -z "${token}" ]]; then
+    echo "Error: set LIGHTSPEED_API_TOKEN or run this script from a terminal so it can prompt." >&2
+    return 1
+  fi
+  if [[ -z "${url}" ]]; then
+    url="$(oc -n "${ns}" get olsconfig cluster -o jsonpath='{.spec.llm.providers[0].url}' 2>/dev/null || true)"
+  fi
+  if [[ -z "${url}" ]]; then
+    if [[ -t 0 ]]; then
+      read -r -p "Lightspeed API URL (Azure or other OpenAI-compatible endpoint): " url
+    fi
+  fi
+  if [[ -z "${url}" ]]; then
+    echo "Error: Lightspeed API URL is unset. Set llm.apiUrl in GitOps or LIGHTSPEED_API_URL." >&2
+    return 1
+  fi
+  oc -n "${ns}" create secret generic llm-credentials \
+    --from-literal=apitoken="${token}" \
+    --dry-run=client -o yaml | oc apply -f - >/dev/null
+  oc -n "${ns}" create secret generic llm-creds-openai \
+    --from-literal=OPENAI_API_KEY="${token}" \
+    --dry-run=client -o yaml | oc apply -f - >/dev/null
+  echo "Lightspeed token stored in ${ns}"
+  if oc -n "${ns}" get olsconfig cluster >/dev/null 2>&1; then
+    oc -n "${ns}" patch olsconfig cluster --type=json \
+      -p "[{\"op\":\"add\",\"path\":\"/spec/llm/providers/0/url\",\"value\":\"${url}\"}]" >/dev/null
+  else
+    if [[ -z "${model}" && -t 0 ]]; then
+      read -r -p "Lightspeed model name: " model
+    fi
+    if [[ -z "${model}" ]]; then
+      echo "Error: OLSConfig is missing and LIGHTSPEED_MODEL is unset." >&2
+      return 1
+    fi
+    local azure=""
+    if [[ "${provider}" == "azure_openai" ]]; then
+      local deployment="${LIGHTSPEED_AZURE_DEPLOYMENT:-}"
+      local api_version="${LIGHTSPEED_AZURE_API_VERSION:-}"
+      if [[ -z "${deployment}" && -t 0 ]]; then
+        read -r -p "Azure OpenAI deployment name: " deployment
+      fi
+      if [[ -z "${api_version}" && -t 0 ]]; then
+        read -r -p "Azure OpenAI API version: " api_version
+      fi
+      if [[ -z "${deployment}" || -z "${api_version}" ]]; then
+        echo "Error: azure_openai needs LIGHTSPEED_AZURE_DEPLOYMENT and LIGHTSPEED_AZURE_API_VERSION." >&2
+        return 1
+      fi
+      azure="$(printf '        deploymentName: %s\n        apiVersion: %s\n' "${deployment}" "${api_version}")"
+    fi
+    oc apply -f - >/dev/null <<EOF
+apiVersion: ols.openshift.io/v1alpha1
+kind: OLSConfig
+metadata:
+  name: cluster
+  namespace: ${ns}
+spec:
+  featureGates:
+    - MCPServer
+  llm:
+    providers:
+      - credentialsSecretRef:
+          name: llm-credentials
+        models:
+          - name: ${model}
+        name: ${provider}
+        type: ${provider}
+        url: ${url}
+${azure}  ols:
+    defaultModel: ${model}
+    defaultProvider: ${provider}
+EOF
+  fi
+  if oc -n "${ns}" get llmprovider openai >/dev/null 2>&1; then
+    oc -n "${ns}" patch llmprovider openai --type=merge \
+      -p "{\"spec\":{\"openAI\":{\"url\":\"${url}\"}}}" >/dev/null || true
+  fi
+}
+
+# Read the Quay admin account GitOps already created. Do not generate another password.
+load_quay_env() {
+  local ns="quay"
+  if ! oc -n "${ns}" get secret quay-admin-password >/dev/null 2>&1; then
+    echo "Error: secret ${ns}/quay-admin-password is missing. Wait for the Quay GitOps application." >&2
+    return 1
+  fi
+  QUAY_USER="$(oc -n "${ns}" get secret quay-admin-password -o jsonpath='{.data.username}' | base64 -d)"
+  QUAY_PASSWORD="$(oc -n "${ns}" get secret quay-admin-password -o jsonpath='{.data.password}' | base64 -d)"
+  QUAY_URL="$(detect_quay_url)" || {
+    echo "Error: could not find a Quay route in ${ns}." >&2
+    return 1
+  }
+  persist_var QUAY_USER "${QUAY_USER}"
+  persist_var QUAY_PASSWORD "${QUAY_PASSWORD}"
+  persist_var QUAY_URL "${QUAY_URL}"
+  echo "Using Quay at ${QUAY_URL}"
+}
 
 do_verify_admin() {
   oc config use-context admin 2>/dev/null || oc config use-context "$(oc config get-contexts -o name | head -1)"
@@ -1258,10 +1353,9 @@ do_ensure_quay() {
 }
 
 progress_run "Verify OpenShift access" do_verify_admin
-progress_run "Configure Quay" do_ensure_quay
+progress_run "Store Lightspeed API token" configure_lightspeed_token
+progress_run "Read Quay credentials" load_quay_env
 progress_run "Install TSSC CLIs (cosign, oc-mirror, ec)" do_tssc_clis
-progress_run "Wait for RHACS Central" do_wait_central
-progress_run "Map Quay route for Central" map_quay_route_for_central
 
 # Kick off RHACS configure in the background so demo apps / Quay work can overlap.
 configure_pid=""
@@ -1293,11 +1387,6 @@ if [[ "${SKIP_DEMO_APPS}" != true ]]; then
   fi
 fi
 
-if [[ "${SKIP_IMAGES}" != true ]]; then
-  progress_run "Log in to Quay" do_quay_login
-  progress_run "Build and push golden base image" do_golden_image
-fi
-
 if [[ -n "${configure_pid}" ]]; then
   # Heartbeat while background configure runs so the bar does not look stuck.
   while kill -0 "${configure_pid}" 2>/dev/null; do
@@ -1323,18 +1412,13 @@ if [[ -n "${configure_pid}" ]]; then
   load_roadshow_env
 fi
 
-if [[ "${SKIP_IMAGES}" != true ]]; then
-  progress_run "Build and push frontend image" do_frontend_image
-fi
-
 progress_done "Lab environment setup complete"
 load_roadshow_env
 
 progress_success_banner "Lab environment setup completed successfully" \
-  "Quay registry reachable" \
+  "Lightspeed API token stored" \
+  "Quay credentials read from the cluster" \
   "RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)" \
   "TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)" \
-  "demo-apps cloned for image builds (cluster deploy is GitOps)" \
-  "Quay images ready (golden base + frontend, when image steps ran)" \
   "Env file: ${ROADSHOW_ENV_FILE}" \
   "Detailed log: ${LOG_FILE}"

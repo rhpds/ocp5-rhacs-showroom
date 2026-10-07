@@ -11,7 +11,7 @@
 == Overview
 Integrate security scanning and policy checks into pipelines.
 
-Build a Tekton pipeline that starts **FROM** the workshop golden Python base (`python-alpine-golden:0.1` in Quay — already pulled and pushed by `setup/lab-environment.sh`), then scans, gates, and signs the result and deploys by digest.
+Build a Tekton pipeline that starts **FROM** the workshop golden Python base (`python-alpine-golden:0.1` in Quay — already pushed by GitOps), then scans, gates, and signs the result and deploys by digest.
 
 == Why it matters
 Unsigned, unscanned images reach production when security sits after deploy. Pipelines that build, scan, gate, and sign shrink the window where attackers swap in a poisoned tag. Starting FROM an approved golden base — not `docker.io/python` at build time — is the other half of that story: the cluster only consumes a base you already scanned and parked in Quay.

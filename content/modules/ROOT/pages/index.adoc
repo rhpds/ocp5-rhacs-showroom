@@ -13,12 +13,12 @@ This course offers hands-on experience with Kubernetes-native security on Red Ha
 * *Cluster setup and services are managed by GitOps* — RHACS, Quay, GitOps, Compliance Operator, and the vulnerable demo apps are already synced by Argo CD. Deleting resources by accident is no problem, as they will be recreated by GitOps.
 * *You can go through the catalog in order, or jump in. The modules are designed to not be influenced by each other.* — 101 → 201 → 301, then the product deep-dives (RHACS, Virtualization, Lightwell TSSC).
 
-IMPORTANT: Make sure to run the setup script below! That step configures your CLI token, workshop images in Quay, and TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
+IMPORTANT: Make sure to run the setup script below! It asks for the shared Lightspeed API token, then saves your CLI credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
 
 [[environment-setup]]
 == Environment setup
 
-Cluster-wide install (RHACS, Quay, GitOps, Compliance Operator, demo apps) is already applied by OpenShift GitOps. Then the bastion setup script sets up RHACS CLI access, workshop images, and TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
+Cluster-wide install is already applied by OpenShift GitOps. That includes RHACS, Quay, the workshop images, the MCP servers, and OpenShift Lightspeed. The bastion script asks for the shared Lightspeed API token, reads Quay and RHACS credentials into your shell, and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----

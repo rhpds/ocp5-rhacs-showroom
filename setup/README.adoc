@@ -79,14 +79,16 @@ Attendees use the Showroom attribute `{workshop_user_suffix}` matching their ass
 
 == Attendee lab environment (bastion)
 
-Attendees clone `ocp5-rhacs-showroom`, then run `setup/lab-environment.sh`. Cluster-wide RHACS, Compliance Operator, collector networking, Central settings, and demo-apps are already synced by OpenShift GitOps. The bastion script configures Quay first (if MinIO cannot pull `quay.io/minio/minio`, it switches the deployment to `quay.io/thanos/minio:RELEASE.2025-09-07T16-13-09Z`), then configures the RHACS CLI token and builds/pushes Quay images:
+Attendees clone `ocp5-rhacs-showroom`, then run `setup/lab-environment.sh`. OpenShift GitOps already syncs RHACS, Quay (including the public MinIO image and the private workshop images), the Central Quay integration, Compliance Operator, collector networking, demo-apps, the MCP servers, and OpenShift Lightspeed. The bastion script prompts for the shared Lightspeed API token, reads Quay and RHACS credentials into `~/.bashrc`, and installs `cosign`, `oc-mirror`, and `ec`.
+
+Patient-portal is not part of that init. ACS module 1 makes the Quay repositories public, then runs `--deploy-skupper-only`.
 
 [source,bash]
 ----
 git clone https://github.com/rhpds/ocp5-rhacs-showroom.git
 cd ocp5-rhacs-showroom
 bash setup/lab-environment.sh
-bash setup/lab-environment.sh --deploy-skupper-only
+source ~/.bashrc
 ----
 
 Use `--rhacs-configure` or `--apply-demo-apps` only on brownfield clusters that are not GitOps-managed.

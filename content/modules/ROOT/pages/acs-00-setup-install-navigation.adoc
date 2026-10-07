@@ -40,13 +40,13 @@ image::01-rhacs-console-dashboard.png[RHACS console,link=self, window=blank, wid
 
 == Lab environment setup
 
-The setup script below is the remaining *bastion* work: RHACS CLI variables, a local clone of `demo-apps` (for Dockerfiles), and the Quay image builds. Vulnerable demo apps, Compliance Operator, collector networking, and RHACS Central settings are deployed by OpenShift GitOps.
+The setup script below is the remaining *bastion* work: the shared Lightspeed API token, RHACS and Quay CLI variables, a local clone of `demo-apps`, and the TSSC CLIs. Quay, the workshop images, MCP, and OpenShift Lightspeed are already synced by OpenShift GitOps.
 
 IMPORTANT: This will run quickly if it has already been run as part of the initial setup.4
 
 === Run the setup script
 
-RHACS CLI setup, TSSC CLIs, and image builds for the roadshow workshop. You can skip this step and run the verification step below if you've already run the script.
+The script prompts for the shared Lightspeed API token, then writes CLI variables and installs the TSSC CLIs. You can skip this step and run the verification step below if you've already run the script.
 
 *Procedure*
 
@@ -75,11 +75,10 @@ Details: /home/lab-user/.acs-roadshow/lab-environment-YYYYMMDD-HHMMSS.log
   SUCCESS: Lab environment setup completed successfully
 ================================================================
 
-  ✓ Quay registry reachable
+  ✓ Lightspeed API token stored
+  ✓ Quay credentials read from the cluster
   ✓ RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)
   ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)
-  ✓ demo-apps cloned for image builds (cluster deploy is GitOps)
-  ✓ Quay images ready (golden base + frontend, when image steps ran)
   ✓ Env file: /home/lab-user/.acs-roadshow/env
   ✓ Detailed log: /home/lab-user/.acs-roadshow/lab-environment-....log
 ----
@@ -110,7 +109,7 @@ ROX_API_TOKEN is set
 
 == Red Hat Quay
 
-Red Hat Quay is an enterprise-quality registry for building, securing, and serving container images. The setup script already pushed your *frontend* and *python-alpine-golden* images. Those repositories are private until you change visibility. OpenShift can pull them without your Quay password only after both are public.
+Red Hat Quay is an enterprise-quality registry for building, securing, and serving container images. GitOps already pushed the *frontend* and *python-alpine-golden* images. Those repositories are private until you change visibility. OpenShift can pull them without your Quay password only after both are public.
 
 [[navigating-the-registry]]
 === Make the repositories public
