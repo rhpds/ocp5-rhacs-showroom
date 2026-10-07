@@ -10,7 +10,7 @@ include::partial$_attributes.adoc[]
 
 * Access the OpenShift, RHACS, and Quay consoles used throughout the roadshow
 * Run the bastion setup script for RHACS CLI access and workshop images (cluster apps are already in GitOps)
-* Build and push workshop images to Quay, then deploy the patient-portal application
+* Deploy the patient-portal application
 * Complete the Trusted Image Pulls from Quay security exercise
 * Navigate the RHACS dashboard, search, and Platform Configuration
 
@@ -38,7 +38,6 @@ image::01-rhacs-login.png[RHACS console,link=self, window=blank, width=100%]
 
 image::01-rhacs-console-dashboard.png[RHACS console,link=self, window=blank, width=100%]
 
-
 == Lab environment setup
 
 The setup script below is the remaining *bastion* work: RHACS CLI variables, a local clone of `demo-apps` (for Dockerfiles), and the Quay image builds. Vulnerable demo apps, Compliance Operator, collector networking, and RHACS Central settings are deployed by OpenShift GitOps.
@@ -47,7 +46,8 @@ IMPORTANT: This will run quickly if it has already been run as part of the initi
 
 === Run the setup script
 
-RHACS CLI setup, TSSC CLIs, and image builds for the roadshow workshop.
+RHACS CLI setup, TSSC CLIs, and image builds for the roadshow workshop. You can skip this step and run the verification step below if you've already run the script.
+
 *Procedure*
 
 [start=1]
@@ -110,88 +110,138 @@ ROX_API_TOKEN is set
 
 == Red Hat Quay
 
-Red Hat Quay is an enterprise-quality registry for building, securing, and serving container images. The setup script already pushed your *frontend* and *python-alpine-golden* images. Explore the registry in the UI before deploying the patient-portal application.
+Red Hat Quay is an enterprise-quality registry for building, securing, and serving container images. The setup script already pushed your *frontend* and *python-alpine-golden* images. Those repositories are private until you change visibility. OpenShift can pull them without your Quay password only after both are public.
 
-=== Accessing Quay
+[[navigating-the-registry]]
+=== Make the repositories public
 
-. Run the following to get the route, username and password for the Quay console:
+*Procedure*
+
+. Sign in to the Quay API and set *frontend* and *python-alpine-golden* to public. The call is `POST /api/v1/repository/<namespace>/<name>/changevisibility` with `"visibility": "public"`.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-source ~/.bashrc
-echo "Quay URL: $QUAY_URL"
-echo "Username: $QUAY_USER"
-echo "Password: $QUAY_PASSWORD"
+cookie=$(mktemp)
+quay="https://${QUAY_URL}"
+
+csrf=$(curl -sk -c "$cookie" -b "$cookie" "${quay}/csrf_token" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf_token"])')
+
+curl -sk -c "$cookie" -b "$cookie" -X POST \
+  -H "Content-Type: application/json" \
+  -H "X-Requested-With: XMLHttpRequest" \
+  -H "X-CSRF-Token: ${csrf}" \
+  -d "{\"username\":\"${QUAY_USER}\",\"password\":\"${QUAY_PASSWORD}\"}" \
+  "${quay}/api/v1/signin"
+echo
+
+for repo in frontend python-alpine-golden; do
+  csrf=$(curl -sk -c "$cookie" -b "$cookie" "${quay}/csrf_token" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf_token"])')
+  echo "== ${QUAY_USER}/${repo}"
+  curl -sk -b "$cookie" -c "$cookie" -X POST \
+    -H "Content-Type: application/json" \
+    -H "X-Requested-With: XMLHttpRequest" \
+    -H "X-CSRF-Token: ${csrf}" \
+    -d '{"visibility":"public"}' \
+    "${quay}/api/v1/repository/${QUAY_USER}/${repo}/changevisibility"
+  echo
+done
+rm -f "$cookie"
 ----
 
 [.console-output]
 [source,bash,subs="+macros,+attributes"]
 ----
-Quay URL: registry-quay-quay.apps.cluster-tkwxg.dyn.redhatworkshops.io
-Username: admin
-Password: e0bb6fc35b324b524578a1b0
+{"success": true}
+== admin/frontend
+{"success": true}
+== admin/python-alpine-golden
+{"success": true}
 ----
 
-[start=2]
-. Open the Quay console by using the URL in the output above in a new browser tab.
+IMPORTANT: The patient-portal deployment pulls *frontend*. Later labs import *python-alpine-golden*. Both responses must be `{"success": true}` before you continue.
 
-[[navigating-the-registry]]
+=== Verify RHACS and Quay integration
 
-=== Browse the Registry
-
-The setup script built and pushed the *frontend* application image. Before deploying it to OpenShift, browse the repository and make it public.
+Central has no registry credentials for the workshop Quay route until you create an image integration. Lab setup already maps `$QUAY_URL` to the in-cluster router so Central can open that route. Scan first, create the integration, then scan the same image again.
 
 *Procedure*
 
-. Click the *frontend* repository in Quay.
-
-image::00-quay-login.png[link=self, window=blank, width=100%]
-
-image::00-frontend-repo.png[link=self, window=blank, width=100%]
-
-image::00-quay-sidebar.png[link=self, window=blank, width=100%]
-
-[start=2]
-. Under *Settings* → *Repository Visibility*, click *Make Public* and confirm.
-
-image::00-quay-settings.png[link=self, window=blank, width=100%]
-image::00-quay-public.png[link=self, window=blank, width=100%]
-image::00-quay-public-yes.png[link=self, window=blank, width=100%]
-
-IMPORTANT: The patient-portal deployment pulls from Quay. The repository must be public before running the deploy step below.
-
-[[vulnerability-scanning-with-quay]]
-
-=== Vulnerability Scanning with Quay
-
-. Open the *Tags* tab for the *frontend* repository.
-
-image::00-quay-tags.png[link=self, window=blank, width=100%]
-
-[start=2]
-. Hover over the *Security Scan* column for vulnerability details.
-
-image::00-quay-scan-hover.png[link=self, window=blank, width=100%]
-
-NOTE: The image includes intentionally vulnerable packages for workshop policy exercises. Counts vary by scanner and feed.
-
-[start=3]
-. Click a vulnerability entry for remediation guidance.
-
-image::00-quay-vuln-overview.png[link=self, window=blank, width=100%]
-image::00-quay-vuln-detailed.png[link=self, window=blank, width=100%]
-
-=== Verify RHACS and Quay integration
+. Scan `frontend:0.1` before Quay is integrated. A non-zero exit is expected. `GRPC_ENFORCE_ALPN_ENABLED=false` lets this `roxctl` talk to Central through the reencrypt route.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 roxctl --insecure-skip-tls-verify -e "$ROX_CENTRAL_ADDRESS:443" \
-  image scan --image=$QUAY_URL/$QUAY_USER/frontend:0.1 --force -o table | head -25
+  image scan --image="${QUAY_URL}/${QUAY_USER}/frontend:0.1" --force -o table
 ----
+
+[.console-output]
+[source,bash,subs="+macros,+attributes"]
+----
+ERROR:  Scanning image failed: retrieving image scan result: could not scan image: "registry-quay-quay.apps.cluster-rhcms.dyn.redhatworkshops.io/admin/frontend:0.1": rpc error: code = Internal desc = image enrichment error: error getting metadata for image: registry-quay-quay.apps.cluster-rhcms.dyn.redhatworkshops.io/admin/frontend:0.1 error: no matching image registries found: please add an image integration for registry-quay-quay.apps.cluster-rhcms.dyn.redhatworkshops.io. Retrying after 3 seconds...
+----
+
+[start=2]
+. Register the workshop Quay route with `POST /v1/imageintegrations`. `jq` places the expanded `$QUAY_URL`, `$QUAY_USER`, and `$QUAY_PASSWORD` in the body. `insecure` is true because the route certificate comes from the cluster ingress CA.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+curl -sk -H "Authorization: Bearer ${ROX_API_TOKEN}" \
+  "https://${ROX_CENTRAL_ADDRESS}/v1/imageintegrations" \
+| jq -r '.integrations[]? | select(.name=="workshop-quay") | .id' \
+| while read -r id; do
+    curl -sk -X DELETE -H "Authorization: Bearer ${ROX_API_TOKEN}" \
+      "https://${ROX_CENTRAL_ADDRESS}/v1/imageintegrations/${id}"
+    echo
+  done
+
+curl -sk -X POST \
+  -H "Authorization: Bearer ${ROX_API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  "https://${ROX_CENTRAL_ADDRESS}/v1/imageintegrations" \
+  -d "$(jq -n \
+    --arg endpoint "${QUAY_URL#*://}" \
+    --arg user "$QUAY_USER" \
+    --arg pass "$QUAY_PASSWORD" \
+    '{name:"workshop-quay", type:"quay", categories:["REGISTRY"],
+      quay:{endpoint:$endpoint, insecure:true,
+            registryRobotCredentials:{username:$user, password:$pass}},
+      skipTestIntegration:true}')"
+echo
+----
+
+[.console-output]
+[source,bash,subs="+macros,+attributes"]
+----
+{"id":"94993e5b-8b0a-4e4e-82e3-66dbb7a32e3d","name":"workshop-quay","type":"quay","categories":["REGISTRY"],"quay":{"endpoint":"registry-quay-quay.apps.cluster-rhcms.dyn.redhatworkshops.io","insecure":true,"registryRobotCredentials":{"username":"admin","password":"******"}},"skipTestIntegration":true}
+----
+
+[start=3]
+. Scan `frontend:0.1` again. The image registry is the same host stored on the integration.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+roxctl --insecure-skip-tls-verify -e "$ROX_CENTRAL_ADDRESS:443" \
+  image scan --image="${QUAY_URL}/${QUAY_USER}/frontend:0.1" --force -o table | head -25
+----
+
+[.console-output]
+[source,bash,subs="+macros,+attributes"]
+----
+Scan results for image: registry-quay-quay.apps.cluster-rhcms.dyn.redhatworkshops.io/admin/frontend:0.1
+(TOTAL-COMPONENTS: 86, TOTAL-VULNERABILITIES: 24, LOW: 6, MODERATE: 11, IMPORTANT: 6, CRITICAL: 1)
+
++---------------------------+---------+------------------+-----------+------+
+|         COMPONENT         | VERSION |       CVE        | SEVERITY  | CVSS |
++---------------------------+---------+------------------+-----------+------+
+----
+
+NOTE: Counts and CVE rows change with the scanner feed. A scan-results header means Central reached Quay.
 
 === Deploy the patient-portal application
 
-After making the *frontend* repository public, run the second setup phase:
+After making the *frontend* and *python-alpine-golden* repositories public, run the second setup phase:
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
@@ -262,11 +312,8 @@ include::partial$security-exercise-task-intro.adoc[]
 .Step 1 — Confirm the deployment image reference
 [%collapsible]
 ====
-Variables come from `~/.bashrc`.
-
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-source ~/.bashrc
 oc get deploy frontend -n patient-portal \
   -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 echo "Expected: ${QUAY_URL}/${QUAY_USER}/frontend:0.1"
@@ -299,7 +346,6 @@ The `imageID` on the pod should include the same digest prefix (`sha256:...`) as
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-source ~/.bashrc
 podman inspect --format='Quay digest: {{.Digest}}' ${QUAY_URL}/${QUAY_USER}/frontend:0.1
 oc get pod -n patient-portal -l app=frontend -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[0].imageID}{"\n"}{end}'
 ----
@@ -312,7 +358,7 @@ Confirm the scanned image matches what you deployed.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-source ~/.bashrc
+GRPC_ENFORCE_ALPN_ENABLED=false \
 roxctl --insecure-skip-tls-verify -e "$ROX_CENTRAL_ADDRESS:443" \
   image scan --image=${QUAY_URL}/${QUAY_USER}/frontend:0.1 --force -o table | head -15
 ----

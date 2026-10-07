@@ -84,7 +84,7 @@ load_roadshow_env() {
     local line
     while IFS= read -r line || [[ -n "${line}" ]]; do
       case "${line}" in
-        export\ ROX_*|export\ QUAY_*|export\ TUTORIAL_HOME=*|export\ APP_HOME=*|export\ RHACS_NAMESPACE=*)
+        export\ ROX_*|export\ QUAY_*|export\ TUTORIAL_HOME=*|export\ APP_HOME=*|export\ RHACS_NAMESPACE=*|export\ GRPC_ENFORCE_ALPN_ENABLED=*)
           # shellcheck disable=SC2163
           eval "${line}"
           ;;
@@ -306,7 +306,7 @@ persist_var QUAY_PASSWORD "${QUAY_PASSWORD}"
 
 # Count top-level lab steps (cluster RHACS/Compliance/apps come from GitOps)
 TOTAL=0
-TOTAL=$((TOTAL + 4)) # admin + configure quay + tssc clis + wait central
+TOTAL=$((TOTAL + 5)) # admin + configure quay + tssc clis + wait central + quay route map
 [[ "${SKIP_RHACS_CONFIGURE}" != true ]] && TOTAL=$((TOTAL + 1))
 TOTAL=$((TOTAL + 2)) # CLI vars + verify API
 [[ "${SKIP_DEMO_APPS}" != true ]] && TOTAL=$((TOTAL + 1)) # clone
@@ -338,8 +338,68 @@ do_wait_central() {
   return 1
 }
 
+# Pods cannot open the apps load-balancer address. After Quay is up, point its
+# route hostname at the in-cluster router so Central and Scanner can pull from it.
+map_quay_route_for_central() {
+  local quay_host router_ip ns central_cr patch deploy
+  quay_host="$(detect_quay_url)" || {
+    echo "Error: Quay route not found; cannot map it for Central." >&2
+    return 1
+  }
+  router_ip="$(oc -n openshift-ingress get svc router-internal-default -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)"
+  if [[ -z "${router_ip}" ]]; then
+    echo "Error: Service openshift-ingress/router-internal-default has no cluster IP." >&2
+    return 1
+  fi
+  ns="$(detect_rhacs_namespace)" || {
+    echo "Error: Central deployment not found (tried rhacs-operator, stackrox)." >&2
+    return 1
+  }
+  central_cr="$(oc -n "${ns}" get central -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+  if [[ -z "${central_cr}" ]]; then
+    echo "Error: Central custom resource not found in ${ns}." >&2
+    return 1
+  fi
+  if QUAY_HOST="${quay_host}" ROUTER_IP="${router_ip}" \
+    oc -n "${ns}" get central "${central_cr}" -o json | python3 -c '
+import json, os, sys
+host = os.environ["QUAY_HOST"]
+ip = os.environ["ROUTER_IP"]
+spec = json.load(sys.stdin).get("spec") or {}
+checks = [
+    ((spec.get("central") or {}).get("hostAliases") or []),
+    (((spec.get("scanner") or {}).get("analyzer") or {}).get("hostAliases") or []),
+    (((spec.get("scannerV4") or {}).get("indexer") or {}).get("hostAliases") or []),
+]
+def has_alias(aliases):
+    return any(a.get("ip") == ip and host in (a.get("hostnames") or []) for a in aliases)
+sys.exit(0 if all(has_alias(group) for group in checks) else 1)
+'; then
+    echo "Quay route ${quay_host} already maps to router ${router_ip}"
+    return 0
+  fi
+  patch="$(QUAY_HOST="${quay_host}" ROUTER_IP="${router_ip}" python3 -c '
+import json, os
+alias = {"ip": os.environ["ROUTER_IP"], "hostnames": [os.environ["QUAY_HOST"]]}
+print(json.dumps({"spec": {
+    "central": {"hostAliases": [alias]},
+    "scanner": {"analyzer": {"hostAliases": [alias]}},
+    "scannerV4": {"indexer": {"hostAliases": [alias]}},
+}}))
+')"
+  echo "Mapping ${quay_host} to router ${router_ip}"
+  oc -n "${ns}" patch central "${central_cr}" --type=merge -p "${patch}"
+  for deploy in central scanner scanner-v4-indexer; do
+    if oc -n "${ns}" get "deploy/${deploy}" >/dev/null 2>&1; then
+      oc -n "${ns}" rollout status "deploy/${deploy}" --timeout=300s
+    fi
+  done
+}
+
 do_cli_vars() {
   load_roadshow_env
+  # Reencrypt Central routes do not offer ALPN; roxctl from grpc-go >= 1.67 fails without this.
+  persist_var GRPC_ENFORCE_ALPN_ENABLED false
   resolve_rox_central_address || return 1
   persist_var ROX_CENTRAL_ADDRESS "${ROX_CENTRAL_ADDRESS}"
   persist_var RHACS_NAMESPACE "${RHACS_NAMESPACE}"
@@ -1201,6 +1261,7 @@ progress_run "Verify OpenShift access" do_verify_admin
 progress_run "Configure Quay" do_ensure_quay
 progress_run "Install TSSC CLIs (cosign, oc-mirror, ec)" do_tssc_clis
 progress_run "Wait for RHACS Central" do_wait_central
+progress_run "Map Quay route for Central" map_quay_route_for_central
 
 # Kick off RHACS configure in the background so demo apps / Quay work can overlap.
 configure_pid=""

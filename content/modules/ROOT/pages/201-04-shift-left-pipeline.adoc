@@ -30,8 +30,8 @@ Build a Tekton path FROM `python-alpine-golden` that refuses unscanned or unsign
 
 * OpenShift Pipelines (Tekton) Operator installed
 * Cosign installed locally, or simulate signing in the pipeline tasks
-* Lab setup already ran (`source ~/.bashrc` or `source ~/.acs-roadshow/env`): `QUAY_URL`, `QUAY_USER`, and the golden image `${QUAY_URL}/${QUAY_USER}/python-alpine-golden:0.1`
-* The `python-alpine-golden` repository is **public** in Quay (same Settings path as `frontend` in xref:acs-00-setup-install-navigation.adoc#navigating-the-registry[acs-00]) so the cluster can import it
+* Lab setup already ran, so `QUAY_URL`, `QUAY_USER`, and the golden image `${QUAY_URL}/${QUAY_USER}/python-alpine-golden:0.1` are already in this shell
+* The `python-alpine-golden` repository is **public** in Quay (same API call as `frontend` in xref:acs-00-setup-install-navigation.adoc#navigating-the-registry[acs-00]) so the cluster can import it
 
 Click each step only if you need a hint.
 
@@ -55,12 +55,11 @@ This is the approved base from setup — not Docker Hub at pipeline time. Pull p
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-source ~/.acs-roadshow/env 2>/dev/null || source ~/.bashrc
 echo "${QUAY_URL}/${QUAY_USER}/python-alpine-golden:0.1"
 podman pull "${QUAY_URL}/${QUAY_USER}/python-alpine-golden:0.1"
 ----
 
-TIP: The pull should complete without `unauthorized` or `manifest unknown`. If `QUAY_URL` is empty, re-run lab setup or `source ~/.acs-roadshow/env`.
+TIP: The pull should complete without `unauthorized` or `manifest unknown`. If `QUAY_URL` is empty, re-run the Welcome environment setup.
 ====
 
 .Import python-alpine-golden into this project
@@ -70,7 +69,6 @@ Copy the golden image into the project ImageStream so the pipeline FROM line sta
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-source ~/.acs-roadshow/env 2>/dev/null || source ~/.bashrc
 oc import-image python-alpine-golden:0.1 \
   --from="${QUAY_URL}/${QUAY_USER}/python-alpine-golden:0.1" \
   --confirm --insecure -n 201-04-s-pipeline

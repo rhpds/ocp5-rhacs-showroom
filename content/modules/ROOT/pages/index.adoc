@@ -13,7 +13,7 @@ This course offers hands-on experience with Kubernetes-native security on Red Ha
 * *Cluster setup and services are managed by GitOps* — RHACS, Quay, GitOps, Compliance Operator, and the vulnerable demo apps are already synced by Argo CD. Deleting resources by accident is no problem, as they will be recreated by GitOps.
 * *You can go through the catalog in order, or jump in. The modules are designed to not be influenced by each other.* — 101 → 201 → 301, then the product deep-dives (RHACS, Virtualization, Lightwell TSSC).
 
-IMPORTANT: * Make sure to run the setup script below! That step configures your CLI token, workshop images in Quay, and TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
+IMPORTANT: Make sure to run the setup script below! That step configures your CLI token, workshop images in Quay, and TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
 
 [[environment-setup]]
 == Environment setup
@@ -44,7 +44,6 @@ TIP: Using the Showroom allows you to move through the console tabs while you wo
 [cols="1,1"]
 |===
 |Console URL| {openshift_cluster_console_url}
-|API URL| {openshift_api_server_url}
 |Username| {openshift_cluster_admin_username}
 |Password| {openshift_cluster_admin_password}
 |===

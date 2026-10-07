@@ -36,7 +36,7 @@ A Hummingbird Python runtime uses the same verify story (`hi/python` or the pin 
 
 * Bastion or Showroom terminal after xref:index.adoc#environment-setup[Environment setup] on the Welcome page (`setup/lab-environment.sh`). That script installs `cosign`, `oc-mirror`, and `ec` into `~/.local/bin` from Red Hat images. Do *not* curl `github.com` for CLIs.
 * ConfigMap `demo-userinfo-lightwell-repo` in namespace `lightwell-repo`.
-* If `command -v cosign` prints nothing, run `source ~/.bashrc` or re-run the Welcome setup block.
+* If `command -v cosign` prints nothing, re-run the Welcome xref:index.adoc#environment-setup[Environment setup] block.
 
 .Confirm the lab CLIs (expect a path and a version, not an empty prompt)
 [source,bash,role=execute]
