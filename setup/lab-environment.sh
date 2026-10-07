@@ -299,24 +299,27 @@ LOG_FILE="${LOG_DIR}/lab-environment-$(date +%Y%m%d-%H%M%S).log"
 progress_init "${TOTAL}" "${LOG_FILE}" "Lab environment setup"
 
 # Ask for the shared Lightspeed token and store it in the secrets Argo already ignores.
+# progress_run sends this function's stdout and stderr to the log, so the prompt
+# has to use the terminal directly. An empty answer skips Lightspeed and continues.
 configure_lightspeed_token() {
   local ns="openshift-lightspeed"
   local token="${LIGHTSPEED_API_TOKEN:-}"
   local url="${LIGHTSPEED_API_URL:-}"
   local provider="${LIGHTSPEED_PROVIDER:-openai}"
   local model="${LIGHTSPEED_MODEL:-}"
+  LIGHTSPEED_TOKEN_SAVED=false
+  if [[ -z "${token}" && -r /dev/tty && -w /dev/tty ]]; then
+    printf '\n%s' "Paste the shared Lightspeed API token (press Enter to skip): " >/dev/tty
+    IFS= read -r -s token </dev/tty || token=""
+    printf '\n' >/dev/tty
+  fi
+  if [[ -z "${token}" ]]; then
+    echo "No Lightspeed API token provided. Continuing." >/dev/tty
+    echo "No Lightspeed API token provided. Continuing."
+    return 0
+  fi
   if ! oc get namespace "${ns}" >/dev/null 2>&1; then
     echo "Error: namespace ${ns} is missing. Wait for the OpenShift Lightspeed GitOps application." >&2
-    return 1
-  fi
-  if [[ -z "${token}" ]]; then
-    if [[ -t 0 ]]; then
-      read -r -s -p "Paste the shared Lightspeed API token: " token
-      echo
-    fi
-  fi
-  if [[ -z "${token}" ]]; then
-    echo "Error: set LIGHTSPEED_API_TOKEN or run this script from a terminal so it can prompt." >&2
     return 1
   fi
   if [[ -z "${url}" ]]; then
@@ -337,6 +340,7 @@ configure_lightspeed_token() {
   oc -n "${ns}" create secret generic llm-creds-openai \
     --from-literal=OPENAI_API_KEY="${token}" \
     --dry-run=client -o yaml | oc apply -f - >/dev/null
+  LIGHTSPEED_TOKEN_SAVED=true
   echo "Lightspeed token stored in ${ns}"
   if oc -n "${ns}" get olsconfig cluster >/dev/null 2>&1; then
     oc -n "${ns}" patch olsconfig cluster --type=json \
@@ -1415,8 +1419,13 @@ fi
 progress_done "Lab environment setup complete"
 load_roadshow_env
 
+if [[ "${LIGHTSPEED_TOKEN_SAVED:-false}" == true ]]; then
+  lightspeed_banner="Lightspeed API token stored"
+else
+  lightspeed_banner="Lightspeed API token skipped"
+fi
 progress_success_banner "Lab environment setup completed successfully" \
-  "Lightspeed API token stored" \
+  "${lightspeed_banner}" \
   "Quay credentials read from the cluster" \
   "RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)" \
   "TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)" \

@@ -46,7 +46,7 @@ IMPORTANT: This will run quickly if it has already been run as part of the initi
 
 === Run the setup script
 
-The script prompts for the shared Lightspeed API token, then writes CLI variables and installs the TSSC CLIs. You can skip this step and run the verification step below if you've already run the script.
+The script prompts for the shared Lightspeed API token. Press Enter to continue without one. It then writes CLI variables and installs the TSSC CLIs. You can skip this step and run the verification step below if you've already run the script.
 
 *Procedure*
 
