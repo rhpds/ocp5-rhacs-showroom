@@ -1027,7 +1027,14 @@ for line in text.splitlines():
         elif line and not line.startswith(" "):
             in_cfg = False
 preference_ok = bool(ids) and bool(prefs) and prefs[0] in ids
-sys.exit(0 if ("signature_version: s3v4" in text and "region_name:" in text and preference_ok) else 1)
+short_host = any(
+    line.strip().startswith("hostname:")
+    and line.strip().endswith(".svc")
+    and ".cluster.local" not in line
+    for line in text.splitlines()
+)
+proxy_ok = "FEATURE_PROXY_STORAGE: true" in text
+sys.exit(0 if ("signature_version: s3v4" in text and "region_name:" in text and preference_ok and proxy_ok and not short_host) else 1)
 '
 }
 
@@ -1111,7 +1118,22 @@ for line in out:
     inserted.append(line)
 if not placed:
     sys.exit(2)
-pathlib.Path(dst).write_text("\n".join(inserted) + "\n")
+final = []
+saw_proxy = False
+for line in inserted:
+    stripped = line.strip()
+    if stripped.startswith("FEATURE_PROXY_STORAGE:"):
+        final.append("FEATURE_PROXY_STORAGE: true")
+        saw_proxy = True
+        continue
+    if stripped.startswith("hostname:") and stripped.endswith(".svc") and ".cluster.local" not in stripped:
+        indent = line[:len(line) - len(line.lstrip())]
+        final.append(f"{indent}{stripped}.cluster.local")
+        continue
+    final.append(line)
+if not saw_proxy:
+    final.insert(0, "FEATURE_PROXY_STORAGE: true")
+pathlib.Path(dst).write_text("\n".join(final) + "\n")
 PY
   if [[ "${py_rc}" -ne 0 ]]; then
     echo "Error: Quay config.yaml has no usable DISTRIBUTED_STORAGE_CONFIG entry." >&2
@@ -1122,7 +1144,7 @@ PY
     oc -n "${ns}" create secret generic quay-config-bundle \
       --from-file=config.yaml="${updated}" \
       --dry-run=client -o yaml | oc apply -f - >/dev/null
-    echo "Updated Quay storage: s3v4 signature and preference matching the configured location."
+    echo "Updated Quay storage: proxy blobs through Quay, s3v4 signature, and a resolvable MinIO hostname."
     nudge_quayregistry "${ns}"
   fi
   rm -f "${cfg}" "${updated}"
@@ -1178,7 +1200,9 @@ repair_quay_storage() {
   local port host
   port="$(oc -n "${ns}" get svc minio -o jsonpath='{.spec.ports[0].port}' 2>/dev/null || true)"
   port="${port:-9000}"
-  host="minio.${ns}.svc"
+  # Short name minio.<ns>.svc is not a CoreDNS record. Image pulls query it
+  # as an absolute name and fail with "no such host".
+  host="minio.${ns}.svc.cluster.local"
   ensure_minio_bucket "${ns}" "${user}" "${pass}" "${host}" "${port}" || return 1
   ensure_quay_storage_signature "${ns}" || return 1
 }
@@ -1213,7 +1237,7 @@ ensure_quay_registry() {
   svc="minio"
   port="$(oc -n "${ns}" get svc "${svc}" -o jsonpath='{.spec.ports[0].port}')"
   port="${port:-9000}"
-  host="${svc}.${ns}.svc"
+  host="${svc}.${ns}.svc.cluster.local"
 
   ensure_minio_bucket "${ns}" "${user}" "${pass}" "${host}" "${port}" || return 1
 
@@ -1233,6 +1257,7 @@ FEATURE_BUILD_SUPPORT: false
 FEATURE_DIRECT_LOGIN: true
 FEATURE_MAILING: false
 FEATURE_USER_INITIALIZE: true
+FEATURE_PROXY_STORAGE: true
 REGISTRY_TITLE: Red Hat Quay
 REGISTRY_TITLE_SHORT: Red Hat Quay
 SETUP_COMPLETE: true
@@ -1301,6 +1326,26 @@ show_quay_status() {
   ' || true
 }
 
+# quay.io/minio/mc rejects anonymous pulls. The bucket Job used to run that
+# client, which left an ImagePullBackOff hook that blocks the Quay Argo sync.
+# Bucket creation is the OpenShift CLI Job plus ensure_minio_bucket, so these
+# Jobs are safe to delete. Deleting the Job also deletes its pods.
+remove_unpullable_minio_mc_jobs() {
+  local ns=$1 name
+  while read -r name; do
+    [[ -z "${name}" ]] && continue
+    echo "Deleting Job ${ns}/${name}: quay.io/minio/mc rejects anonymous pulls."
+    oc -n "${ns}" delete job "${name}" --wait=false || return 1
+  done < <(oc -n "${ns}" get jobs -o json | jq -r '
+    .items[]?
+    | select(any(
+        ((.spec.template.spec.containers // []) + (.spec.template.spec.initContainers // []))[];
+        (.image // "") | test("minio/mc")
+      ))
+    | .metadata.name
+  ')
+}
+
 # Repair Quay object storage before the rest of the lab. A healthy registry
 # is left alone. A MinIO pod that cannot pull, or is not already on the
 # public mirror, is switched to MINIO_REPLACEMENT_IMAGE.
@@ -1311,6 +1356,7 @@ do_ensure_quay() {
     return 1
   }
   echo "Checking Quay in namespace ${ns}"
+  remove_unpullable_minio_mc_jobs "${ns}" || return 1
 
   if quay_v2_ready; then
     echo "Quay is up at $(detect_quay_url)."
