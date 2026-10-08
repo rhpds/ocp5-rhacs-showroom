@@ -65,7 +65,7 @@ oc get rolebinding -A -o json | jq -c '
 '
 ----
 
-TIP: Zero ClusterRoles (or only ones you documented) plus no foreign-SA RoleBindings is a pass. A binding from `src-ns` to `default` in `dst-ns` with role `datavolume-cloner` is the textbook finding from the guide.
+TIP: Zero ClusterRoles (or only ones you documented) plus no foreign-SA RoleBindings is a pass. A binding from `src-ns` to `default` in `dst-ns` with role `datavolume-cloner` is the textbook finding from the link:https://access.redhat.com/sites/default/files/attachments/rh-openshift-virtualization-hardening-guide-detail-202512-en.pdf[Red Hat OpenShift Virtualization hardening guide^].
 ====
 
 .Inspect a known cloner ClusterRole (if it exists)

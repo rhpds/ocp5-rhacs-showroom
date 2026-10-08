@@ -50,7 +50,7 @@ The following components are pre-installed:
 * *OpenShift Virtualization Security*
 ** HyperConverged feature gates and virtualization RBAC
 ** VM, storage, and network isolation
-** Host firmware and kernel controls from the OpenShift Virtualization hardening guide
+** Host firmware and kernel controls from the link:https://access.redhat.com/sites/default/files/attachments/rh-openshift-virtualization-hardening-guide-detail-202512-en.pdf[Red Hat OpenShift Virtualization hardening guide^]
 
 * *Lightwell and Trusted Software Supply Chain*
 ** Hummingbird verification and Lightwell remediated pins

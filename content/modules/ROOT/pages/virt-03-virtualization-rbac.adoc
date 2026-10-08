@@ -11,7 +11,7 @@
 == Overview
 xref:virt-02-devices-ksm-permissions.adoc[virt-02] locked devices and node files. This module is identity: who can live-migrate, `oc exec` into virt pods, mint VNC tokens, create cluster instance types and preferences, and update the cluster-scoped Containerized Data Importer (CDI) CR.
 
-The hardening guide's position is least privilege. Namespace admins can often migrate today; the KubeVirt community is moving that to cluster admins. You will *see* who can, then remove only bindings you created or that are clearly extra.
+The link:https://access.redhat.com/sites/default/files/attachments/rh-openshift-virtualization-hardening-guide-detail-202512-en.pdf[Red Hat OpenShift Virtualization hardening guide^]'s position is least privilege. Namespace admins can often migrate today; the KubeVirt community is moving that to cluster admins. You will *see* who can, then remove only bindings you created or that are clearly extra.
 
 == Why it matters
 Live migration copies VM memory over the network and consumes CPU on two nodes. VNC is a console that is weaker than SSH or a bastion with MFA. Cluster instance types are copy-paste security: one insecure template becomes every new VM. CDI holds importer configuration for the whole cluster.

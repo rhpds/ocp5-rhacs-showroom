@@ -9,9 +9,9 @@
 **Duration:** ~15 minutes
 
 == Overview
-Red Hat OpenShift Virtualization is an extension on top of an already-hardened OpenShift cluster. The link:https://www.redhat.com/en/resources/openshift-virtualization-hardening-guide[OpenShift Virtualization hardening guide^] tells you what to lock on the hypervisor, not how to STIG the guest OS and not how to replace xref:101-10-security-compliance-addons.adoc[Compliance Operator] profiles for OpenShift and RHCOS.
+Red Hat OpenShift Virtualization is an extension on top of an already-hardened OpenShift cluster. The link:https://access.redhat.com/sites/default/files/attachments/rh-openshift-virtualization-hardening-guide-detail-202512-en.pdf[Red Hat OpenShift Virtualization hardening guide^] is focused on hardening the hypervisor and not how to STIG the OS inside the VM.
 
-This module confirms CNV is installed, shows the one object you will audit for the rest of the pathway (`HyperConverged/kubevirt-hyperconverged` in `openshift-cnv`), and orients you to the running `rhel-webserver` VM. Later modules do not reinstall anything; they read and, only when a control has already drifted, remediate.
+This module confirms container-native virtualization (CNV) is installed, shows the one object you will audit for the rest of the pathway (`HyperConverged/kubevirt-hyperconverged` in `openshift-cnv`), and orients you to the running `rhel-webserver` VM. Later modules do not reinstall anything; they read and, only when a control has already drifted, remediate.
 
 == Why it matters
 A VM looks like a pet server. On OpenShift it is a set of CRs (VirtualMachine, DataVolume, NAD) plus privileged node components (`virt-handler`, `virt-launcher`). If you only harden the guest, you miss device pass-through, live migration RBAC, and KubeVirt feature gates. If you only harden OpenShift, you still have a hypervisor attack surface.

@@ -136,6 +136,6 @@ Use the *Terminal* tab (or SSH) for CLI work (`oc`, `roxctl`, `podman`, `curl`, 
 * xref:intermediate-INDEX.adoc[201 Intermediate] — Hardening and shift-left.
 * xref:advanced-INDEX.adoc[301 Advanced] — Enterprise and zero trust.
 * xref:acs-INDEX.adoc[Advanced Cluster Security (RHACS)] — Setup, vulnerabilities, policy and risk, CI/CD gates, compliance, notifications and API, network and runtime, installation, and xref:acs.adoc[ACS 5 capabilities] (VM scanning, file activity monitoring, MCP, and init containers).
-* xref:virt-INDEX.adoc[OpenShift Virtualization Security] — HyperConverged feature gates, virt RBAC, VM and storage isolation, VM networking, and host firmware/kernel controls from the OpenShift Virtualization hardening guide.
+* xref:virt-INDEX.adoc[OpenShift Virtualization Security] — HyperConverged feature gates, virt RBAC, VM and storage isolation, VM networking, and host firmware/kernel controls from the link:https://access.redhat.com/sites/default/files/attachments/rh-openshift-virtualization-hardening-guide-detail-202512-en.pdf[Red Hat OpenShift Virtualization hardening guide^].
 * xref:tssc-INDEX.adoc[Lightwell and Red Hat Trusted Software Supply Chain (TSSC)] — Hummingbird, Lightwell remediations, hermetic build, keyless signing, GitOps admission, and TPA/ACS compliance.
 

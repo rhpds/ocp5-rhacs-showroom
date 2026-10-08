@@ -9,7 +9,7 @@
 **Duration:** ~30 minutes
 
 == Overview
-xref:virt-05-storage-isolation.adoc[virt-05] isolated disks. This module isolates L2. The hardening guide wants dedicated VLANs (Level 2), MAC spoof filtering (Level 1), and MultiNetworkPolicy microsegmentation inside a VLAN (Level 2, OVN-Kubernetes localnet).
+xref:virt-05-storage-isolation.adoc[virt-05] isolated disks. This module isolates L2. The link:https://access.redhat.com/sites/default/files/attachments/rh-openshift-virtualization-hardening-guide-detail-202512-en.pdf[Red Hat OpenShift Virtualization hardening guide^] wants dedicated VLANs (Level 2), MAC spoof filtering (Level 1), and MultiNetworkPolicy microsegmentation inside a VLAN (Level 2, OVN-Kubernetes localnet).
 
 Pod `NetworkPolicy` from xref:101-05-network-policy-basics.adoc[101-05] and cluster xref:301-03-multi-tenant-zero-trust-network.adoc[AdminNetworkPolicy] do not replace secondary-network policy on Multus/localnet. VMs on extra networks need NADs, spoof checking, and MultiNetworkPolicy.
 

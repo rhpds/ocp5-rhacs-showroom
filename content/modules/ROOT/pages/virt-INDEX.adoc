@@ -8,9 +8,9 @@ xref:index.adoc[← Back to HOME]
 
 == Overview
 
-These labs walk the link:https://www.redhat.com/en/resources/openshift-virtualization-hardening-guide[Red Hat OpenShift Virtualization hardening guide^] on a cluster that already has OpenShift Virtualization installed. You audit every control, compare it to the secure default, and record what you would change to reach a hardened baseline.
+These labs walk the link:https://access.redhat.com/sites/default/files/attachments/rh-openshift-virtualization-hardening-guide-detail-202512-en.pdf[Red Hat OpenShift Virtualization hardening guide^] on a cluster that already has OpenShift Virtualization installed. You audit every control, compare it to the secure default, and record what you would change to reach a hardened baseline.
 
-This is a product deep-dive, not a 101/201/301 skill level. Harden the OpenShift platform first (xref:101-10-security-compliance-addons.adoc[101-10], xref:201-07-compliance-tailoring.adoc[201-07]). Guest operating system CIS/STIG work inside the VM is out of scope.
+NOTE: The guide uses CIS-style Level 1 / Level 2 labels and is not an official CIS benchmark yet. 
 
 Lab details and prerequisites:
 
@@ -19,7 +19,7 @@ Lab details and prerequisites:
 * A running VM to inspect: this environment uses `rhel-webserver` in project `rhel-webserver`
 * Credentials and console links are on the xref:index.adoc[home page]
 
-Modules are sequential. Later labs reuse the HyperConverged object, VM, and any NetworkAttachmentDefinitions you already inspected. Cleanup records progress only; it does not delete those objects.
+Modules are sequential are recommended to be completed in order.
 
 == Recommended sequence
 
@@ -63,4 +63,3 @@ Modules are sequential. Later labs reuse the HyperConverged object, VM, and any 
 |Host Firmware and Kernel
 |===
 
-The guide uses CIS-style Level 1 / Level 2 labels. It is not an official CIS benchmark yet. Level 2 controls in this pathway are Kernel Samepage Merging, dedicated VLANs, and MultiNetworkPolicy.
