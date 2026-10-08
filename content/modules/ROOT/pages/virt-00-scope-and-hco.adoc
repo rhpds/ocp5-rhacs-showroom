@@ -11,10 +11,12 @@
 == Overview
 Red Hat OpenShift Virtualization is an extension on top of an already-hardened OpenShift cluster. The link:https://access.redhat.com/sites/default/files/attachments/rh-openshift-virtualization-hardening-guide-detail-202512-en.pdf[Red Hat OpenShift Virtualization hardening guide^] is focused on hardening the hypervisor and not how to STIG the OS inside the VM.
 
-This module confirms container-native virtualization (CNV) is installed, shows the one object you will audit for the rest of the pathway (`HyperConverged/kubevirt-hyperconverged` in `openshift-cnv`), and orients you to the running `rhel-webserver` VM. Later modules do not reinstall anything; they read and, only when a control has already drifted, remediate.
+This module confirms container-native virtualization (CNV) is installed, shows the one object you will audit for the rest of the pathway (`HyperConverged/kubevirt-hyperconverged` in `openshift-cnv`), and orients you to the running `rhel9-vm` VM. Later modules do not reinstall anything; they read and, only when a control has already drifted, remediate.
 
 == Why it matters
-A VM looks like a pet server. On OpenShift it is a set of CRs (VirtualMachine, DataVolume, NAD) plus privileged node components (`virt-handler`, `virt-launcher`). If you only harden the guest, you miss device pass-through, live migration RBAC, and KubeVirt feature gates. If you only harden OpenShift, you still have a hypervisor attack surface.
+A VM traditionally looks like a pet server. On OpenShift it isn't. It is a handful of custom resources (VirtualMachine, DataVolume, NAD) plus privileged node components (virt-handler, virt-launcher) that actually run the guest.
+
+Harden only the guest and you miss device passthrough, live-migration RBAC, and KubeVirt feature gates. Harden only OpenShift and the hypervisor is still an attack surface. You have to treat both.
 
 == What does it solve
 
@@ -23,11 +25,11 @@ A VM looks like a pet server. On OpenShift it is a set of CRs (VirtualMachine, D
 * Confusing Kata sandboxed pods (xref:201-09-sandboxed-containers-intro.adoc[201-09]) with full VMs on OpenShift Virtualization
 
 == Your Mission
-Prove CNV is healthy, name the HyperConverged object you will audit from virt-01 onward, and confirm the lab VM is Running. Do not patch HCO in this module.
+Prove CNV is healthy, name the HyperConverged object you will audit from virt-01 onward, and confirm the lab VM is Running. 
 
 === Prerequisites
 
-* Cluster-admin (or permission to get CRs in `openshift-cnv` and VMs in `rhel-webserver`)
+* Cluster-admin (or permission to get CRs in `openshift-cnv` and VMs in `rhacs-virt`)
 * OpenShift Virtualization installed (this environment already has it)
 * OpenShift console tab available from the xref:index.adoc[home page]
 
@@ -60,15 +62,15 @@ oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv -o jsonpath='{.sp
 TIP: The CR exists. Feature gates print as JSON (often empty or a short map). Empty is a secure starting point for most gates in virt-01.
 ====
 
-.Confirm the rhel-webserver VM
+.Confirm the rhel9-vm VM
 [%collapsible]
 ====
 This VM is the production-like audit target for virt-04 and virt-05. Do not delete it and do not patch its spec in this pathway.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc get vm,vmi -n rhel-webserver
-oc get vm rhel-webserver -n rhel-webserver -o jsonpath='{.status.printableStatus}{"\n"}'
+oc get vm,vmi -n rhacs-virt
+oc get vm rhel9-vm -n rhacs-virt -o jsonpath='{.status.printableStatus}{"\n"}'
 ----
 
 TIP: `VirtualMachine` and `VirtualMachineInstance` exist. Status should be `Running`.
@@ -77,9 +79,9 @@ TIP: `VirtualMachine` and `VirtualMachineInstance` exist. Status should be `Runn
 .Open VirtualMachines in the console
 [%collapsible]
 ====
-In the OpenShift console: *Virtualization* → *VirtualMachines*. Enable *Show only projects with VirtualMachines* and select project `rhel-webserver`. Overview should show one Running VM with guest agent reporting.
+In the OpenShift console: *Virtualization* → *VirtualMachines*. Enable *Show only projects with VirtualMachines* and select project `rhacs-virt`. Overview should show one Running VM with guest agent reporting.
 
-image::virt-00-virtualmachines.png[VirtualMachines overview for rhel-webserver,link=self,window=blank,width=100%]
+image::virt-00-virtualmachines.png[VirtualMachines overview for rhel9-vm,link=self,window=blank,width=100%]
 
 TIP: Zero alerts and one Running VM is a clean baseline before you start scoring controls.
 ====
@@ -100,7 +102,7 @@ TIP: If Compliance Operator is not scanning the cluster yet, run xref:101-10-sec
 
 == Debrief
 
-You now have the two objects this pathway keeps returning to: `HyperConverged/kubevirt-hyperconverged` and `VirtualMachine/rhel-webserver`. Virt-01 starts with feature gates, insecure registries, and HCO jsonpatch annotations.
+You now have the two objects this pathway keeps returning to: `HyperConverged/kubevirt-hyperconverged` and `VirtualMachine/rhel9-vm`. Virt-01 starts with feature gates, insecure registries, and HCO jsonpatch annotations.
 
 What breaks without this orientation:
 
@@ -112,7 +114,7 @@ NOTE: Next is xref:virt-01-feature-gates-and-trusted-config.adoc[virt-01] -- fea
 
 == Cleanup
 
-This pathway is cumulative. The cleanup script records progress only. It does not delete HCO or `rhel-webserver`.
+This pathway is cumulative. The cleanup script records progress only. It does not delete HCO or `rhel9-vm`.
 
 :lab-cleanup-module: virt-00
 include::partial$lab-cleanup.adoc[]

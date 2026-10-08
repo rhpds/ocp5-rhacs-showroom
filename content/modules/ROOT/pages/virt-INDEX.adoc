@@ -16,7 +16,7 @@ Lab details and prerequisites:
 
 * OpenShift cluster with OpenShift Virtualization (CNV) in `openshift-cnv`
 * Cluster-admin (or equivalent) for HyperConverged, RBAC `who-can`, and node debug 
-* A running VM to inspect: this environment uses `rhel-webserver` in project `rhel-webserver`
+* A running VM to inspect: this environment uses `rhel9-vm` in project `rhacs-virt`
 * Credentials and console links are on the xref:index.adoc[home page]
 
 Modules are sequential are recommended to be completed in order.

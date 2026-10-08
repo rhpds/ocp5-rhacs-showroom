@@ -211,7 +211,7 @@ The pathway is complete. Cluster objects were left in place on purpose so you ca
 
 == Cleanup
 
-Records progress only. No MachineConfig, no node reboot, no delete of `rhel-webserver` or HCO.
+Records progress only. No MachineConfig, no node reboot, no delete of `rhel9-vm` or HCO.
 
 :lab-cleanup-module: virt-07
 include::partial$lab-cleanup.adoc[]

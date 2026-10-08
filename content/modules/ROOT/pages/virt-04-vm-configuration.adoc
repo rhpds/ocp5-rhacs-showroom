@@ -11,7 +11,7 @@
 == Overview
 xref:virt-02-devices-ksm-permissions.adoc[virt-02] locked the *cluster* allow-list (`permittedHostDevices`). This module looks at each VirtualMachine spec: `domain.devices.gpus`, `domain.devices.hostDevices`, and `domain.resources.overcommitGuestOverhead`.
 
-Audit every VM, then inspect `rhel-webserver` as the lab's production-like guest. Do not patch that VM. A finding on any other VM is a real exception to document or remove.
+Audit every VM, then inspect `rhel9-vm` as the lab's production-like guest. Do not patch that VM. A finding on any other VM is a real exception to document or remove.
 
 == Why it matters
 HCO can forbid a device and a VM spec can still *request* one (it will not schedule). The inverse is worse: HCO allows a GPU and a forgotten VM still has it attached after the business need ended. Memory overcommit tells the scheduler the guest needs less RAM than the hypervisor actually uses. If the guest fills memory, kubelet OOM-kills the virt-launcher.
@@ -23,13 +23,13 @@ HCO can forbid a device and a VM spec can still *request* one (it will not sched
 * `overcommitGuestOverhead: true` used as silent density, then random virt-launcher deaths
 
 == Your Mission
-List VMs with GPUs, hostDevices, or overcommit. Confirm `rhel-webserver` is clean. Know the jsonpatch that removes a device or the overcommit flag.
+List VMs with GPUs, hostDevices, or overcommit. Confirm `rhel9-vm` is clean. Know the jsonpatch that removes a device or the overcommit flag.
 
 === Prerequisites
 
 * xref:virt-03-virtualization-rbac.adoc[virt-03] complete
 * `jq` on the bastion
-* Get access to VirtualMachines cluster-wide (or at least `rhel-webserver`)
+* Get access to VirtualMachines cluster-wide (or at least project `rhacs-virt`)
 
 Click each step only if you need a hint.
 
@@ -66,12 +66,12 @@ oc get vm -A -o json | jq -c '
 TIP: Empty output (aside from the separator) is a pass. Any JSON object is a VM with pass-through to review.
 ====
 
-.Audit rhel-webserver only
+.Audit rhel9-vm only
 [%collapsible]
 ====
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc get vm rhel-webserver -n rhel-webserver -o jsonpath='gpus={.spec.template.spec.domain.devices.gpus}{"\n"}hostDevices={.spec.template.spec.domain.devices.hostDevices}{"\n"}'
+oc get vm rhel9-vm -n rhacs-virt -o jsonpath='gpus={.spec.template.spec.domain.devices.gpus}{"\n"}hostDevices={.spec.template.spec.domain.devices.hostDevices}{"\n"}'
 ----
 
 TIP: Both fields empty is the expected lab baseline. Do not add devices to this VM.
@@ -80,7 +80,7 @@ TIP: Both fields empty is the expected lab baseline. Do not add devices to this 
 .Remediation
 [%collapsible]
 ====
-Remove host device index 0 from a VM you *intend* to change. Do not run this against `rhel-webserver`.
+Remove host device index 0 from a VM you *intend* to change. Do not run this against `rhel9-vm`.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
@@ -116,7 +116,7 @@ oc get vm -A -o json | jq -r '
   | select(.spec.template.spec.domain.resources.overcommitGuestOverhead == true)
   | .metadata.namespace + "/" + .metadata.name
 '
-oc get vm rhel-webserver -n rhel-webserver -o jsonpath='{.spec.template.spec.domain.resources.overcommitGuestOverhead}{"\n"}'
+oc get vm rhel9-vm -n rhacs-virt -o jsonpath='{.spec.template.spec.domain.resources.overcommitGuestOverhead}{"\n"}'
 ----
 
 TIP: First command empty, second command empty or `false`.
@@ -134,7 +134,7 @@ Stop the guest, remove the flag, start it. Example for a non-lab VM:
 # ]'
 ----
 
-TIP: The VM should no longer appear in the `jq` select. Do not patch `rhel-webserver` unless you set this flag yourself (you should not have).
+TIP: The VM should no longer appear in the `jq` select. Do not patch `rhel9-vm` unless you set this flag yourself (you should not have).
 ====
 
 == Debrief
@@ -150,7 +150,7 @@ NOTE: Next is xref:virt-05-storage-isolation.adoc[virt-05] -- DataVolume cloning
 
 == Cleanup
 
-Progress only. `rhel-webserver` is unchanged.
+Progress only. `rhel9-vm` is unchanged.
 
 :lab-cleanup-module: virt-04
 include::partial$lab-cleanup.adoc[]

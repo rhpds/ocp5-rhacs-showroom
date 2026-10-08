@@ -307,7 +307,7 @@ case "${MODULE}" in
     echo "Removed temporary lab files for module ${MODULE}."
     ;;
   virt-00|virt-01|virt-02|virt-03|virt-04|virt-05|virt-06)
-    echo "Virtualization pathway is cumulative. No cluster objects deleted (HCO, rhel-webserver, NADs stay)."
+    echo "Virtualization pathway is cumulative. No cluster objects deleted (HCO, rhel9-vm, NADs stay)."
     ;;
   virt-07)
     echo "Virtualization pathway complete. Cluster objects were left in place on purpose."

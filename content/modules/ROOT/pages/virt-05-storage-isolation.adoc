@@ -23,7 +23,7 @@ A clone across namespaces is a data copy the destination owners did not take fro
 * Windows clustered FS needing `report`, vs a lab that set `ignore` to quiet logs
 
 == Your Mission
-Find RoleBindings that grant DataVolume clone across namespaces, list VMs with `shareable: true`, and list VMs with `errorPolicy: ignore`. Expect empty on a fresh lab. Do not patch `rhel-webserver`.
+Find RoleBindings that grant DataVolume clone across namespaces, list VMs with `shareable: true`, and list VMs with `errorPolicy: ignore`. Expect empty on a fresh lab. Do not patch `rhel9-vm`.
 
 === Prerequisites
 
@@ -114,7 +114,7 @@ oc get vm -A -o json | jq -r '
   | select([.spec.template.spec.domain.devices.disks[]? | select(.shareable == true)] | length > 0)
   | .metadata.namespace + "/" + .metadata.name
 '
-oc get vm rhel-webserver -n rhel-webserver -o json | jq '
+oc get vm rhel9-vm -n rhacs-virt -o json | jq '
   [.spec.template.spec.domain.devices.disks[]? | {name, shareable}]
 '
 ----
@@ -125,7 +125,7 @@ TIP: First command empty. Second command: disks with `shareable` null or `false`
 .Remediation
 [%collapsible]
 ====
-Remove the flag on disk index 0 of a VM you own (not `rhel-webserver`):
+Remove the flag on disk index 0 of a VM you own (not `rhel9-vm`):
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
@@ -159,7 +159,7 @@ oc get vm -A -o json | jq -r '
   | select([.spec.template.spec.domain.devices.disks[]? | select(.errorPolicy == "ignore")] | length > 0)
   | .metadata.namespace + "/" + .metadata.name
 '
-oc get vm rhel-webserver -n rhel-webserver -o json | jq '
+oc get vm rhel9-vm -n rhacs-virt -o json | jq '
   [.spec.template.spec.domain.devices.disks[]? | {name, errorPolicy}]
 '
 ----
@@ -196,7 +196,7 @@ NOTE: Next is xref:virt-06-network-segmentation.adoc[virt-06] -- VLANs, MAC spoo
 
 == Cleanup
 
-Progress only. DataVolumes and `rhel-webserver` stay.
+Progress only. DataVolumes and `rhel9-vm` stay.
 
 :lab-cleanup-module: virt-05
 include::partial$lab-cleanup.adoc[]

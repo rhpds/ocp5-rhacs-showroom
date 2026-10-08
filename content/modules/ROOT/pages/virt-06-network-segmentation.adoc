@@ -23,7 +23,7 @@ Two VMs on the same bridge see each other's broadcasts. MAC spoofing is a classi
 * A VLAN that is "isolated" but still allows every MAC on that VLAN to talk
 
 == Your Mission
-Inventory NetworkAttachmentDefinitions and SriovNetworks. Parse each NAD `spec.config` JSON for `vlanID` / `vlan` and MAC spoof fields. If the cluster has no secondary network yet, that is the default (VLANs are opt-in): you still leave with the YAML you would apply in production. Do not attach a new network to `rhel-webserver` in this lab.
+Inventory NetworkAttachmentDefinitions and SriovNetworks. Parse each NAD `spec.config` JSON for `vlanID` / `vlan` and MAC spoof fields. If the cluster has no secondary network yet, that is the default (VLANs are opt-in): you still leave with the YAML you would apply in production. Do not attach a new network to `rhel9-vm` in this lab.
 
 === Prerequisites
 
@@ -98,7 +98,7 @@ Bridge CNI should set `"vlan": 100` and `"preserveDefaultVlan": false`. SR-IOV u
 
 Docs: link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/virtualization/virt-connecting-a-virtual-machine-to-a-linux-bridge[VLAN with bridge CNI^], link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/virtualization/virt-connecting-a-virtual-machine-to-an-ovn-kubernetes-secondary-network[OVN localnet^], link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/networking/hardware-networks#nw-sriov-network-attachment_configuring-sriov-net-attach[SR-IOV networks^].
 
-TIP: After you create a NAD, attach it only to VMs that should sit on that VLAN. Leave `rhel-webserver` on its current network unless you are on a cluster you own and have a change window.
+TIP: After you create a NAD, attach it only to VMs that should sit on that VLAN. Leave `rhel9-vm` on its current network unless you are on a cluster you own and have a change window.
 ====
 
 === Control: Enable MAC spoof filtering
@@ -162,7 +162,7 @@ MultiNetworkPolicy selects a VM *and* the NetworkAttachmentDefinition it uses, t
 oc get multi-networkpolicy -A 2>/dev/null || echo "MultiNetworkPolicy CRD not available"
 ----
 
-TIP: Empty is the default. The hardened *goal* is at least one policy per namespace that has VMs on a secondary network, matching both the VM and the NAD. Primary-network-only VMs (like a default `rhel-webserver`) are covered by NetworkPolicy/ANP, not this CR.
+TIP: Empty is the default. The hardened *goal* is at least one policy per namespace that has VMs on a secondary network, matching both the VM and the NAD. Primary-network-only VMs (like a default `rhel9-vm`) are covered by NetworkPolicy/ANP, not this CR.
 ====
 
 .Remediation
@@ -178,9 +178,9 @@ apiVersion: k8s.cni.cncf.io/v1beta1
 kind: MultiNetworkPolicy
 metadata:
   name: allow-same-vlan
-  namespace: rhel-webserver
+  namespace: rhacs-virt
   annotations:
-    k8s.v1.cni.cncf.io/policy-for: rhel-webserver/vlan-100
+    k8s.v1.cni.cncf.io/policy-for: rhacs-virt/vlan-100
 spec:
   podSelector: {}
   policyTypes:
