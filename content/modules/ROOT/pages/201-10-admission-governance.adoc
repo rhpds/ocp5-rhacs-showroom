@@ -53,7 +53,7 @@ RHACM Policy annotations (`standards`, `categories`, `controls`) are what the Go
 * A `ManagedCluster` (hub is usually `local-cluster`)
 * Cluster-admin on the hub
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Part A: Hub inventory and placement
 

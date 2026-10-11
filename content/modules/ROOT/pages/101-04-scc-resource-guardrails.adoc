@@ -35,7 +35,7 @@ Attackers prefer pods that already run as root. Refusing that by default removes
 == Your Mission
 Refuse the privilege ladder attackers want (`anyuid`, UID 0, port 80) and stop noisy-neighbor resource grabs with LimitRange and ResourceQuota. Complete *Part A*, then *Part B*.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Part A: SCC Limits & Non-Root Realities
 An unpatched vendor image wants root and port 80—exactly the privilege ladder attackers climb after breakout. Prove restricted SCC blocks it, see what `anyuid` would unlock if you caved, and document any unavoidable exception instead of silently normalizing root.

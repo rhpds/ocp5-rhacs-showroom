@@ -30,7 +30,7 @@ A foothold in any pod can scan sideways to databases and internal APIs when east
 
 *Your mission:* prove the open path exists, slam the door with default deny, then reopen only the client you trust.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .Create project 101-05-n-netpol-demo
 [%collapsible]

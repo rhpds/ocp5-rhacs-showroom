@@ -32,7 +32,7 @@ Confirm Splunk is up (reinstall if 201-07 cleanup tore it down), generate an exe
 * RHACS Central (optional notifier into Splunk if `ROX_API_TOKEN` was set at install)
 * Something to hunt: leftover `301-04-runtime` probe, or a sleeper in this lab
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Part A: SIEM still there?
 

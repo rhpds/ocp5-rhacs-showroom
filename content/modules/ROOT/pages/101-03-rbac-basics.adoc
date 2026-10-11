@@ -129,7 +129,7 @@ IMPORTANT: Result is `yes` — a pod using `app-sa` could enumerate Secrets afte
 == Your Mission
 Stop the same attack without blocking legitimate work. Remove the over-permissioned grants, start from `view`, open only the verbs the team needs (`edit` for app changes), and prove each attack step now fails. Keep the default ServiceAccount powerless until you deliberately bind it.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .Delete the broken RoleBindings and foothold Deployment
 [%collapsible]

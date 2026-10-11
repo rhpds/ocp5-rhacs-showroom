@@ -51,7 +51,7 @@ Apply PolicySet `stride-ocp-baseline`, watch it NonCompliant while `inform` is o
 * Cluster-admin on the hub
 * xref:201-10-admission-governance.adoc[201-10] recommended (same `policies` namespace and ClusterSet binding)
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Part A: Hub inventory
 

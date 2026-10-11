@@ -30,7 +30,7 @@ Deploy Splunk as the lab SIEM, forward kube-apiserver audit to it, generate a su
 * `jq` and `curl` on the bastion
 * Storage for Splunk PVCs (about 20Gi + 5Gi)
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Part A: SIEM and audit forwarding
 

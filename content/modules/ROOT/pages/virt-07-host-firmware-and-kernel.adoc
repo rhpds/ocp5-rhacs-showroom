@@ -32,7 +32,7 @@ Pick a worker, `oc debug` it, and score four controls. Leave MachineConfig YAML 
 * Permission to `oc debug node`
 * Intel vs AMD: use `kvm_intel` or `kvm_amd` as appropriate
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .Pick a worker node
 [%collapsible]

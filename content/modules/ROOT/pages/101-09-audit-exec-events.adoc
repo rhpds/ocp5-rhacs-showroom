@@ -28,7 +28,7 @@ Someone may already have exec’d into a pod. Your mission: know the log locatio
 
 Deeper correlation in Splunk (SIEM + ClusterLogForwarder) with RHACS is xref:201-06-audit-monitoring-correlation.adoc[201-06]. Compliance Operator scans are xref:101-10-security-compliance-addons.adoc[101-10].
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Part A: CIS controls and where the logs live
 OpenShift writes **three** API audit streams on every control plane node. `oc adm node-logs` reads them without SSH. You need permission to get `nodes/log` (`cluster-admin` or the roadshow `node-log-viewer` ClusterRole).

@@ -33,7 +33,7 @@ Build a Tekton path FROM `python-alpine-golden` that refuses unscanned or unsign
 * Lab setup already ran, so `QUAY_URL`, `QUAY_USER`, and the golden image `${QUAY_URL}/${QUAY_USER}/python-alpine-golden:0.1` are already in this shell
 * The `python-alpine-golden` repository is **public** in Quay (same API call as `frontend` in xref:acs-00-setup-install-navigation.adoc#navigating-the-registry[acs-00]) so the cluster can import it
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .Create project 201-04-s-pipeline
 [%collapsible]

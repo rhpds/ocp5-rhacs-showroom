@@ -27,7 +27,7 @@ Take the CIS audit rows from 101-09 (1.2.22–1.2.25, 3.2.1) and see how `ocp4-c
 
 SPO and RHACS still matter for runtime and image risk; this hour is the audit-log follow-up. Tailoring and bulk remediate is xref:201-07-compliance-tailoring.adoc[201-07]. Log shipping into Splunk is xref:201-06-audit-monitoring-correlation.adoc[201-06].
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .List Compliance Operator pods and the ocp4-cis profile
 [%collapsible]

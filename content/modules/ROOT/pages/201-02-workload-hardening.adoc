@@ -28,7 +28,7 @@ Broad SCC usage silently enables:
 == Your Mission
 Prove restricted-plus is not enough for this workload: apply a tighter SCC, run a good pod, then watch capability-add and root-UID pods fail.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .Inspect SCC restricted
 [%collapsible]

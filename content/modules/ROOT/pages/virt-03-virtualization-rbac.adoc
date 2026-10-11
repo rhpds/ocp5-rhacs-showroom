@@ -32,7 +32,7 @@ Run `oc adm policy who-can` (and one `jq` pass over RoleBindings) for five actio
 * xref:virt-02-devices-ksm-permissions.adoc[virt-02] complete
 * Cluster-admin for `who-can` and for listing RoleBindings across namespaces
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Control: Restrict namespace administrator access to migration tools
 

@@ -80,7 +80,7 @@ Hands-on ACS runtime enforcement is xref:acs-06-network-and-runtime.adoc[acs-06]
 == Your Mission
 Turn on File Integrity Operator for worker nodes so a silent binary or config change on the host is a report, not a surprise during incident response. Treat that as the node layer only—RHACS still has to watch file activity in the workload.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .Install File Integrity Operator
 [%collapsible]

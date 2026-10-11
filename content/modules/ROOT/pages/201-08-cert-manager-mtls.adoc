@@ -32,7 +32,7 @@ Issue a service certificate with cert-manager so east-west traffic can use ident
 
 Do **not** edit or delete ClusterIssuers named `selfsigned` or `acme-*`. Do not change certificates in `openshift-ingress`, `openshift-config`, or `stackrox`.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Part A: In-cluster issuance (self-signed)
 

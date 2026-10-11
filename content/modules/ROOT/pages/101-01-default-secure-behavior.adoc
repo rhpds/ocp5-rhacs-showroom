@@ -33,7 +33,7 @@ OpenShift forces an explicit choice. Either rebuild for random UIDs and high por
 == Your Mission
 A teammate (or a new hire following a blog post) wants to stand up a quick web service. They grab the public Docker Hub `httpd` image—it worked on their laptop as *root* on *port 80*—and deploy it to the shared cluster. Your job is to show why that fails under OpenShift defaults, then restore a hardened path that still serves traffic without widening privilege.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .Create project 101-01-httpd-demo
 [%collapsible]

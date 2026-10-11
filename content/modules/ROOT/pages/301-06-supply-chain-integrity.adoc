@@ -32,7 +32,7 @@ Inspect the UBI Python image, apply a digest-only ValidatingAdmissionPolicy to a
 * Pull access to `registry.access.redhat.com/ubi9/python-311`
 * Optional: RHACS image scan UI; optional: `cosign` / TAS from TSSC-00
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Part A: Provenance of the catalog image
 

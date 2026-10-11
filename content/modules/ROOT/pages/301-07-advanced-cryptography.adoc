@@ -25,7 +25,7 @@ Crypto that is “on the roadmap” does not help a stolen etcd snapshot. You ne
 == Your Mission
 Read APIServer encryption, confirm the Python app has no Secret env, and check default IngressController redirect to HTTPS.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .etcd encryption type
 [%collapsible]

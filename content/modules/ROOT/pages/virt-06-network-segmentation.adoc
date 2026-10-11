@@ -31,7 +31,7 @@ Inventory NetworkAttachmentDefinitions and SriovNetworks. Parse each NAD `spec.c
 * `jq` on the bastion
 * OVN-Kubernetes is the usual default CNI; SR-IOV and bridge NADs are optional
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Control: Use dedicated VLANs to segment network traffic
 

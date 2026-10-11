@@ -34,7 +34,7 @@ Prove A can reach B, apply labeled ANPs (allow DNS, allow intra-namespace, deny 
 * CRD `adminnetworkpolicies.policy.networking.k8s.io`
 * Cluster-admin for ANP; tenant tests use `--as`
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Part A: Open path (101-05 reminder)
 

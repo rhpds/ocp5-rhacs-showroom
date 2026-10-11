@@ -34,7 +34,7 @@ Resolve the UBI Python digest, apply the in-repo manifests, prove the running im
 * Egress to `registry.access.redhat.com` (or a cluster mirror of UBI)
 * Optional: OpenShift GitOps Operator (`applications.argoproj.io`)
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Part A: Catalog image
 

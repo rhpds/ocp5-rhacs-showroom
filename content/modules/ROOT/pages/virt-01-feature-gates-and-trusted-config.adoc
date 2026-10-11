@@ -33,7 +33,7 @@ Audit five HCO controls. Leave the live object at the secure default. Use the re
 * Cluster-admin to get and, if needed, patch HCO
 * `jq` on the bastion for annotation checks
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Control: Enable nonRoot (pre-4.18)
 
@@ -52,7 +52,7 @@ The `nonRoot` feature gate makes virt-launcher run without root. From OpenShift 
 ====
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv \
+oc get hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv \
   -o jsonpath='{.spec.featureGates.nonRoot}{"\n"}'
 oc get csv -n openshift-cnv -o jsonpath='{range .items[*]}{.spec.version}{"\n"}{end}'
 ----
@@ -67,7 +67,7 @@ Skip this patch on 4.18+. On older clusters set the gate to `true`:
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc patch hyperconverged kubevirt-hyperconverged -n openshift-cnv --type='json' -p='[
+oc patch hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv --type='json' -p='[
   {"op": "replace", "path": "/spec/featureGates/nonRoot", "value": true}
 ]'
 ----
@@ -92,7 +92,7 @@ Persistent SCSI reservations share a LUN among VMs. They exist for Windows Share
 ====
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv \
+oc get hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv \
   -o jsonpath='{.spec.featureGates.persistentReservation}{"\n"}'
 ----
 
@@ -106,7 +106,7 @@ Only if the audit returned `true` and you do not run Windows Shared Cluster File
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc patch hyperconverged kubevirt-hyperconverged -n openshift-cnv --type='json' -p='[
+oc patch hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv --type='json' -p='[
   {"op": "replace", "path": "/spec/featureGates/persistentReservation", "value": false}
 ]'
 ----
@@ -131,7 +131,7 @@ TIP: Audit should return `false`.
 ====
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv \
+oc get hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv \
   -o jsonpath='{.spec.featureGates.downwardMetrics}{"\n"}'
 ----
 
@@ -145,7 +145,7 @@ Only if the audit returned `true`:
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc patch hyperconverged kubevirt-hyperconverged -n openshift-cnv --type='json' -p='[
+oc patch hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv --type='json' -p='[
   {"op": "replace", "path": "/spec/featureGates/downwardMetrics", "value": false}
 ]'
 ----
@@ -170,7 +170,7 @@ TIP: Audit should return `false`.
 ====
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv \
+oc get hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv \
   -o jsonpath='{.spec.storageImport.insecureRegistries}{"\n"}'
 ----
 
@@ -184,7 +184,7 @@ Remove the entire allow-list (only if it is populated and you intend to break th
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc patch hyperconverged kubevirt-hyperconverged -n openshift-cnv --type='json' -p='[
+oc patch hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv --type='json' -p='[
   {"op": "remove", "path": "/spec/storageImport/insecureRegistries"}
 ]'
 ----
@@ -209,7 +209,7 @@ HCO honors experimental jsonpatch annotations on itself: `kubevirt.kubevirt.io/j
 ====
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv -o json | jq '
+oc get hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv -o json | jq '
   .metadata.annotations // {}
   | {
       kubevirt: has("kubevirt.kubevirt.io/jsonpatch"),
@@ -230,7 +230,7 @@ Remove a specific annotation (example: CDI). Repeat for any `true` result above.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc annotate --overwrite -n openshift-cnv hyperconverged kubevirt-hyperconverged \
+oc annotate --overwrite -n openshift-cnv hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged \
   'containerizeddataimporter.kubevirt.io/jsonpatch-'
 ----
 

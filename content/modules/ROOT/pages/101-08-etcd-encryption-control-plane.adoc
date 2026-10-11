@@ -27,7 +27,7 @@ If an attacker (or stolen backup) can read raw etcd, unencrypted Secrets become 
 
 This uses the supported `etcdctl` client inside an `openshift-etcd` pod—the same check Red Hat documents for verifying encryption. Do not copy other namespaces’ Secrets.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .List nodes and control-plane pods
 [%collapsible]

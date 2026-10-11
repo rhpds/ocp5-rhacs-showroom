@@ -31,7 +31,7 @@ List VMs with GPUs, hostDevices, or overcommit. Confirm `rhel9-vm` is clean. Kno
 * `jq` on the bastion
 * Get access to VirtualMachines cluster-wide (or at least project `rhacs-virt`)
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Control: Restrict pass-through of GPUs and host devices to the VM
 

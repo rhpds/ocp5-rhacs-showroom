@@ -31,7 +31,7 @@ Find RoleBindings that grant DataVolume clone across namespaces, list VMs with `
 * `jq` on the bastion
 * Permission to get RoleBindings, ClusterRoles, and VirtualMachines
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Control: Restrict access to cross-namespace DataVolume cloning
 

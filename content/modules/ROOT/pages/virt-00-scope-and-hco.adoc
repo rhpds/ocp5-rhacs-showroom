@@ -33,7 +33,7 @@ Prove CNV is healthy, name the HyperConverged object you will audit from virt-01
 * OpenShift Virtualization installed (this environment already has it)
 * OpenShift console tab available from the xref:index.adoc[home page]
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .Confirm the OpenShift Virtualization CSV
 [%collapsible]
@@ -56,10 +56,31 @@ Almost every platform control in this pathway is a field on this single namespac
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv
-oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv -o jsonpath='{.spec.featureGates}{"\n"}'
+oc get hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv -o json | jq '.spec.featureGates // {}'
 ----
 
-TIP: The CR exists. Feature gates print as JSON (often empty or a short map). Empty is a secure starting point for most gates in virt-01.
+*console output:*
+```
+NAME                      AGE
+kubevirt-hyperconverged   34h
+{
+  "alignCPUs": false,
+  "containerPathVolumes": false,
+  "decentralizedLiveMigration": true,
+  "declarativeHotplugVolumes": false,
+  "deployKubeSecondaryDNS": false,
+  "disableMDevConfiguration": false,
+  "downwardMetrics": false,
+  "enableMultiArchBootImageImport": false,
+  "incrementalBackup": false,
+  "objectGraph": false,
+  "persistentReservation": false,
+  "videoConfig": true
+}
+```
+
+NOTE: The CR exists. On 4.22 an unversioned get reads API v1, which omits `spec.featureGates` when no gate is set, so a jsonpath prints a blank line. This command reads v1beta1 and prints the map. `{}` is a secure starting point for virt-01.
+
 ====
 
 .Confirm the rhel9-vm VM
@@ -91,26 +112,22 @@ TIP: Zero alerts and one Running VM is a clean baseline before you start scoring
 ====
 Keep these boundaries in mind for every later module:
 
-* *OpenShift and RHCOS first.* Use Compliance Operator supported profiles before you treat CNV as "done."
 * *Guest OS separately.* RHEL, Windows, or other guests follow their own hardening guides.
 * *Level 1 vs Level 2.* Level 1 is the expected baseline. Level 2 (KSM, dedicated VLANs, MultiNetworkPolicy) is extra segmentation or anti-side-channel posture.
 * *Defaults are often already hardened.* Many audits should return empty or `false`. That is a pass, not a skipped lab.
-* *Kata vs CNV.* xref:201-09-sandboxed-containers-intro.adoc[201-09] isolates a *pod* with a second kernel. This pathway hardens *virtual machines* scheduled by KubeVirt.
+* *Kata containers vs CNV.* xref:201-09-sandboxed-containers-intro.adoc[201-09] isolates a *pod* with a second kernel. This pathway hardens *virtual machines* scheduled by KubeVirt.
 
-TIP: If Compliance Operator is not scanning the cluster yet, run xref:101-10-security-compliance-addons.adoc[101-10] on a different day; do not block this pathway on it.
 ====
 
 == Debrief
 
-You now have the two objects this pathway keeps returning to: `HyperConverged/kubevirt-hyperconverged` and `VirtualMachine/rhel9-vm`. Virt-01 starts with feature gates, insecure registries, and HCO jsonpatch annotations.
+HyperConverged/kubevirt-hyperconverged is the control plane for OpenShift Virtualization. The HyperConverged Cluster Operator owns the KubeVirt, CDI, and related operands and reconciles them to match this CR. Feature gates, insecure registries, and most of the cluster-wide virt posture live here, or get applied here as jsonpatch annotations that HCO forwards. Virt-01 starts on this object for that reason. If the change is not on HCO, it is not durable.
 
-What breaks without this orientation:
+VirtualMachine/rhel9-vm is the workload. It is the guest you can log into, plus the spec that asks for disks, networks, and devices. Hardening the pathway means both: the cluster object that decides what KubeVirt is allowed to do, and the VM object that decides what this guest is allowed to ask for.
 
-* Patching KubeVirt CRs instead of HCO, then losing the change on reconcile
-* Hardening only the guest while pass-through and RBAC stay wide open
-* Assuming Kata completed "virtualization security"
-
-NOTE: Next is xref:virt-01-feature-gates-and-trusted-config.adoc[virt-01] -- feature gates and trusted HCO config.
+Skip that split and three things go wrong.
+Patching the KubeVirt CR (or CDI, or the rest of the operand set) instead of HCO looks like it worked. The field changes, the VM still starts, and then HCO reconciles and puts the old value back. The lab "passes" until the next operator loop. That is why Virt-01 is feature gates, insecure registries, and HCO jsonpatch annotations, not a direct edit of KubeVirt/kubevirt.
+Hardening only the guest leaves the interesting surface outside it. Device passthrough, live-migration RBAC, and KubeVirt feature gates are not RHEL settings. A locked-down rhel9-vm on a permissive HCO is still a hypervisor with extra hardware and a migration API.
 
 == Cleanup
 

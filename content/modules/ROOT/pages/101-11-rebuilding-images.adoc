@@ -29,7 +29,7 @@ Shipping an image that needs root pushes teams toward `anyuid` and other SCC exc
 == Your Mission
 The public `httpd` image just crashed because it wants root and port 80 -- the same privilege attackers hope you unlock with `anyuid`. Rebuild on UBI so the app serves under restricted SCC: non-root, high port, multi-stage, and the rest of the OpenShift-ready build checklist. Prove the UID stays non-root, and expose it without widening the blast radius.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .Create project 101-11-r-rebuild
 [%collapsible]

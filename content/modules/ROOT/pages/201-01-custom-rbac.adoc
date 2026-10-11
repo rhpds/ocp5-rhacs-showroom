@@ -39,7 +39,7 @@ Your job is to cut a *custom* Role for that job and prove it is not a master bad
 
 When you finish, you should be able to say in one sentence what this identity may do—and what an attacker with that leaked token still cannot do.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .Create project 201-01-c-rbac-lab
 [%collapsible]

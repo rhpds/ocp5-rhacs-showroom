@@ -28,7 +28,7 @@ Plain HTTP leaves credentials, cookies, and API bodies open on the wire. TLS enc
 == Your Mission
 Stand up an app, prove HTTP is readable, issue a certificate with cert-manager, then hit the same hostname again over HTTPS. Complete *Part A*, then *Part B*, then *Part C*.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Part A: Start with an application
 Deploy a UBI httpd app, expose it on HTTP, and capture the Route hostname. That hostname is the name you will put on the certificate.

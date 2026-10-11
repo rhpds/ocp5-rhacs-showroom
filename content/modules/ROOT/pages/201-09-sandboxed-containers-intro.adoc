@@ -37,7 +37,7 @@ Run a sandboxed workload and contrast it with a normal pod so you know when stro
 * Worker nodes with virtualization support (VT-x/AMD-V)
 * Cluster admin permissions
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .Get the Sandboxed Containers CSV
 [%collapsible]

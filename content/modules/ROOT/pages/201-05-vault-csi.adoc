@@ -29,7 +29,7 @@ NOTE: This lab runs Vault in *dev mode* (auto-unsealed, root token `root`). Dev 
 
 This lab tracks the https://github.com/validatedpatterns/layered-zero-trust[Layered Zero Trust Validated Pattern] pattern for secrets (Vault and External Secrets Operator).
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .Run install-vault.sh
 [%collapsible]

@@ -31,7 +31,7 @@ Deploy a UBI probe (and reuse xref:301-02-gitops-policy-compliance.adoc[301-02] 
 * Cluster-admin or permission to exec in the lab namespace
 * Collector running on worker nodes
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Part A: Workload
 

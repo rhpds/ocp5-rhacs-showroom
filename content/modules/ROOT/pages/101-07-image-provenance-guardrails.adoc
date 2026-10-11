@@ -30,7 +30,7 @@ Supply-chain attackers ship malware through any registry that will take a tag. P
 
 This is the 101 baseline (ValidatingAdmissionPolicy on a labeled namespace). Later modules add RHACM Policy, signing, and SBOMs.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Part A: Allow-list the registries
 Mark one namespace, install the policy, then prove `docker.io` and `ghcr.io` cannot create a Deployment there. Leave the cluster-scoped policy in place until the module cleanup at the end.

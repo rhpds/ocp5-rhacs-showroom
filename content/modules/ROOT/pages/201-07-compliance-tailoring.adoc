@@ -61,7 +61,7 @@ OpenShift CIS 1.7 has **no** separate “Prometheus is installed” automated ro
 
 NOTE: `audit_log_forwarding_uses_tls` and `audit_error_alert_exists` are STIG/NIST-oriented. Stay on `ocp4-cis` for this lab.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 === Part A: Prove 201-06 against CIS
 

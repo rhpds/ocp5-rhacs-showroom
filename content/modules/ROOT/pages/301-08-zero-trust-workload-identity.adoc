@@ -33,7 +33,7 @@ Network reachability alone is not trust. Password spray, stolen Secret mounts, a
 == Your Mission
 Wire ZTWIM and PostgreSQL so only cert-bearing workloads connect—then prove bare connections are rejected and certificates rotate without another shared password to steal.
 
-Click each step only if you need a hint.
+Click each step for the full solution.
 
 .Prepare the platform and deploy PostgreSQL
 [%collapsible]
