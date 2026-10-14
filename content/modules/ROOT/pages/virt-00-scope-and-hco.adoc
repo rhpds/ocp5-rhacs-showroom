@@ -11,17 +11,17 @@
 == Overview
 Red Hat OpenShift Virtualization is an extension on top of an already-hardened OpenShift cluster. The link:https://access.redhat.com/sites/default/files/attachments/rh-openshift-virtualization-hardening-guide-detail-202512-en.pdf[Red Hat OpenShift Virtualization hardening guide^] is focused on hardening the hypervisor and not how to STIG the OS inside the VM.
 
-This module confirms container-native virtualization (CNV) is installed, shows the one object you will audit for the rest of the pathway (`HyperConverged/kubevirt-hyperconverged` in `openshift-cnv`), and orients you to the running `rhel9-vm` VM. Later modules do not reinstall anything; they read and, only when a control has already drifted, remediate.
+This module confirms *Container-Native Virtualization* (CNV) is installed, shows the one object you will audit for the rest of the pathway (`HyperConverged/kubevirt-hyperconverged` in `openshift-cnv`), and orients you to the running `rhel9-vm` VM. Later modules do not reinstall anything; they read and, only when a control has already drifted, remediate.
 
 == Why it matters
 A VM traditionally looks like a pet server. On OpenShift it isn't. It is a handful of custom resources (VirtualMachine, DataVolume, NAD) plus privileged node components (virt-handler, virt-launcher) that actually run the guest.
 
 Harden only the guest and you miss device passthrough, live-migration RBAC, and KubeVirt feature gates. Harden only OpenShift and the hypervisor is still an attack surface. You have to treat both.
 
-== What does it solve
+== What are we trying to solve
 
 * Treating CNV as "just another operator" with no extra baseline
-* Guest-only hardening while `HyperConverged` still allows insecure registries or jsonpatch experiments
+* Performing only guest-only hardening.
 * Confusing Kata sandboxed pods (xref:201-09-sandboxed-containers-intro.adoc[201-09]) with full VMs on OpenShift Virtualization
 
 == Your Mission
@@ -79,8 +79,48 @@ kubevirt-hyperconverged   34h
 }
 ```
 
-NOTE: The CR exists. On 4.22 an unversioned get reads API v1, which omits `spec.featureGates` when no gate is set, so a jsonpath prints a blank line. This command reads v1beta1 and prints the map. `{}` is a secure starting point for virt-01.
+====
 
+.Read the feature gates
+[%collapsible]
+====
+The map above is `spec.featureGates` on this cluster. Two gates are on: `decentralizedLiveMigration` and `videoConfig`. The rest are off. xref:virt-01-feature-gates-and-trusted-config.adoc[virt-01] scores `persistentReservation` and `downwardMetrics`; both should stay `false`.
+
+`alignCPUs` (`false`)::
+When a VM pins the QEMU emulator thread to its own dedicated CPU, KubeVirt can request up to two extra dedicated CPUs so the total is even. With this off, KubeVirt leaves the CPU count as requested.
+
+`containerPathVolumes` (`false`)::
+Lets a VM mount a path from the virt-launcher pod through virtiofs, including files Kubernetes injected into the pod, such as a projected service-account token. With this off, the guest stays on its own disks.
+
+`decentralizedLiveMigration` (`true`)::
+Live migration can move a running VM between namespaces and between clusters, using separate source and target migration objects. This gate is on by default and widens who can relocate a VM.
+
+`declarativeHotplugVolumes` (`false`)::
+Volume hotplug uses KubeVirt's subresource API. A disk change written into the VirtualMachine spec takes effect on the next restart. With this on, that same spec edit hotplugs or unplugs the volume immediately.
+
+`deployKubeSecondaryDNS` (`false`)::
+Deploys KubeSecondaryDNS so guests on secondary networks can resolve DNS. With this off, that component stays undeployed.
+
+`disableMDevConfiguration` (`false`)::
+KubeVirt still configures mediated devices such as a vGPU slice. Setting this to `true` stops that handling.
+
+`downwardMetrics` (`false`)::
+Exposes a small set of host and VM CPU and memory metrics into the guest over a virtio-serial port. With this off, the guest receives none of those host metrics. virt-01 expects `false`.
+
+`enableMultiArchBootImageImport` (`false`)::
+Lets the operator build golden boot images for each CPU architecture on a mixed-architecture cluster. Off matches this single-architecture lab.
+
+`incrementalBackup` (`false`)::
+Turns on QEMU changed-block tracking for incremental VM backups, and utility volumes on the launcher pod to hold backup data. With this off, that backup path stays unavailable.
+
+`objectGraph` (`false`)::
+Serves a subresource that lists the Kubernetes objects related to a VirtualMachine or VirtualMachineInstance. With this off, that inventory API stays unavailable. The guest is unchanged.
+
+`persistentReservation` (`false`)::
+Lets a guest issue SCSI Persistent Reserve commands against a shared LUN, and adds a `qemu-pr-helper` container to virt-handler. virt-01 expects `false`.
+
+`videoConfig` (`true`)::
+A VM spec can set the video device under `spec.template.spec.domain.devices.video` (`virtio`, `vga`, `bochs`, `cirrus`, or `ramfb`). If that field is unset, KubeVirt still picks the architecture default.
 ====
 
 .Confirm the rhel9-vm VM
