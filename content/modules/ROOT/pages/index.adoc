@@ -37,15 +37,31 @@ source ~/.bashrc
 [.console-output]
 [source,bash,subs="+macros,+attributes"]
 ----
+[########--------------------] 2/7  Configure Lightspeed provider
+OpenShift Lightspeed uses an LLM API key. This is not your OpenShift, RHACS, or Quay password.
+The choice is cluster-wide. Press Enter at the token prompt to leave Lightspeed unchanged.
+
 Select the LLM provider:
-  1) OpenAI
-  2) Azure AI
-  3) Anthropic
-  4) Google Gemini
-  5) Other
-Choice [1]: 1
-Using gpt-6.1-sol
-Paste the OpenAI API key (press Enter to skip):
+  1) ChatGPT (OpenAI)
+  2) Azure OpenAI
+  3) Other OpenAI-compatible API
+  4) Keep the current provider
+Choice [4]: 4
+Paste the API key for the current Lightspeed provider (press Enter to skip): 
+[############################] 7/7  Lab environment setup complete
+
+================================================================
+  SUCCESS: Lab environment setup completed successfully
+================================================================
+
+  ✓ Lightspeed API token stored (current provider kept)
+  ✓ Quay credentials read from the cluster
+  ✓ RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)
+  ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)
+  ✓ Env file: /home/lab-user/.acs-roadshow/env
+  ✓ Detailed log: /home/lab-user/.acs-roadshow/lab-environment-20261014-174611.log
+
+[lab-user@bastion ocp5-rhacs-showroom]$ 
 ----
 
 TIP: Feel free to sign into the consoles while the lab environment script runs in the background.
