@@ -35,6 +35,8 @@ The seed is too permissive. Your copy in `lw-poc-build` is the gate. Do not fetc
 
 == Discover the seed (do not paste the example)
 
+. Discover the seed (do not paste the example)
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-tasks get task conforma-policy
@@ -63,7 +65,7 @@ Named `verify-enterprise-contract`, `runAfter: [clone]` (before sign), fake `exa
 == Your change: copy, tighten, wire
 
 . Copy ConfigMap `conforma-policy` from `lightwell-tasks` into `lw-poc-build`. Do *not* edit the Argo-owned original.
-
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -81,8 +83,8 @@ oc -n lightwell-tasks get configmap conforma-policy -o yaml \
 
 Fail path is the in-cluster ImageStream `openjdk-21-builder` you imported in xref:tssc-08-forbid-list.adoc[4.1] — it is *not* signed with the RHTAS pipeline SA. It can pull (internal registry is allowed). Pass path is the 5.1 app digest. Do not use `docker.io/library/java:latest` (worked example; hermetic egress also blocks it from the build namespace).
 
-`ec` is on Showroom `PATH` (do not curl `github.com`). Initialize TUF and log in to the internal registry the same way as xref:tssc-12-sign-keyless.adoc[5.1]. Do *not* pass `--ignore-rekor` (Fulcio certs need Rekor timestamps) and do *not* pass `--skip-att-sig-check` (unknown on `ec` 0.7). `--strict=false` writes a report even when the attestation builtin fails; judge the files, not the exit code.
-
+. `ec` is on Showroom `PATH` (do not curl `github.com`). Initialize TUF and log in to the internal registry the same way as xref:tssc-12-sign-keyless.adoc[5.1]. Do *not* pass `--ignore-rekor` (Fulcio certs need Rekor timestamps) and do *not* pass `--skip-att-sig-check` (unknown on `ec` 0.7). `--strict=false` writes a report even when the attestation builtin fails; judge the files, not the exit code.
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -125,15 +127,6 @@ Pass when the builder report has `builtin.image.signature_check` as a `[Violatio
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/68
 image::conforma-fail-then-pass.png[Conforma fail on openjdk-21-builder then pass on signed app digest,width=700,link=self,window=blank]
-
-:report-name: report-13-attest-conforma
-:report-key: policy_owner
-:report-token: learner-copy
-include::partial$validate-job-report.adoc[]
-
-:validate-job: validate-13-attest-conforma
-:validate-job-template: job-13.yaml
-include::partial$validate-job-rerun.adoc[]
 
 Continue to xref:tssc-14-disconnected-verify.adoc[5.3] when you are ready. Track 6 still opens.
 

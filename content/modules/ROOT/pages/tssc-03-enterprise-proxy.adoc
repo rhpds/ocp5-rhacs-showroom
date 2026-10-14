@@ -46,7 +46,8 @@ Do *not* copy v1 `module-02-direct-vs-proxy.png` (different framing). The diagra
 
 == Discover Nexus (do not invent the host)
 
-.Userinfo: Nexus URL and channel names
+. Userinfo: Nexus URL and channel names
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
@@ -55,15 +56,16 @@ oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
 
 ConfigMap `lightwell-maven-settings` is a *reference* (repo ids and URLs). Copying it into `stub-03-enterprise-proxy` is not the Your change — complete the incomplete stub.
 
-.Peek at the reference (ids and URLs only)
+. Peek at the reference (ids and URLs only)
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap lightwell-maven-settings \
   -o jsonpath='{.data.settings\.xml}' | head -60
 ----
 
-Showroom home may not be writable for the Maven local repo. Use `/tmp`:
-
+. Showroom home may not be writable for the Maven local repo. Use `/tmp`
++
 [source,bash,role=execute]
 ----
 export MVN_LOCAL='-Dmaven.repo.local=/tmp/m2'
@@ -104,7 +106,8 @@ Fake host and repo id. If your scored `settings.xml` still uses this URL, the Ch
 
 The scored object is ConfigMap `stub-03-enterprise-proxy` in `lightwell-repo`. Extract it, replace every `REPLACE_ME_*` with values from userinfo (`nexus_url` plus `channel_validated` / `channel_remediated`), then write it back. Do not leave Maven Central as the only remote for the Lightwell profiles. Do not paste the `nexus.example.invalid` worked example.
 
-.Extract the incomplete seed
+. Extract the incomplete seed
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap stub-03-enterprise-proxy \
@@ -149,7 +152,8 @@ The seed looks like this (placeholders fail):
 </settings>
 ----
 
-.Write settings back to the ConfigMap
+. Write settings back to the ConfigMap
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo create configmap stub-03-enterprise-proxy \
@@ -160,8 +164,8 @@ grep -E 'REPLACE_ME' ~/track-2-1-settings.xml && echo 'STILL HAS PLACEHOLDERS' |
 
 == Check: Maven resolve from Nexus
 
-Resolve *Validated* `commons-lang3:3.14.0` (upstream line — not the `.rhlw-*` pin). The log must show your Nexus host, not `repo.maven.apache.org` as the source of that GAV.
-
+. Resolve *Validated* `commons-lang3:3.14.0` (upstream line — not the `.rhlw-*` pin). The log must show your Nexus host, not `repo.maven.apache.org` as the source of that GAV.
++
 [source,bash,role=execute]
 ----
 mvn -s ~/track-2-1-settings.xml ${MVN_LOCAL} -Plightwell-validated \
@@ -169,21 +173,12 @@ mvn -s ~/track-2-1-settings.xml ${MVN_LOCAL} -Plightwell-validated \
   -Dartifact=org.apache.commons:commons-lang3:3.14.0
 ----
 
-:report-name: report-03-enterprise-proxy
-:report-key: proxy_standin
-:report-token: nexus-stand-in
-include::partial$validate-job-report.adoc[]
-
-:validate-job: validate-03-enterprise-proxy
-:validate-job-template: job-03.yaml
-include::partial$validate-job-rerun.adoc[]
-
-Honor system: later modules still open if you skip this. The Validate Job grades the ConfigMap (Nexus host, no `REPLACE_ME`, not the worked-example URL). The `~/track-2-1-settings.xml` copy is for `mvn -s`.
+Honor system: later modules still open if you skip this. The ConfigMap must name your Nexus host, with no `REPLACE_ME` and not the worked-example URL. The `~/track-2-1-settings.xml` copy is for `mvn -s`.
 
 == Callout: pip.conf
 
-`pip.conf` is the analogue of `settings.xml`: `index-url` to Lightwell PyPI Validated (and a remediated file). ConfigMap `lightwell-pip-settings` shows the pattern. PEP 740 wheel attestations are the analogue of Maven GPG when the artifacts carry them — not this Check.
-
+. `pip.conf` is the analogue of `settings.xml`: `index-url` to Lightwell PyPI Validated (and a remediated file). ConfigMap `lightwell-pip-settings` shows the pattern. PEP 740 wheel attestations are the analogue of Maven GPG when the artifacts carry them — not this Check.
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap lightwell-pip-settings \

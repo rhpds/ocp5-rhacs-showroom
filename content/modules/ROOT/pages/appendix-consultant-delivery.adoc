@@ -253,7 +253,7 @@ You did *not* click every engagement activity. Use the *Playbook* / *Not on this
 
 == What this workshop does not include
 
-Student-facing table: xref:tssc-INDEX.adoc#what-this-workshop-does-not-include[What this workshop does not include].
+Student-facing list: xref:tssc-INDEX.adoc#what-this-workshop-does-not-include[What this workshop does not include].
 
 Remind the room: no Hummingbird factory, no hosted Konflux, no physical air-gap, no Artifactory or FastAPI on this environment, no unassisted customer exam, no production VM. SIEM / SOAR is also absent (table above).
 

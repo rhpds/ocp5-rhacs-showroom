@@ -31,8 +31,8 @@ The two-column picture is on xref:tssc-12-sign-keyless.adoc[5.1 Keyless vs keys]
 
 == Discover the 5.1 digest
 
-`cosign` is installed by Welcome xref:index.adoc#environment-setup[Environment setup] into `~/.local/bin`. Private keys never go in Git or a screenshot.
-
+. `cosign` is installed by Welcome xref:index.adoc#environment-setup[Environment setup] into `~/.local/bin`. Private keys never go in Git or a screenshot.
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -44,6 +44,8 @@ ls ~/lab-trust 2>/dev/null || echo 'lab-trust empty (expected before your change
 
 == Worked example (not the Check)
 
+. Worked example (not the Check)
++
 [source,bash]
 ----
 # Worked example ONLY — different directory and key name. Do not use as the Check.
@@ -56,8 +58,8 @@ cosign verify --key ~/example-not-lab-trust/demo.pub \
 
 == Your change: key pair, sign `--key`
 
-Empty password is for this lab terminal only so the execute block is non-interactive. Do not reuse that empty-password pattern when you issue keys for your own organization. Do not commit `cosign.key`. `export HOME=/tmp/lab-home` is only so `cosign login` does not write Docker config into the real home. Keep `--key` / `--from-file` on `/home/lab-user/lab-trust` (tilde follows `HOME`).
-
+. Empty password is for this lab terminal only so the execute block is non-interactive. Do not reuse that empty-password pattern when you issue keys for your own organization. Do not commit `cosign.key`. `export HOME=/tmp/lab-home` is only so `cosign login` does not write Docker config into the real home. Keep `--key` / `--from-file` on `/home/lab-user/lab-trust` (tilde follows `HOME`).
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -87,6 +89,8 @@ Pass when `~/lab-trust/cosign.pub` exists, `sign` exits 0, and ConfigMap `tssc-a
 
 == Check: `cosign verify --key`
 
+. Check: `cosign verify --key`
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -104,15 +108,6 @@ cosign verify --key "${LAB_TRUST}/cosign.pub" \
 ----
 
 Pass when that command exits 0 on *your* app digest using `/home/lab-user/lab-trust/cosign.pub`. 5.1 keyless verify must still be possible; do not strip the Fulcio signature.
-
-:report-name: report-14-disconnected-verify
-:report-key: diode_honest
-:report-token: not-air-gap
-include::partial$validate-job-report.adoc[]
-
-:validate-job: validate-14-disconnected-verify
-:validate-job-template: job-14.yaml
-include::partial$validate-job-rerun.adoc[]
 
 Continue to Track 6 when you are ready.
 

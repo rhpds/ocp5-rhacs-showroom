@@ -36,8 +36,8 @@ The CronJob retries about every 20 minutes.
 
 == Confirm the bot is on this cluster
 
-The chart is *default-off*. If the CronJob is missing, this cluster did not enable `components.renovate`. Tell an instructor. Do not fake a PR.
-
+. The chart is *default-off*. If the CronJob is missing, this cluster did not enable `components.renovate`. Tell an instructor. Do not fake a PR.
++
 [source,bash,role=execute]
 ----
 oc -n renovate get cronjob
@@ -48,8 +48,8 @@ oc -n renovate get configmap renovate-docs \
 
 == Worked example (not the Check)
 
-A hand commit by `student` on `pom.xml` / Jackson. If that is what landed on `main`, the Check fails.
-
+. A hand commit by `student` on `pom.xml` / Jackson. If that is what landed on `main`, the Check fails.
++
 [source,bash]
 ----
 # Worked example ONLY — wrong author, wrong file. Do not commit this as the Check.
@@ -68,7 +68,8 @@ image::gitea-renovate-bot-pr.png[Gitea pull request authored by renovate-bot on 
 
 If no PR yet: wait for the next CronJob; check Job logs in namespace `renovate`. Maven bump should appear once Nexus remotes are up. Dest Docker bump needs 1.2. Retry. Do *not* push a student commit that edits the pins file.
 
-.After merge, refresh the clone
+. After merge, refresh the clone
++
 [source,bash,role=execute]
 ----
 cd /tmp/spring-boot-lw-poc
@@ -87,16 +88,7 @@ Pass when:
 * `lightwell-pins.properties` moved off `rhlw-00000` / all-zero digest
 * You did not recreate that diff as a hand commit
 
-:report-name: report-07-live-renovate
-:report-key: who_changed_pins
-:report-token: renovate-bot
-include::partial$validate-job-report.adoc[]
-
-:validate-job: validate-07-live-renovate
-:validate-job-template: job-07.yaml
-include::partial$validate-job-rerun.adoc[]
-
-Honor system: Track 4 still opens. The Validate Job still rejects a seeded or student-authored pin bump.
+Honor system: Track 4 still opens. A seeded or student-authored pin bump still fails this lab.
 
 == Callout: pip pins
 

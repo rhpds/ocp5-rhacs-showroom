@@ -119,8 +119,9 @@ Environment:
   LIGHTSPEED_MODEL          Optional. Defaults: OpenAI and Azure gpt-6.1-sol,
                             Anthropic claude-sonnet-5-5, Gemini gemini-3.8-flash.
                             Required for other.
-  LIGHTSPEED_API_URL        Optional for OpenAI, Anthropic, and Gemini.
-                            Required for Azure AI and Other.
+  LIGHTSPEED_API_URL        Optional. OpenAI, Anthropic, Gemini, and Azure AI
+                            have defaults. Required for Other. Set this to
+                            override the default.
   LIGHTSPEED_AZURE_DEPLOYMENT
                             Optional. Defaults to the model name.
   LIGHTSPEED_AZURE_API_VERSION
@@ -474,6 +475,9 @@ lightspeed_apply_default_url() {
     gemini)
       url="https://generativelanguage.googleapis.com/v1beta/openai/"
       ;;
+    azure_openai)
+      url="https://my-resource.openai.azure.com"
+      ;;
   esac
 }
 
@@ -512,12 +516,16 @@ lightspeed_apply_defaults() {
   fi
 }
 
-# Known providers need only the API key. Azure still needs the resource
-# endpoint. Other needs an endpoint and a model name.
+# Known providers need only the API key. Azure shows its default endpoint;
+# Enter keeps it and a typed URL replaces it. Other needs an endpoint and a model name.
 lightspeed_prompt_provider_fields() {
+  local entered=""
   if [[ "${provider}" == "azure_openai" ]]; then
-    if [[ -z "${url}" && "${interactive}" == true ]]; then
-      lightspeed_tty_prompt url "Azure resource endpoint (https://my-resource.openai.azure.com): "
+    if [[ "${interactive}" == true && "${url_from_env}" != true ]]; then
+      lightspeed_tty_prompt entered "Azure resource endpoint [${url}]: "
+      if [[ -n "${entered}" ]]; then
+        url="${entered}"
+      fi
     fi
     return 0
   fi
@@ -967,7 +975,7 @@ configure_lightspeed_token() {
     choice_label="current provider"
   else
     echo "Error: Lightspeed is not configured. Set LIGHTSPEED_PROVIDER (openai, azure_openai, anthropic, gemini, or other) and LIGHTSPEED_API_TOKEN." >&2
-    echo "The script selects the model. Azure AI and Other also need LIGHTSPEED_API_URL. Other also needs LIGHTSPEED_MODEL." >&2
+    echo "The script selects the model and endpoint. Other also needs LIGHTSPEED_API_URL and LIGHTSPEED_MODEL." >&2
     return 1
   fi
 

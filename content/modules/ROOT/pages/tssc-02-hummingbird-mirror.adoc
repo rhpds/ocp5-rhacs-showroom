@@ -5,18 +5,19 @@
 
 == Overview
 
-The dest Docker repo `hummingbird-mirror` starts empty. You finish the incomplete `ImageSetConfiguration`, start the learner Job from ConfigMap `oc-mirror-tooling`, and `cosign verify` the *internal* digest you record. You already verified the published pin in xref:tssc-01-hummingbird-verify.adoc[1.1]. This Check is the digest inside the enterprise.
+The destination container repository `hummingbird-mirror` starts empty. 
+
+In this module, you will finish the incomplete `ImageSetConfiguration`, start the learner Job from ConfigMap `oc-mirror-tooling`, and `cosign verify` the *internal* digest you record.
 
 == Why it matters
 
-Builds, GitOps, and admission must pull a dest digest inside the enterprise. They must not pull `registry.access.redhat.com` at build time. Signatures need to land on dest with the image so you can still verify after the mirror.
+Builds, GitOps, and admission must pull a destination container image digest inside the enterprise. Signatures need to be linked to the container image with the image itself so you can still verify after the mirror.
 
 == What does it solve
 
-* Catalog images that never entered your registry
+* Catalog images that never entered your container registry
 * Signatures stripped on mirror
 * Treating public verify as enough
-* Confusing the Lightwell Maven path with the Docker dest
 
 == Why dest is empty
 
@@ -25,76 +26,54 @@ An enterprise DMZ host runs `oc-mirror`. This Showroom is the in-cluster stand-i
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/49
 image::hummingbird-published-vs-dest.png[Published Hummingbird digest versus internal dest digest after learner oc-mirror,width=700,link=self,window=blank]
 
-[NOTE]
-====
-A Python Hummingbird base uses the same ImageSet pin-and-mirror idea. This Check is the Java `hi/openjdk` dest digest.
-====
-
 == Discover dest + incomplete ImageSet
 
-.Dest host and empty-repo name (do not invent a registry)
+. Dest host and empty-repo name (do not invent a registry)
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
   -o jsonpath='dest={.data.dest_registry_host}{"\n"}repo={.data.dest_registry_repo}{"\n"}docker={.data.dest_registry_docker}{"\n"}pre_mirror={.data.oc_mirror_pre_stage_scored_image}{"\n"}'
 ----
 
-.Seed ImageSet (scored ConfigMap — still has the placeholder)
+. Seed ImageSet (scored ConfigMap — still has the placeholder)
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap imageset-configuration \
   -o jsonpath='{.data.imageset-config\.yaml}'
 ----
 
-.Cluster copy of the worked example (do not paste into the scored ConfigMap)
+. Cluster copy of the worked example (do not paste into the scored ConfigMap)
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap oc-mirror-tooling \
   -o jsonpath='{.data.example-imageset\.yaml}'
 ----
 
-== Worked example (not the Check)
+== Your task: ImageSet
 
-UBI, not Hummingbird. If `imageset-configuration` still names this image, the Check fails.
-
-[source,yaml]
-----
-# Worked example ONLY — ubi-minimal. The scored ImageSet must be the Hummingbird digest pin.
-kind: ImageSetConfiguration
-apiVersion: mirror.openshift.io/v2alpha1
-mirror:
-  additionalImages:
-    - name: registry.access.redhat.com/ubi9/ubi-minimal:latest
-----
-
-== Your change: ImageSet
-
-.Copy the live pin into a note (same key as 1.1)
+. Copy the pin to add to the ImageSet
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
   -o jsonpath='{.data.hummingbird_source_pullspec}{"\n"}'
 ----
 
-Edit ConfigMap `imageset-configuration` in namespace `lightwell-repo` so `mirror.additionalImages[0].name` is that pull spec (digest, not `:latest`). The seed looks like:
-
-[source,yaml]
+. Edit ConfigMap `imageset-configuration` in namespace `lightwell-repo` so `mirror.additionalImages[0].name` is that pull spec (digest, not `:latest`). 
++
+[source,bash,role=execute]
 ----
-kind: ImageSetConfiguration
-apiVersion: mirror.openshift.io/v2alpha1
-mirror:
-  additionalImages:
-    - name: REPLACE_ME_HUMMINGBIRD_PULLSPEC
+oc -n lightwell-repo edit configmap imageset-configuration
 ----
-
-Use `oc -n lightwell-repo edit configmap imageset-configuration` and change only that `name:` line. Do not copy `example-imageset.yaml` over the scored key.
-
-The Job does *not* pass `--remove-signatures`. oc-mirror v2 still cannot land OCI referrers on this Nexus Docker dest, so the Job copies the image first, then copies tag-based signatures (`.sig` / `.att` / `.sbom`) with `cosign copy`. Do not add a flag that strips signatures.
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/54
 image::imageset-hummingbird-filled.png[ImageSetConfiguration after REPLACE_ME is replaced with the workshop Hummingbird pin,width=700,link=self,window=blank]
 
-.Confirm the placeholder is gone
+. Confirm the placeholder is gone
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap imageset-configuration \
@@ -102,11 +81,12 @@ oc -n lightwell-repo get configmap imageset-configuration \
   && echo 'STILL HAS PLACEHOLDERS' || echo 'placeholders gone'
 ----
 
-== Run oc-mirror (learner Job)
+== Run oc-mirror
 
 `oc-mirror` is on Showroom `PATH`, but the scored run is the in-cluster Job so dest credentials and the workspace PVC are already wired.
 
-.Delete a previous attempt if the Job name already exists, then create from tooling
+. Delete a previous attempt if the Job name already exists, then create from tooling
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo delete job oc-mirror-learner --ignore-not-found
@@ -114,34 +94,36 @@ oc -n lightwell-repo get configmap oc-mirror-tooling \
   -o jsonpath='{.data.job\.yaml}' | oc create -f -
 ----
 
-.Wait for completion (mirror + signatures can take several minutes)
+. Wait for completion (mirror + signatures can take several minutes)
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo wait --for=condition=complete job/oc-mirror-learner --timeout=20m
 ----
 
-.Read oc-mirror logs for the dest image, then the signature-copy container
+. Read oc-mirror logs for the dest image, then the signature-copy container
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo logs job/oc-mirror-learner -c oc-mirror
 oc -n lightwell-repo logs job/oc-mirror-learner -c copy-signatures
 ----
 
-Record the *dest* digest from those logs (or dest registry metadata). Do not reuse only the 1.1 published digest as proof that dest is populated.
+. Record the *dest* digest from those logs (or dest registry metadata).
 
-== Check: internal `cosign verify`
+== Time to verify with internal `cosign verify`
 
 Build a dest pull spec from:
 
 * `dest_registry_host` (userinfo)
-* image path `hi/openjdk` (not the Nexus Docker repo name `dest_registry_repo` / `hummingbird-mirror`)
+* image path `hi/openjdk`
 * the dest digest *you recorded from the Job*
 
 Or copy the `DEST_PULLSPEC=` line from the `copy-signatures` container log.
 
-Then verify with the same Red Hat Hardened Images public key as 1.1. Dest TLS is lab-internal; allow an insecure registry if `cosign` requires it:
-
-[source,bash]
+. Then verify with the same Red Hat Hardened Images public key as 1.1. Dest TLS is lab-internal; allow an insecure registry if `cosign` requires it
++
+[source,bash,role=execute]
 ----
 # Stub — fill DEST_PULLSPEC from Job logs + dest_registry_host. Not the worked UBI example.
 export DEST_PULLSPEC='REPLACE_ME_DEST_PULLSPEC'
@@ -151,15 +133,6 @@ cosign verify \
   --insecure-ignore-tlog \
   "${DEST_PULLSPEC}"
 ----
-
-:report-name: report-02-hummingbird-mirror
-:report-key: learner_runs_mirror
-:report-token: learner-mirror
-include::partial$validate-job-report.adoc[]
-
-:validate-job: validate-02-hummingbird-mirror
-:validate-job-template: job-02.yaml
-include::partial$validate-job-rerun.adoc[]
 
 Honor system: you can open Track 2 without a UI lock. The Check is still: ImageSet has no `REPLACE_ME`, Job `oc-mirror-learner` completed, and `cosign verify` used the *internal* digest.
 

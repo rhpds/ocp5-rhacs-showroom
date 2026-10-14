@@ -34,29 +34,32 @@ image::osv-fixed-to-rhlw-pin.png[OSV fixed event mapped to a Maven default .rhlw
 
 == Discover the scored OSV (do not use the spring-core sample as the pin)
 
-.Userinfo keys for the Track 2 / Track 7 GAV
+. Userinfo keys for the Track 2 / Track 7 GAV
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
   -o jsonpath='id={.data.scored_vex_id}{"\n"}gav={.data.scored_vex_gav}{"\n"}base={.data.scored_vex_base_version}{"\n"}'
 ----
 
-.Scored OSV JSON — read `affected[].ranges[].events[].fixed`
+. Scored OSV JSON — read `affected[].ranges[].events[].fixed`
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap lightwell-repo-seed \
   -o jsonpath='{.data.LW-DEMO-0002\.json}'
 ----
 
-.Worked example OSV (different GAV — pasting its `fixed` into your pom still fails)
+. Worked example OSV (different GAV — pasting its `fixed` into your pom still fails)
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap lightwell-sample-osv \
   -o jsonpath='{.data.LW-DEMO-0001\.json}'
 ----
 
-Reuse 2.1 settings and a writable local repo:
-
+. Reuse 2.1 settings and a writable local repo
++
 [source,bash,role=execute]
 ----
 export MVN_LOCAL='-Dmaven.repo.local=/tmp/m2'
@@ -79,7 +82,8 @@ Spring-core / `LW-DEMO-0001`. If the default property on `stub-04-remediated-pin
 
 The scored object is ConfigMap `stub-04-remediated-pin` in `lightwell-repo`. Extract it to `~/track-2-2/pom.xml`. The stub’s *default* property is the affected upstream line. Change *only* that default to the `fixed` version from `LW-DEMO-0002`, then write the ConfigMap back. Do not rely on a profile id that already embeds the pin.
 
-.Extract the incomplete seed
+. Extract the incomplete seed
++
 [source,bash,role=execute]
 ----
 mkdir -p ~/track-2-2
@@ -121,7 +125,8 @@ Worked example pin (wrong GAV):
 <commons.lang3.version>5.3.18.rhlw-00003</commons.lang3.version>
 ----
 
-.Write the pom back to the ConfigMap (after you replace `3.14.0` with the LW-DEMO-0002 fixed version)
+. Write the pom back to the ConfigMap (after you replace `3.14.0` with the LW-DEMO-0002 fixed version)
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo create configmap stub-04-remediated-pin \
@@ -132,8 +137,8 @@ grep commons.lang3.version ~/track-2-2/pom.xml
 
 == Check: dependency tree shows `.rhlw-*` from Nexus
 
-Use the *remediated* profile from 2.1 settings so the GAV comes from Nexus, not Central.
-
+. Use the *remediated* profile from 2.1 settings so the GAV comes from Nexus, not Central.
++
 [source,bash,role=execute]
 ----
 mvn -s ~/track-2-1-settings.xml ${MVN_LOCAL} -f ~/track-2-2/pom.xml \
@@ -142,16 +147,7 @@ mvn -s ~/track-2-1-settings.xml ${MVN_LOCAL} -f ~/track-2-2/pom.xml \
 
 You should see `org.apache.commons:commons-lang3:jar:3.14.0.rhlw-00001` and a download path on your Nexus host. A tree that still shows plain `3.14.0`, `3.18.0`, or `5.3.18.rhlw-00003`, fails.
 
-:report-name: report-04-remediated-pin
-:report-key: pin_kind
-:report-token: exact-version
-include::partial$validate-job-report.adoc[]
-
-:validate-job: validate-04-remediated-pin
-:validate-job-template: job-04.yaml
-include::partial$validate-job-rerun.adoc[]
-
-Honor system: Track 3 still opens. The Validate Job grades the ConfigMap default property. The `~/track-2-2/pom.xml` copy is for `mvn -f`.
+Honor system: Track 3 still opens. The ConfigMap default property is the pin. The `~/track-2-2/pom.xml` copy is for `mvn -f`.
 
 Do *not*:
 

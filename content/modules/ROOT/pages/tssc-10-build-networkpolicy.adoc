@@ -28,6 +28,8 @@ image::np-build-vs-app-operate.png[build-egress hermetic versus app-operate on s
 
 == Discover seed + allow-list hints
 
+. Discover seed + allow-list hints
++
 [source,bash,role=execute]
 ----
 oc -n lw-poc-build get networkpolicy build-egress -o yaml
@@ -68,8 +70,8 @@ Allow-list (from userinfo keys — do not invent CIDRs except the kube API Clust
 * `trusted-artifact-signer` TCP `8080` (TUF), `5555` (Fulcio HTTP), `5554` (Fulcio gRPC), `3000` (Rekor)
 * `trusted-profile-analyzer` TCP `8080` (TPA Service is `443` → pod `8080`)
 
-Discover the API addresses (they differ per cluster).
-
+. Discover the API addresses (they differ per cluster).
++
 [source,bash,role=execute]
 ----
 oc -n default get svc kubernetes -o jsonpath='clusterIP={.spec.clusterIP} port={.spec.ports[0].port}{"\n"}'
@@ -78,8 +80,8 @@ oc -n default get endpoints kubernetes -o jsonpath='{.subsets[*].addresses[*].ip
 
 == Your change: tighten `build-egress`
 
-Replace the seed `egress: [ {} ]` with deny-by-default plus the destinations above (`namespaceSelector` on those namespaces, matching **pod** ports from userinfo, plus `ipBlock` `/32` for the kube API ClusterIP and endpoint IPs). Do not add `registry.redhat.io` or a public CIDR. Do not rely on `namespaceSelector: openshift-ingress` for Routes — Route hostnames resolve to the ingress VIP, which that selector does not match. After 4.3, 4.4 must use in-cluster Gitea (`student_repo_internal_url`) and Nexus (`nexus_internal_url`), not HTTPS Routes. Pipeline ACS / keyless sign / TPA need the stackrox / RHTAS / TPA pod ports — Service port 80 or 443 is not enough.
-
+. Replace the seed `egress: [ {} ]` with deny-by-default plus the destinations above (`namespaceSelector` on those namespaces, matching **pod** ports from userinfo, plus `ipBlock` `/32` for the kube API ClusterIP and endpoint IPs). Do not add `registry.redhat.io` or a public CIDR. Do not rely on `namespaceSelector: openshift-ingress` for Routes — Route hostnames resolve to the ingress VIP, which that selector does not match. After 4.3, 4.4 must use in-cluster Gitea (`student_repo_internal_url`) and Nexus (`nexus_internal_url`), not HTTPS Routes. Pipeline ACS / keyless sign / TPA need the stackrox / RHTAS / TPA pod ports — Service port 80 or 443 is not enough.
++
 [source,bash,role=execute]
 ----
 oc -n lw-poc-build get networkpolicy build-egress -o yaml
@@ -99,15 +101,6 @@ Pass when:
 After this tighten, a PipelineRun that still clones the Gitea HTTPS Route or resolves Maven from Central *will* hang or fail. That is the lesson, not a reason to reopen egress.
 
 `build-egress` applies to *pods* in `lw-poc-build`. Node/kubelet image pulls (Task step images, some BuildConfig strategy pulls) are not that NetworkPolicy. The prefetch Task image (`registry.access.redhat.com/ubi9/openjdk-21`) can still land after 4.3; xref:tssc-08-forbid-list.adoc[4.1]'s ImageStream import is what keeps the Dockerfile `FROM` internal. Do not add `registry.redhat.io` to the allow-list because a Task step pulled.
-
-:report-name: report-10-build-networkpolicy
-:report-key: np_scope
-:report-token: build-ns
-include::partial$validate-job-report.adoc[]
-
-:validate-job: validate-10-build-networkpolicy
-:validate-job-template: job-10.yaml
-include::partial$validate-job-rerun.adoc[]
 
 Honor system: 4.4 still opens. The Check grades the live NetworkPolicy, not a YAML screenshot.
 

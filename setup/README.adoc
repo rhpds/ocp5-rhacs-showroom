@@ -97,10 +97,10 @@ Unattended runs can export the provider before the script. When `LIGHTSPEED_API_
 ----
 export LIGHTSPEED_API_TOKEN='...'
 export LIGHTSPEED_PROVIDER=openai          # openai, azure_openai, anthropic, gemini, other, or keep
-# Optional. Defaults: OpenAI and Azure gpt-6.1-sol, Anthropic claude-sonnet-5-5,
-# Gemini gemini-3.8-flash. OpenAI, Anthropic, and Gemini use their public endpoints.
+# Optional overrides. Defaults: OpenAI and Azure gpt-6.1-sol, Anthropic claude-sonnet-5-5,
+# Gemini gemini-3.8-flash. Endpoints default to the public OpenAI, Anthropic, and Gemini
+# URLs, and Azure to https://my-resource.openai.azure.com. Enter accepts a shown default.
 # export LIGHTSPEED_MODEL=gpt-6.1-sol
-# Azure AI needs the resource endpoint. The deployment name defaults to the model.
 # export LIGHTSPEED_API_URL=https://my-resource.openai.azure.com
 # export LIGHTSPEED_AZURE_DEPLOYMENT=gpt-6.1-sol
 # Other needs LIGHTSPEED_API_URL and LIGHTSPEED_MODEL.

@@ -35,6 +35,8 @@ image::tssc-artifact-trust-chain.png[End-state trust chain: Hummingbird digest, 
 
 == Discover the scored VEX (not the spring-core sample)
 
+. Discover the scored VEX (not the spring-core sample)
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
@@ -63,7 +65,7 @@ remediation: via-upstream
 . Download Maven classifier `cdx` from the userinfo URL (Nexus Remediated) and POST it to TPA `/api/v3/sbom`. The companion `-vex.json` classifier is **OpenVEX** — TPA does not accept OpenVEX as an SBOM or as `/api/v3/advisory` (that path is CSAF, CVE, or OSV only). Ingest the scored **OSV** document instead (`scored_vex_osv` / `LW-DEMO-0002.json`). Do not scrape CSAF. Do not POST OpenVEX to `/api/v3/sbom`.
 
 . Upload the CycloneDX file to `/api/v3/sbom` and the OSV file to `/api/v3/advisory` (same SoR as 7.1). Provision does *not* pre-ingest them. Keep `live_csaf_gate=false`.
-
++
 [source,bash,role=execute]
 ----
 CDX_URL="$(oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo -o jsonpath='{.data.scored_vex_maven_cdx}')"
@@ -106,7 +108,8 @@ remediation: REPLACE_ME_VIA
 
 Fill with `LW-DEMO-0002`, the remediated GAV (include `3.14.0.rhlw-00001`), status `fixed` (or `not_affected` if the VEX statement uses that), and remediation `via-lightwell-pin`. Do *not* claim the upstream `3.14.0` is fixed. Do *not* use `LW-DEMO-0001`.
 
-.Extract the incomplete seed, then write it back after you fill the keys
+. Extract the incomplete seed, then write it back after you fill the keys
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap stub-18-blast-radius \
@@ -121,6 +124,8 @@ oc -n lightwell-repo create configmap stub-18-blast-radius \
 
 == Check: report tokens + ACS not skipped
 
+. Check: report tokens + ACS not skipped
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -134,15 +139,6 @@ oc -n "${BUILD_NS}" get tr -l tekton.dev/pipelineTask=acs-image-check
 ----
 
 Pass when: Nexus GAV files were ingested; the report has the scored id + GAV + via-Lightwell token and no `REPLACE_ME`; `acs-image-check` is not `skipped`; CSAF importer is still off.
-
-:report-name: report-18-vex-acs
-:report-key: vex_layer
-:report-token: gav-bound
-include::partial$validate-job-report.adoc[]
-
-:validate-job: validate-18-vex-acs
-:validate-job-template: job-18.yaml
-include::partial$validate-job-rerun.adoc[]
 
 == Official documentation
 

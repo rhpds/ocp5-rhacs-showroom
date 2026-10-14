@@ -32,6 +32,8 @@ image::gitea-templates-vs-learner-org.png[workshop-templates versus your lw-stud
 
 == Discover Gitea (never paste a hostname from this page)
 
+. Discover Gitea (never paste a hostname from this page)
++
 [source,bash,role=execute]
 ----
 oc -n gitea get configmap demo-userinfo-gitea \
@@ -40,7 +42,8 @@ oc -n gitea get configmap demo-userinfo-gitea \
 
 Expect user `student` and org `lw-student`. The Gitea password is the *value* of ConfigMap key `student_password` (not the key name). Do not put that value in Git or a screenshot.
 
-.Ensure the Gitea user can sign in (no-op if the seed Job already created the account)
+. Ensure the Gitea user can sign in (no-op if the seed Job already created the account)
++
 [source,bash,role=execute]
 ----
 export STUDENT_USER=student
@@ -57,8 +60,8 @@ Open `gitea_url` and sign in as `student` with the password value from that Conf
 
 == Worked example (not the Check)
 
-GitHub or the operator template org. If `student_repo_url` still points here, the Check fails.
-
+. GitHub or the operator template org. If `student_repo_url` still points here, the Check fails.
++
 [source,bash]
 ----
 # Worked example ONLY — not the scored remote.
@@ -79,8 +82,8 @@ image::gitea-new-org-lw-student.png[Gitea New Organization form with name lw-stu
 * `gitops-spring-boot-lw-poc` (stage)
 * `gitops-prod-spring-boot-lw-poc` (prod)
 
-. Seed from templates (adds `renovate-bot` as a write collaborator on the app repo):
-
+. Seed from templates (adds `renovate-bot` as a write collaborator on the app repo)
++
 [source,bash,role=execute]
 ----
 export STUDENT_USER=student
@@ -95,6 +98,8 @@ chmod +x /tmp/learner-seed.sh
 
 == Check: your remote exists and is not the template org
 
+. Check: your remote exists and is not the template org
++
 [source,bash,role=execute]
 ----
 oc -n gitea get configmap demo-userinfo-gitea \
@@ -108,16 +113,7 @@ Expect HTTP `200` on `student_repo_url`. Open `lw-student/spring-boot-lw-poc` an
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/62
 image::gitea-seeded-app-root.png[Seeded lw-student spring-boot-lw-poc repository root showing pom.xml,width=700,link=self,window=blank]
 
-:report-name: report-05-golden-path-source
-:report-key: git_home
-:report-token: gitea-not-github
-include::partial$validate-job-report.adoc[]
-
-:validate-job: validate-05-golden-path-source
-:validate-job-template: job-05.yaml
-include::partial$validate-job-rerun.adoc[]
-
-Honor system: 3.2 still opens. The Validate Job grades the Gitea remotes, not a screenshot.
+Honor system: 3.2 still opens. The Gitea remotes are the check, not a screenshot.
 
 == Callout: RHDH (optional)
 

@@ -44,6 +44,8 @@ A Buildah task that never creates ImageStream `spring-boot-lw-poc`. Paste-identi
 
 == Your change: successful pipeline in the build namespace
 
+. Your change: successful pipeline in the build namespace
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -56,8 +58,8 @@ oc -n "${BUILD_NS}" apply -f /tmp/spring-boot-lw-poc/.tekton/pipeline.yaml
 
 Edit `.tekton/pipelinerun.yaml`: replace `STUDENT_REPO_URL_PLACEHOLDER` with `student_repo_internal_url` (`http://gitea.gitea.svc:3000/…` — the HTTPS Route is blocked after 4.3), replace `<lab-namespace>` with `lw-poc-build`, and fill Fulcio/Rekor/TUF from `demo-userinfo-rhtas` **`fulcio_internal_url` / `rekor_internal_url` / `tuf_internal_url`** (in-cluster Services). Route hints (`fulcio_url_hint`) fail after 4.3. Leave syft `rhtpa-url` empty — Track 7 uploads from Showroom.
 
-Check 12 (xref:tssc-12-sign-keyless.adoc[5.1]) reads this file from *Gitea*, not the live PipelineRun. `oc create` alone leaves the placeholder on origin. Commit and push *before* you create the run:
-
+. Check 12 (xref:tssc-12-sign-keyless.adoc[5.1]) reads this file from *Gitea*, not the live PipelineRun. `oc create` alone leaves the placeholder on origin. Commit and push *before* you create the run
++
 [source,bash,role=execute]
 ----
 cd /tmp/spring-boot-lw-poc
@@ -68,8 +70,8 @@ git commit -m "Fill PipelineRun in-cluster repo, namespace, and RHTAS URLs"
 git push origin HEAD
 ----
 
-Then create the PipelineRun from the filled file:
-
+. Then create the PipelineRun from the filled file
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -84,6 +86,8 @@ image::pipelinerun-buildconfig-sbom.png[PipelineRun graph with BuildConfig and S
 
 == Check: image + SBOM; known-bad still fails
 
+. Check: image + SBOM; known-bad still fails
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -93,8 +97,8 @@ oc -n "${BUILD_NS}" get pipelinerun
 oc -n "${BUILD_NS}" get tr -l tekton.dev/pipelineTask=syft-sbom-rhtpa
 ----
 
-Known-bad: patch the BuildConfig Dockerfile, start a binary build, then restore the good path. `oc start-build` has no `-DdockerfilePath`. The first `registry-1.docker.io` / `dial tcp …:443: i/o timeout` is the fail — press **Ctrl-C**. That only stops `--follow`; OpenShift keeps retrying the pull for many minutes and **queues** later Binary builds (5.2 / 7.2 PipelineRuns). Cancel the Build, then restore `dockerfilePath`.
-
+. Known-bad: patch the BuildConfig Dockerfile, start a binary build, then restore the good path. `oc start-build` has no `-DdockerfilePath`. The first `registry-1.docker.io` / `dial tcp …:443: i/o timeout` is the fail — press **Ctrl-C**. That only stops `--follow`; OpenShift keeps retrying the pull for many minutes and **queues** later Binary builds (5.2 / 7.2 PipelineRuns). Cancel the Build, then restore `dockerfilePath`.
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -110,15 +114,6 @@ oc -n "${BUILD_NS}" patch bc spring-boot-lw-poc --type=json \
 ----
 
 It must fail (public `FROM` / `curl` after 4.1–4.3). Do not leave the BuildConfig pointed at the known-bad file, and do not leave a Running known-bad Build.
-
-:report-name: report-11-build-sbom
-:report-key: image_builder
-:report-token: buildconfig
-include::partial$validate-job-report.adoc[]
-
-:validate-job: validate-11-build-sbom
-:validate-job-template: job-11.yaml
-include::partial$validate-job-rerun.adoc[]
 
 Honor system: Track 5 still opens.
 

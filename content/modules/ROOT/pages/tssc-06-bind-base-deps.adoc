@@ -30,6 +30,8 @@ image::hummingbird-published-vs-dest.png[Published Hummingbird versus dest diges
 
 == Clone your app remote
 
+. Clone your app remote
++
 [source,bash,role=execute]
 ----
 export STUDENT_USER=student
@@ -46,7 +48,8 @@ cat lightwell-pins.properties
 
 Expect runtime `FROM` `ubi9/openjdk-21-runtime` and a default `commons.lang3.version` of `3.14.0` (affected upstream). `3.18.0` (or any newer Central line) is the wrong fix. The pin is not yet `3.14.0.rhlw-00001`. Pins file should still show `3.14.0.rhlw-00000` and an all-zero Hummingbird digest.
 
-.Dest host (runtime FROM registry). `dest_registry_repo` is the Nexus Docker *repository name* (`hummingbird-mirror`), not the image path. Dest image path is `hi/openjdk`. Prefer the `DEST_PULLSPEC=` line from the 1.2 `copy-signatures` Job log.
+. Dest host (runtime FROM registry). `dest_registry_repo` is the Nexus Docker *repository name* (`hummingbird-mirror`), not the image path. Dest image path is `hi/openjdk`. Prefer the `DEST_PULLSPEC=` line from the 1.2 `copy-signatures` Job log.
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
@@ -72,7 +75,8 @@ FROM registry.example.invalid/not-hummingbird:latest
 
 . Do *not* edit `lightwell-pins.properties`.
 
-.If `git commit` reports unknown author identity, or `git push` cannot read a username (Showroom has no TTY for HTTPS auth)
+. If `git commit` reports unknown author identity, or `git push` cannot read a username (Showroom has no TTY for HTTPS auth)
++
 [source,bash,role=execute]
 ----
 cd /tmp/spring-boot-lw-poc
@@ -86,8 +90,8 @@ hostpath="${hostpath#http://}"
 git remote set-url origin "https://${STUDENT_USER}:${STUDENT_PASS}@${hostpath}"
 ----
 
-A later Showroom restart stores the same author and Gitea credentials in `~/.gitconfig` so later modules can keep `git commit` / `git push origin HEAD` as written.
-
+. A later Showroom restart stores the same author and Gitea credentials in `~/.gitconfig` so later modules can keep `git commit` / `git push origin HEAD` as written.
++
 [source,bash,role=execute]
 ----
 cd /tmp/spring-boot-lw-poc
@@ -100,6 +104,8 @@ git push origin HEAD
 
 == Check: committed files on your remote
 
+. Check: committed files on your remote
++
 [source,bash,role=execute]
 ----
 cd /tmp/spring-boot-lw-poc
@@ -114,15 +120,6 @@ Pass when:
 * Runtime `FROM` is dest registry + `hi/openjdk` + digest (not `hummingbird-mirror`, not `ubi9/openjdk-21-runtime`, not the worked-example host)
 * Default pom property is `3.14.0.rhlw-00001`
 * `lightwell-pins.properties` is still stale (bot work)
-
-:report-name: report-06-bind-base-deps
-:report-key: runtime_from
-:report-token: dest-digest
-include::partial$validate-job-report.adoc[]
-
-:validate-job: validate-06-bind-base-deps
-:validate-job-template: job-06.yaml
-include::partial$validate-job-rerun.adoc[]
 
 Honor system: 3.3 still opens. Still-UBI runtime `FROM` fails this Check.
 

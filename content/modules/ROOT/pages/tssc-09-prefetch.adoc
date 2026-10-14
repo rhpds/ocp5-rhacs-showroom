@@ -30,6 +30,8 @@ Do not pull `quay.io/konflux-ci/hermeto`. Do not rename the cluster object `herm
 
 == Discover the Task
 
+. Discover the Task
++
 [source,bash,role=execute]
 ----
 oc -n lightwell-tasks get task prefetch-dependencies
@@ -68,8 +70,8 @@ COPY .m2-offline ./.m2-offline
 RUN mvn -B -o -s settings.xml -Dmaven.repo.local=.m2-offline -DskipTests package
 ----
 
-. Commit and push. Apply the Pipeline (not yet the successful 4.4 run) in `lw-poc-build` if it is not applied:
-
+. Commit and push. Apply the Pipeline (not yet the successful 4.4 run) in `lw-poc-build` if it is not applied
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -82,6 +84,8 @@ oc -n "${BUILD_NS}" apply -f .tekton/pipeline.yaml
 
 == Check: Task wired; Central gone
 
+. Check: Task wired; Central gone
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -93,15 +97,6 @@ git show HEAD:Dockerfile | grep -E 'COPY .*m2-offline'
 ----
 
 Pass when the live Pipeline includes `prefetch-dependencies` before `openshift-build`, settings have no Central, and the Dockerfile `COPY`s `.m2-offline` and uses `mvn -o`. Empty prefetch dir / undeclared deps fail later on `mvn -o`.
-
-:report-name: report-09-prefetch
-:report-key: hermeto_maps_to
-:report-token: prefetch-dependencies
-include::partial$validate-job-report.adoc[]
-
-:validate-job: validate-09-prefetch
-:validate-job-template: job-09.yaml
-include::partial$validate-job-rerun.adoc[]
 
 Honor system: 4.3 still opens.
 

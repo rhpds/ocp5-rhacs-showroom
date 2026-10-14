@@ -22,7 +22,7 @@ The following script asks you to choose the Lightspeed LLM provider and paste th
 
 OpenShift Lightspeed uses an LLM API key. The choice is cluster-wide, meaning everyone on this cluster shares the provider you save. Press Enter at the token prompt to leave Lightspeed unchanged.
 
-Choose OpenAI, Azure AI, Anthropic, Google Gemini, or Other, then paste that provider's API key. The script selects the model and the public endpoint. Azure AI also asks for the resource endpoint. Other asks for the endpoint and model name.
+Choose OpenAI, Azure AI, Anthropic, Google Gemini, or Other, then paste that provider's API key. The script selects the model and the endpoint. Press Enter to accept a shown default, or type a value to replace it. Other asks for the endpoint and model name.
 
 When a provider is already saved, the script also offers *Keep the current provider*. That stores a new key and leaves the provider and model as they are.
 

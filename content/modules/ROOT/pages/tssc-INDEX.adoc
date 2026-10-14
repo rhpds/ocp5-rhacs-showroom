@@ -7,21 +7,23 @@ xref:index.adoc[← Back to HOME]
 
 == Overview
 
-These labs walk a trusted software supply chain on this OpenShift Security Roadshow cluster. You verify a signed Hummingbird runtime, consume Lightwell application libraries through an enterprise proxy, bind those pins in source, build without the public internet, sign and attest the image, promote only that digest, then keep proof in Trusted Profile Analyzer and Advanced Cluster Security.
+These labs walk a trusted software supply chain on this OpenShift Security Roadshow cluster. You verify a signed Red Hat Hardened Image (Hummingbird), consume Lightwell application libraries through an enterprise proxy, bind those pins in source, build without the public internet, sign and attest the image, promote only that digest, then keep proof in Trusted Profile Analyzer and Advanced Cluster Security.
 
-This is a product deep-dive, not a 101, 201, or 301 skill level. Work the labs in order. Hands-on work starts at xref:tssc-01-hummingbird-verify.adoc[1.1 Verify Hummingbird].
+Work the labs in order. Hands-on work starts at xref:tssc-01-hummingbird-verify.adoc[1.1 Verify Hummingbird].
 
-The lab application is Java (Maven). Where the same control applies to Python (`pip`) or Artifactory, that page says so in one sentence.
+The lab application is Java (Maven). 
 
-== Why it matters
+== Why does a secure software supply chain matter?
 
-Scanners tell you what is wrong. They do not give you a signed runtime, a patched library you can actually consume, or a path that keeps that proof through build, sign, and promote.
+Security can be complex.
+
+Vulnerability scanners tell you what is wrong. They do not give you a signed runtime, a patched library you can actually consume, or a path that keeps that proof through build, sign, and promote. However, a secure software supply chain can help you answer these questions.
 
 Public indexes and mutable tags are convenient. They are not a trusted input. A production container still has to answer what went into the image, who built and signed it, and whether known vulnerabilities were remediated on the versions you already run.
 
-link:{lightwell-product-url}[Lightwell^] covers *third-party application dependencies* (libraries, frameworks, build tools, and transitive deps). link:{docs-hardened-images-url}[Red Hat Hardened Images^] (Hummingbird) are the *runtime* foundation. OpenShift, RHEL, and RHACS still cover the platform. Lightwell does not replace those products.
+AND more importantly, security is speed in the age of AI. You require quicker builds, limited vulnerabilities, and faster remediation to keep up with AI.
 
-== What does it solve
+== What does a Red Hat secure software supply chain solve?
 
 * CVE findings on libraries you cannot jump to “latest” because of certification, compatibility, or a release window
 * Application builds that pull from the public internet instead of a trusted enterprise repository
@@ -30,7 +32,7 @@ link:{lightwell-product-url}[Lightwell^] covers *third-party application depende
 * Builds that succeed only because Maven Central or a public registry was reachable
 * No system of record for what shipped, what was fixed, and what ACS should treat as remediated
 
-== How Lightwell and TSSC fit together
+== How Lightwell fits into a supply chain?
 
 A *trusted software supply chain* (TSSC) is the set of controls that keep those answers attached to every production container.
 
@@ -46,7 +48,11 @@ This same stack powers link:{docs-rhtap-tech-url}[Red Hat Trusted Application Pi
 
 TSSC does not start at the pipeline. It starts with inputs you can name. A signed runtime base. Application libraries from a trusted repository. Source that binds those pins.
 
-Lightwell is an annual subscription with two models. This workshop uses the *Lightwell Network* path (public, post-disclosure remediations). *Lightwell Clearinghouse Premier* adds member-specific package versions and disclosure handling. A Premier remediation still uses the same proxy, pin, hermetic build, and TPA or ACS evidence.
+*Lightwell* is an annual subscription with two models. 
+
+This workshop uses the *Lightwell Network* path (public, post-disclosure remediations). 
+
+*Lightwell Clearinghouse Premier* adds member-specific package versions and disclosure handling. A Premier remediation still uses the same proxy, pin, hermetic build, and TPA or ACS evidence.
 
 [cols="1,2,2",options="header"]
 |===
@@ -61,9 +67,11 @@ Lightwell is an annual subscription with two models. This workshop uses the *Lig
 |Your pinned version is not in the public catalog, or the fix must stay in a closed set until a public disclosure date. Same TSSC controls as Network. This cluster does not include a live Premier membership.
 |===
 
-An *embargo* is a coordinated-disclosure window. The vulnerability and its patch stay in a closed member set until a public date. Clearinghouse Premier can deliver that member pin during the window. Lightwell Network’s documented lifecycle ends at public *Disclosure* (VEX and OSV to the broader ecosystem). See link:{docs-lwn-lifecycle-url}[Patch delivery lifecycle^].
+An *embargo* is a coordinated-disclosure window. The vulnerability and its patch stay in a closed member set until a public date. Clearinghouse Premier can deliver that member pin during the window. Lightwell Network’s documented lifecycle ends at public *Disclosure* (VEX and OSV to the broader ecosystem). 
 
-More background is in xref:appendix-lightwell-concepts.adoc[Lightwell concepts].
+See link:{docs-lwn-lifecycle-url}[Patch delivery lifecycle^].
+
+For more background visit the xref:appendix-lightwell-concepts.adoc[Lightwell concepts] appendix.
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/109
 image::tssc-lwn-clearinghouse-overview.png[TSSC controls wrapping Lightwell Network catalog consumption and Clearinghouse Premier member remediations,width=700,link=self,window=blank]
@@ -184,36 +192,16 @@ image::tssc-artifact-trust-chain.png[Trust chain from Hummingbird digest and Lig
 [[what-this-workshop-does-not-include]]
 == What this workshop does not include
 
-You walk *one* Java (Maven) supply chain on this OpenShift environment. The items below are out of scope on purpose.
+You walk one Java (Maven) supply chain on this OpenShift cluster.
 
-[cols="1,2",options="header"]
-|===
-|Not in this workshop
-|What you do instead
+* *Konflux.* Builds are OpenShift Pipelines. Name mapping is in xref:appendix-konflux-mapping.adoc[Konflux mapping].
+* *A physical air-gap.* xref:tssc-14-disconnected-verify.adoc[5.3] and xref:appendix-disconnected-playbook.adoc[Disconnected transfer] stay on this network.
+* *Building Hummingbird images.* You verify published Red Hat Hardened Images.
+* *FIPS evidence.* You consume an image that already carries that claim.
+* *Artifactory or a Python app.* You configure Nexus for the Java lab.
+* *A live Clearinghouse Premier membership.* You practice the post-disclosure pin. See the xref:appendix-lightwell-concepts.adoc[Lightwell concepts] appendix.
 
-|Hosted Konflux
-|Builds run as *OpenShift Pipelines* (the Task and BuildConfig names on the cluster). Equivalent Konflux names are in xref:appendix-konflux-mapping.adoc[Konflux mapping]. Do not install Konflux here.
-
-|A physical air-gap or data diode
-|This environment stays on the network. xref:tssc-14-disconnected-verify.adoc[5.3] is the key-based sign and verify procedure. xref:appendix-disconnected-playbook.adoc[Disconnected transfer] is a simulated file drop, not USB or a diode.
-
-|Building Project Hummingbird images
-|You *verify and consume* published Red Hat Hardened Images. You do not rebuild the factory that produces them.
-
-|FIPS certification in the lab
-|FIPS is a *product claim* on the image you consume. This workshop does not rebuild an image to produce FIPS evidence.
-
-|JFrog Artifactory, or a Python (FastAPI) application
-|The lab application is Java. *Nexus* is the enterprise proxy you configure. Short callouts cover `pip` and Artifactory patterns. You do not install Artifactory or scaffold a second app.
-
-|A live Clearinghouse Premier membership, member-specific GAV, or embargo window
-|You practice the *post-disclosure* Network pin and the TSSC controls Premier would reuse (private proxy, exact pin, system of record). You do not request a member-only package on this cluster. Concept is in xref:appendix-lightwell-concepts.adoc[Lightwell concepts].
-
-|A production virtual machine
-|You promote a *signed container digest* through GitOps (xref:tssc-15-gitops-admission.adoc[6.1], xref:tssc-16-prod-gitops.adoc[6.2]). The same digest can later run on bootc or Satellite. There is no VM to boot here.
-|===
-
-== How checks work
+== How the lab checks work
 
 Every lab ends with a *Check*. It is a Job in `lw-poc-validate`. You set a short report token, run the Job, and read the logs.
 
@@ -224,7 +212,8 @@ Practice on this overview Check. It only grades the report token. It does not co
 
 Create the practice objects on this cluster (safe to re-run). Then leave the token as `REPLACE_ME` and the Job fails. Set it to `checks-work` and run the Job again. Expect `CHECK PASSED`.
 
-.Create the practice Check objects
+. Create the practice Check objects
++
 [source,bash,role=execute]
 ----
 NS=lw-poc-validate
@@ -286,13 +275,10 @@ include::partial$validate-job-rerun.adoc[]
 
 Lab Checks use the same Job flow. Each lab also grades a scored object from *Your change*.
 
-== Before you start
+== 2 Important things to remember
 
-* This guide runs in the RHDP *Showroom* (lab nav plus embedded terminal) or the bastion SSH session.
-* `oc` is on the bastion by default. `cosign`, `oc-mirror`, and `ec` are installed by the Welcome xref:index.adoc#environment-setup[Environment setup] block into `~/.local/bin` (Red Hat images, not GitHub). Re-run that block if `command -v cosign` prints nothing.
-* Console URLs and passwords for Gitea, Keycloak, RHTPA, and Developer Hub are on xref:index.adoc[Welcome]. CLI steps still discover hosts from `demo-userinfo-*` ConfigMaps. Do not invent Route hosts. Do not use GitHub as lab git. Gitea is in-cluster.
-* Checks are Validate Jobs in `lw-poc-validate`. The practice Check above is how you run one.
-* Never commit credentials (`LW_USERNAME` / `LW_PASSWORD`, `student_password`, `cosign.key`).
+* Console URLs and passwords for Gitea, Keycloak, RHTPA, and Developer Hub are on xref:index.adoc[Welcome]. 
+* Never commit credentials to a public repository (`LW_USERNAME` / `LW_PASSWORD`, `student_password`, `cosign.key`).
 
 == Related documentation
 

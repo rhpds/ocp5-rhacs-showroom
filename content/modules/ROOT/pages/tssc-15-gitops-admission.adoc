@@ -31,8 +31,8 @@ Lightwell Network and Clearinghouse Premier are already in the image as GAVs. Ad
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/52
 image::gitops-stage-vs-prod-remotes.png[Stage versus prod Gitea remotes, Argo Applications, and namespaces,width=700,link=self,window=blank]
 
-Discover URLs from userinfo. The Gitea password is the *value* of ConfigMap key `student_password` (not the key name). Do not put that value in Git or a screenshot.
-
+. Discover URLs from userinfo. The Gitea password is the *value* of ConfigMap key `student_password` (not the key name). Do not put that value in Git or a screenshot.
++
 [source,bash,role=execute]
 ----
 oc -n gitea get configmap demo-userinfo-gitea \
@@ -63,8 +63,8 @@ spec:
 
 == Your change: tag, stage GitOps, TrustPolicy
 
-. Tag the signed image into staging (not prod):
-
+. Tag the signed image into staging (not prod)
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -89,8 +89,8 @@ COSIGN_PASSWORD="" cosign sign --key /home/lab-user/lab-trust/cosign.key \
 
 Keep the `sha256:` prefix. That digest must match Track 5.1.
 
-. Clone the *stage* GitOps remote (`student_gitops_repo_url`). Set `image.digest` to that digest and `replicas: 1`. Commit and push. Do not edit the prod remote. Follow `PROMOTE.md` in that repo if you need the field names. A fresh clone does not inherit `git config` from the app repo — set author locally (same identity as xref:tssc-06-bind-base-deps.adoc[3.2]):
-
+. Clone the *stage* GitOps remote (`student_gitops_repo_url`). Set `image.digest` to that digest and `replicas: 1`. Commit and push. Do not edit the prod remote. Follow `PROMOTE.md` in that repo if you need the field names. A fresh clone does not inherit `git config` from the app repo — set author locally (same identity as xref:tssc-06-bind-base-deps.adoc[3.2])
++
 [source,bash,role=execute]
 ----
 STAGE_GITOPS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_gitops_repo_url}')"
@@ -104,8 +104,8 @@ git config user.name student
 git config user.email student@workshop.local
 ----
 
-. After you push `image.digest` + `replicas: 1`, hard-refresh Argo. Automated sync often stays on the previous commit (`replicas: 0` still looks Healthy). Wait until the Deployment has `replicas: 1` and a Ready pod:
-
+. After you push `image.digest` + `replicas: 1`, hard-refresh Argo. Automated sync often stays on the previous commit (`replicas: 0` still looks Healthy). Wait until the Deployment has `replicas: 1` and a Ready pod
++
 [source,bash,role=execute]
 ----
 ARGO="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_argocd_app}')"
@@ -132,8 +132,8 @@ CronJob `trust-policy-apply` in `tssc-admission` polls about every two minutes. 
 
 Native `ImagePolicy` is CRI-O `policy.json`: `oc apply` of an unsigned Deployment can *succeed*; the pod fails at *pull*. Kyverno fallback (if the claim uses it) denies at admission instead — still look at the pod / events.
 
-The gate only covers `spec.scopes`. Tag an *unsigned* digest onto the *same* ImageStream and deploy that tag. Do not point GitOps `image.digest` at it (that would flap the Healthy Check).
-
+. The gate only covers `spec.scopes`. Tag an *unsigned* digest onto the *same* ImageStream and deploy that tag. Do not point GitOps `image.digest` at it (that would flap the Healthy Check).
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -159,15 +159,6 @@ Pass when: TrustPolicy has no `REPLACE_ME` and `enforce: true`; ImagePolicy is l
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/69
 image::unsigned-deny-imagepullbackoff.png[Throwaway unsigned tag pod in ImagePullBackOff while signed latest stays running,width=700,link=self,window=blank]
-
-:report-name: report-15-gitops-admission
-:report-key: live_api
-:report-token: imagepolicy
-include::partial$validate-job-report.adoc[]
-
-:validate-job: validate-15-gitops-admission
-:validate-job-template: job-15.yaml
-include::partial$validate-job-rerun.adoc[]
 
 Continue to xref:tssc-16-prod-gitops.adoc[6.2] when you are ready.
 

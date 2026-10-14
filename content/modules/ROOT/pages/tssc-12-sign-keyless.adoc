@@ -34,8 +34,8 @@ Keyless is the connected path, when the cluster can reach Fulcio. The pipeline s
 
 == Discover RHTAS URLs
 
-`cosign` is installed by Welcome xref:index.adoc#environment-setup[Environment setup] into `~/.local/bin`. Do *not* curl `github.com` for the CLI.
-
+. `cosign` is installed by Welcome xref:index.adoc#environment-setup[Environment setup] into `~/.local/bin`. Do *not* curl `github.com` for the CLI.
++
 [source,bash,role=execute]
 ----
 command -v cosign
@@ -48,6 +48,8 @@ Confirm the hints against live Routes. Do not leave `apps.<domain>` in the Pipel
 
 == Worked example (not the Check)
 
+. Worked example (not the Check)
++
 [source,bash]
 ----
 # Worked example ONLY — fake issuer/subject. Do not use as the scored verify.
@@ -59,8 +61,8 @@ cosign verify \
 
 == Your change: fill URLs; sign the app digest
 
-If 4.4 already ran `cosign-sign-keyless` to Succeeded, skip to verify *after* origin has the filled PipelineRun. Check 12 reads Gitea `.tekton/pipelinerun.yaml`, not the live object — `STUDENT_REPO_URL_PLACEHOLDER` or `<lab-namespace>` still on `main` fails even when sign Succeeded. Confirm, and commit if 4.4 only `oc create`d the local file:
-
+. If 4.4 already ran `cosign-sign-keyless` to Succeeded, skip to verify *after* origin has the filled PipelineRun. Check 12 reads Gitea `.tekton/pipelinerun.yaml`, not the live object — `STUDENT_REPO_URL_PLACEHOLDER` or `<lab-namespace>` still on `main` fails even when sign Succeeded. Confirm, and commit if 4.4 only `oc create`d the local file
++
 [source,bash,role=execute]
 ----
 cd /tmp/spring-boot-lw-poc
@@ -70,8 +72,8 @@ git show origin/main:.tekton/pipelinerun.yaml | grep -E 'STUDENT_REPO_URL_PLACEH
   || echo 'Gitea pipelinerun is filled'
 ----
 
-Otherwise edit `.tekton/pipelinerun.yaml` on `lw-student/spring-boot-lw-poc`: replace Fulcio / Rekor / TUF with `fulcio_internal_url` / `rekor_internal_url` / `tuf_internal_url` (not the HTTPS Route hints), `STUDENT_REPO_URL_PLACEHOLDER` with `student_repo_internal_url` (in-cluster Gitea, not the HTTPS Route), and `<lab-namespace>` with `lw-poc-build`. Commit and push that file (same as xref:tssc-11-build-sbom.adoc[4.4]), then create a new run:
-
+. Otherwise edit `.tekton/pipelinerun.yaml` on `lw-student/spring-boot-lw-poc`: replace Fulcio / Rekor / TUF with `fulcio_internal_url` / `rekor_internal_url` / `tuf_internal_url` (not the HTTPS Route hints), `STUDENT_REPO_URL_PLACEHOLDER` with `student_repo_internal_url` (in-cluster Gitea, not the HTTPS Route), and `<lab-namespace>` with `lw-poc-build`. Commit and push that file (same as xref:tssc-11-build-sbom.adoc[4.4]), then create a new run
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -90,8 +92,8 @@ Do *not* `oc tag` into staging here (Track 6). Do *not* generate a Showroom key 
 
 == Check: `cosign verify` on the app digest
 
-Identity is the *pipeline* SA in the build namespace (claim-proven), *not* a Hummingbird signer and *not* `REPLACE_ME_*`. Issuer is the Kubernetes API. If verify fails, capture the SAN from Rekor / `cosign verify` error text — do not invent an alternate issuer.
-
+. Identity is the *pipeline* SA in the build namespace (claim-proven), *not* a Hummingbird signer and *not* `REPLACE_ME_*`. Issuer is the Kubernetes API. If verify fails, capture the SAN from Rekor / `cosign verify` error text — do not invent an alternate issuer.
++
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
@@ -112,15 +114,6 @@ cosign verify \
 ----
 
 Pass when that command exits 0 on *your* app digest. Record the digest (`oc -n "${BUILD_NS}" get istag spring-boot-lw-poc:latest -o jsonpath='{.image.dockerImageReference}'`) — Track 6 promotes it.
-
-:report-name: report-12-sign-keyless
-:report-key: what_you_signed
-:report-token: app-digest
-include::partial$validate-job-report.adoc[]
-
-:validate-job: validate-12-sign-keyless
-:validate-job-template: job-12.yaml
-include::partial$validate-job-rerun.adoc[]
 
 Continue to xref:tssc-13-attest-conforma.adoc[5.2] when you are ready.
 
