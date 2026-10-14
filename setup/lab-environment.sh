@@ -115,10 +115,10 @@ Environment:
                             quay.io/minio/minio. Default:
                             quay.io/thanos/minio:RELEASE.2025-09-07T16-13-09Z
   LIGHTSPEED_API_TOKEN      LLM API key. Empty skips Lightspeed configuration.
-  LIGHTSPEED_PROVIDER       openai, azure_openai, or keep.
+  LIGHTSPEED_PROVIDER       openai, azure_openai, anthropic, gemini, other, or keep.
   LIGHTSPEED_MODEL          Model name for that provider.
-  LIGHTSPEED_API_URL        Provider URL. Interactive ChatGPT uses
-                            https://api.openai.com/v1 when this is unset.
+  LIGHTSPEED_API_URL        Provider URL. OpenAI, Anthropic, and Gemini
+                            use their public endpoints when this is unset.
   LIGHTSPEED_AZURE_DEPLOYMENT
   LIGHTSPEED_AZURE_API_VERSION
                             Required for azure_openai. Version looks like
@@ -346,13 +346,19 @@ lightspeed_tty_prompt() {
 
 lightspeed_token_prompt_text() {
   case "$1" in
-    ChatGPT)
+    OpenAI)
       printf '%s' "Paste the OpenAI API key (press Enter to skip): "
       ;;
-    "Azure OpenAI")
-      printf '%s' "Paste the Azure OpenAI key (press Enter to skip): "
+    "Azure AI")
+      printf '%s' "Paste the Azure AI key (press Enter to skip): "
       ;;
-    OpenAI-compatible)
+    Anthropic)
+      printf '%s' "Paste the Anthropic API key (press Enter to skip): "
+      ;;
+    "Google Gemini")
+      printf '%s' "Paste the Gemini API key (press Enter to skip): "
+      ;;
+    Other)
       printf '%s' "Paste the API key for this endpoint (press Enter to skip): "
       ;;
     *)
@@ -371,18 +377,20 @@ lightspeed_choose_provider() {
   local default_choice="1"
   local pick=""
   if [[ "${configured}" == true ]]; then
-    default_choice="4"
+    default_choice="6"
   fi
   lightspeed_tty_say ""
   lightspeed_tty_say "OpenShift Lightspeed uses an LLM API key. This is not your OpenShift, RHACS, or Quay password."
   lightspeed_tty_say "The choice is cluster-wide. Press Enter at the token prompt to leave Lightspeed unchanged."
   lightspeed_tty_say ""
   lightspeed_tty_say "Select the LLM provider:"
-  lightspeed_tty_say "  1) ChatGPT (OpenAI)"
-  lightspeed_tty_say "  2) Azure OpenAI"
-  lightspeed_tty_say "  3) Other OpenAI-compatible API"
+  lightspeed_tty_say "  1) OpenAI"
+  lightspeed_tty_say "  2) Azure AI"
+  lightspeed_tty_say "  3) Anthropic"
+  lightspeed_tty_say "  4) Google Gemini"
+  lightspeed_tty_say "  5) Other"
   if [[ "${configured}" == true ]]; then
-    lightspeed_tty_say "  4) Keep the current provider"
+    lightspeed_tty_say "  6) Keep the current provider"
   fi
   while true; do
     lightspeed_tty_prompt pick "Choice [${default_choice}]: "
@@ -392,7 +400,7 @@ lightspeed_choose_provider() {
     case "${pick}" in
       1)
         provider="openai"
-        choice_label="ChatGPT"
+        choice_label="OpenAI"
         if [[ "${url_from_env}" != true ]]; then
           url=""
         fi
@@ -400,38 +408,76 @@ lightspeed_choose_provider() {
         ;;
       2)
         provider="azure_openai"
-        choice_label="Azure OpenAI"
+        choice_label="Azure AI"
         if [[ "${url_from_env}" != true ]]; then
           url=""
         fi
         return 0
         ;;
       3)
-        provider="openai"
-        choice_label="OpenAI-compatible"
+        provider="anthropic"
+        choice_label="Anthropic"
         if [[ "${url_from_env}" != true ]]; then
           url=""
         fi
         return 0
         ;;
       4)
+        provider="gemini"
+        choice_label="Google Gemini"
+        if [[ "${url_from_env}" != true ]]; then
+          url=""
+        fi
+        return 0
+        ;;
+      5)
+        provider="other"
+        choice_label="Other"
+        if [[ "${url_from_env}" != true ]]; then
+          url=""
+        fi
+        return 0
+        ;;
+      6)
         if [[ "${configured}" == true ]]; then
           keep_current=true
           choice_label="current provider"
           return 0
         fi
-        lightspeed_tty_say "No Lightspeed provider is configured yet. Choose 1, 2, or 3."
+        lightspeed_tty_say "No Lightspeed provider is configured yet. Choose 1, 2, 3, 4, or 5."
         ;;
       *)
         if [[ "${configured}" == true ]]; then
-          lightspeed_tty_say "Enter 1, 2, 3, or 4."
+          lightspeed_tty_say "Enter 1, 2, 3, 4, 5, or 6."
         else
-          lightspeed_tty_say "Enter 1, 2, or 3."
+          lightspeed_tty_say "Enter 1, 2, 3, 4, or 5."
         fi
         ;;
     esac
     pick=""
   done
+}
+
+# Public endpoints used when the caller does not pass LIGHTSPEED_API_URL.
+lightspeed_apply_default_url() {
+  [[ -n "${url}" ]] && return 0
+  case "${provider}" in
+    openai)
+      url="https://api.openai.com/v1"
+      ;;
+    anthropic)
+      url="https://api.anthropic.com/v1/"
+      ;;
+    gemini)
+      url="https://generativelanguage.googleapis.com/v1beta/openai/"
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+  if [[ "${interactive}" == true ]]; then
+    lightspeed_tty_say "Using ${url}"
+  fi
 }
 
 lightspeed_prompt_provider_fields() {
@@ -456,32 +502,38 @@ lightspeed_prompt_provider_fields() {
     fi
     return 0
   fi
-  if [[ -z "${url}" && "${interactive}" == true ]]; then
-    if [[ "${choice_label}" == "ChatGPT" ]]; then
-      url="https://api.openai.com/v1"
-      lightspeed_tty_say "Using https://api.openai.com/v1"
-    elif [[ "${choice_label}" == "OpenAI-compatible" ]]; then
-      lightspeed_tty_prompt url "API URL (http or https, for example https://example.com/v1): "
-    else
-      lightspeed_tty_prompt url "API URL [https://api.openai.com/v1]: "
-      if [[ -z "${url}" ]]; then
-        url="https://api.openai.com/v1"
-      fi
-    fi
+  if [[ -z "${url}" && "${provider}" == "other" && "${interactive}" == true ]]; then
+    lightspeed_tty_prompt url "API URL (http or https, for example https://example.com/v1): "
   fi
   if [[ -z "${model}" && "${interactive}" == true ]]; then
-    lightspeed_tty_prompt model "Model name (for example gpt-4o): "
+    case "${provider}" in
+      openai)
+        lightspeed_tty_prompt model "Model name (for example gpt-4o): "
+        ;;
+      anthropic)
+        lightspeed_tty_prompt model "Model name (for example claude-sonnet-4-5): "
+        ;;
+      gemini)
+        lightspeed_tty_prompt model "Model name (for example gemini-2.5-flash): "
+        ;;
+      *)
+        lightspeed_tty_prompt model "Model name: "
+        ;;
+    esac
   fi
 }
 
 lightspeed_fields_ok() {
   ls_field_error=""
   ls_clear_field=""
-  if [[ "${provider}" != "openai" && "${provider}" != "azure_openai" ]]; then
-    ls_field_error="LIGHTSPEED_PROVIDER must be openai or azure_openai."
-    ls_clear_field="provider"
-    return 1
-  fi
+  case "${provider}" in
+    openai|azure_openai|anthropic|gemini|other) ;;
+    *)
+      ls_field_error="LIGHTSPEED_PROVIDER must be openai, azure_openai, anthropic, gemini, or other."
+      ls_clear_field="provider"
+      return 1
+      ;;
+  esac
   if [[ -z "${url}" ]]; then
     ls_field_error="API URL is required. Set LIGHTSPEED_API_URL."
     ls_clear_field="url"
@@ -494,7 +546,7 @@ lightspeed_fields_ok() {
   fi
   if [[ "${provider}" == "azure_openai" ]]; then
     if [[ -z "${deployment}" ]]; then
-      ls_field_error="Azure OpenAI needs a deployment name. Set LIGHTSPEED_AZURE_DEPLOYMENT."
+      ls_field_error="Azure AI needs a deployment name. Set LIGHTSPEED_AZURE_DEPLOYMENT."
       ls_clear_field="deployment"
       return 1
     fi
@@ -540,7 +592,24 @@ url = os.environ["LS_URL"]
 ns = os.environ["LS_NS"]
 deployment = os.environ.get("LS_AZURE_DEPLOYMENT", "")
 api_version = os.environ.get("LS_AZURE_API_VERSION", "")
-pname = "azure" if provider == "azure_openai" else "openai"
+provider_names = {
+    "azure_openai": "azure",
+    "anthropic": "anthropic",
+    "gemini": "gemini",
+    "other": "other",
+    "openai": "openai",
+}
+# Console Lightspeed accepts openai and azure_openai. Anthropic and Gemini
+# are reached through their OpenAI-compatible endpoints.
+ols_types = {
+    "azure_openai": "azure_openai",
+    "anthropic": "openai",
+    "gemini": "openai",
+    "other": "openai",
+    "openai": "openai",
+}
+pname = provider_names.get(provider, provider)
+ols_type = ols_types.get(provider, provider)
 
 
 def emit(payload):
@@ -552,7 +621,7 @@ if mode == "ols":
         "credentialsSecretRef": {"name": "llm-credentials"},
         "models": [{"name": model}],
         "name": pname,
-        "type": provider,
+        "type": ols_type,
         "url": url,
     }
     if provider == "azure_openai":
@@ -619,6 +688,16 @@ if provider == "azure_openai":
             "apiVersion": api_version,
         },
     }
+elif provider == "anthropic":
+    anthropic = {"credentialsSecret": {"name": "llm-creds-openai"}}
+    if url not in (
+        "",
+        "https://api.anthropic.com",
+        "https://api.anthropic.com/v1",
+        "https://api.anthropic.com/v1/",
+    ):
+        anthropic["url"] = url
+    spec_body = {"type": "Anthropic", "anthropic": anthropic}
 else:
     spec_body = {
         "type": "OpenAI",
@@ -704,55 +783,80 @@ lightspeed_write_secrets() {
   local ns="$1"
   local api_token="$2"
   local mode="$3"
+  local want_openai=false want_azure=false want_anthropic=false
+  case " ${mode} " in
+    *" openai "*) want_openai=true ;;
+  esac
+  case " ${mode} " in
+    *" azure "*) want_azure=true ;;
+  esac
+  case " ${mode} " in
+    *" anthropic "*) want_anthropic=true ;;
+  esac
+  if [[ "${want_openai}" != true && "${want_azure}" != true && "${want_anthropic}" != true ]]; then
+    echo "Error: unknown Lightspeed secret mode ${mode}." >&2
+    return 1
+  fi
   oc -n "${ns}" create secret generic llm-credentials \
     --from-literal=apitoken="${api_token}" \
     --dry-run=client -o yaml | oc apply -f - >/dev/null
-  case "${mode}" in
-    openai)
-      oc -n "${ns}" create secret generic llm-creds-openai \
-        --from-literal=OPENAI_API_KEY="${api_token}" \
-        --dry-run=client -o yaml | oc apply -f - >/dev/null
-      ;;
-    azure)
-      oc -n "${ns}" create secret generic llm-creds-openai \
-        --from-literal=AZURE_OPENAI_API_KEY="${api_token}" \
-        --dry-run=client -o yaml | oc apply -f - >/dev/null
-      ;;
-    both)
-      oc -n "${ns}" create secret generic llm-creds-openai \
-        --from-literal=OPENAI_API_KEY="${api_token}" \
-        --from-literal=AZURE_OPENAI_API_KEY="${api_token}" \
-        --dry-run=client -o yaml | oc apply -f - >/dev/null
-      ;;
-    *)
-      echo "Error: unknown Lightspeed secret mode ${mode}." >&2
-      return 1
-      ;;
-  esac
+  if [[ "${want_openai}" == true && "${want_azure}" == true && "${want_anthropic}" == true ]]; then
+    oc -n "${ns}" create secret generic llm-creds-openai \
+      --from-literal=OPENAI_API_KEY="${api_token}" \
+      --from-literal=AZURE_OPENAI_API_KEY="${api_token}" \
+      --from-literal=ANTHROPIC_API_KEY="${api_token}" \
+      --dry-run=client -o yaml | oc apply -f - >/dev/null
+  elif [[ "${want_openai}" == true && "${want_azure}" == true ]]; then
+    oc -n "${ns}" create secret generic llm-creds-openai \
+      --from-literal=OPENAI_API_KEY="${api_token}" \
+      --from-literal=AZURE_OPENAI_API_KEY="${api_token}" \
+      --dry-run=client -o yaml | oc apply -f - >/dev/null
+  elif [[ "${want_openai}" == true && "${want_anthropic}" == true ]]; then
+    oc -n "${ns}" create secret generic llm-creds-openai \
+      --from-literal=OPENAI_API_KEY="${api_token}" \
+      --from-literal=ANTHROPIC_API_KEY="${api_token}" \
+      --dry-run=client -o yaml | oc apply -f - >/dev/null
+  elif [[ "${want_azure}" == true && "${want_anthropic}" == true ]]; then
+    oc -n "${ns}" create secret generic llm-creds-openai \
+      --from-literal=AZURE_OPENAI_API_KEY="${api_token}" \
+      --from-literal=ANTHROPIC_API_KEY="${api_token}" \
+      --dry-run=client -o yaml | oc apply -f - >/dev/null
+  elif [[ "${want_azure}" == true ]]; then
+    oc -n "${ns}" create secret generic llm-creds-openai \
+      --from-literal=AZURE_OPENAI_API_KEY="${api_token}" \
+      --dry-run=client -o yaml | oc apply -f - >/dev/null
+  elif [[ "${want_anthropic}" == true ]]; then
+    oc -n "${ns}" create secret generic llm-creds-openai \
+      --from-literal=ANTHROPIC_API_KEY="${api_token}" \
+      --dry-run=client -o yaml | oc apply -f - >/dev/null
+  else
+    oc -n "${ns}" create secret generic llm-creds-openai \
+      --from-literal=OPENAI_API_KEY="${api_token}" \
+      --dry-run=client -o yaml | oc apply -f - >/dev/null
+  fi
   echo "Stored Lightspeed credentials in namespace ${ns}"
 }
 
 lightspeed_current_secret_mode() {
   local ns="$1"
-  local ols_type="" agentic_type=""
-  local azure=false openai_key=false
+  local ols_type="" ols_name="" agentic_type="" mode=""
   ols_type="$(oc -n "${ns}" get olsconfig cluster -o jsonpath='{.spec.llm.providers[0].type}' 2>/dev/null || true)"
+  ols_name="$(oc -n "${ns}" get olsconfig cluster -o jsonpath='{.spec.llm.providers[0].name}' 2>/dev/null || true)"
   agentic_type="$(oc -n "${ns}" get llmprovider openai -o jsonpath='{.spec.type}' 2>/dev/null || true)"
   if [[ "${ols_type}" == "azure_openai" || "${agentic_type}" == "AzureOpenAI" ]]; then
-    azure=true
+    mode="${mode} azure"
   fi
-  if [[ "${ols_type}" == "openai" || "${agentic_type}" == "OpenAI" ]]; then
-    openai_key=true
+  if [[ "${agentic_type}" == "Anthropic" || "${ols_name}" == "anthropic" ]]; then
+    mode="${mode} anthropic"
   fi
-  if [[ "${azure}" == true && "${openai_key}" == true ]]; then
-    printf '%s' "both"
-  elif [[ "${azure}" == true ]]; then
-    printf '%s' "azure"
-  elif [[ "${openai_key}" == true ]]; then
-    printf '%s' "openai"
-  else
-    printf '%s' "both"
+  if [[ "${agentic_type}" == "OpenAI" || ( "${ols_type}" == "openai" && "${ols_name}" != "anthropic" ) ]]; then
+    mode="${mode} openai"
   fi
+  mode="$(lightspeed_trim "${mode}")"
+  if [[ -z "${mode}" ]]; then
+    mode="openai azure anthropic"
+  fi
+  printf '%s' "${mode}"
 }
 
 lightspeed_restart_appserver() {
@@ -806,19 +910,41 @@ configure_lightspeed_token() {
         keep_current=true
         choice_label="current provider"
         ;;
-      azure_openai)
-        choice_label="Azure OpenAI"
+      azure|azure_openai)
+        provider="azure_openai"
+        choice_label="Azure AI"
+        ;;
+      anthropic)
+        choice_label="Anthropic"
+        ;;
+      gemini)
+        choice_label="Google Gemini"
+        ;;
+      other)
+        choice_label="Other"
         ;;
       openai)
-        if [[ -z "${url}" || "${url}" == "https://api.openai.com/v1" || "${url}" == "https://api.openai.com/v1/" ]]; then
-          choice_label="ChatGPT"
-        else
-          choice_label="OpenAI-compatible"
-        fi
+        case "${url}" in
+          https://api.anthropic.com|https://api.anthropic.com/v1|https://api.anthropic.com/v1/)
+            provider="anthropic"
+            choice_label="Anthropic"
+            ;;
+          https://generativelanguage.googleapis.com/v1beta/openai|https://generativelanguage.googleapis.com/v1beta/openai/)
+            provider="gemini"
+            choice_label="Google Gemini"
+            ;;
+          ""|https://api.openai.com/v1|https://api.openai.com/v1/)
+            choice_label="OpenAI"
+            ;;
+          *)
+            provider="other"
+            choice_label="Other"
+            ;;
+        esac
         ;;
       *)
-        echo "Error: LIGHTSPEED_PROVIDER must be openai, azure_openai, or keep." >&2
-        lightspeed_tty_say "Error: LIGHTSPEED_PROVIDER must be openai, azure_openai, or keep."
+        echo "Error: LIGHTSPEED_PROVIDER must be openai, azure_openai, anthropic, gemini, other, or keep." >&2
+        lightspeed_tty_say "Error: LIGHTSPEED_PROVIDER must be openai, azure_openai, anthropic, gemini, other, or keep."
         return 1
         ;;
     esac
@@ -831,14 +957,15 @@ configure_lightspeed_token() {
     keep_current=true
     choice_label="current provider"
   else
-    echo "Error: Lightspeed is not configured. Set LIGHTSPEED_PROVIDER (openai or azure_openai), LIGHTSPEED_MODEL, LIGHTSPEED_API_URL, and LIGHTSPEED_API_TOKEN." >&2
-    echo "Azure OpenAI also needs LIGHTSPEED_AZURE_DEPLOYMENT and LIGHTSPEED_AZURE_API_VERSION." >&2
+    echo "Error: Lightspeed is not configured. Set LIGHTSPEED_PROVIDER (openai, azure_openai, anthropic, gemini, or other), LIGHTSPEED_MODEL, and LIGHTSPEED_API_TOKEN." >&2
+    echo "Azure AI also needs LIGHTSPEED_API_URL, LIGHTSPEED_AZURE_DEPLOYMENT, and LIGHTSPEED_AZURE_API_VERSION." >&2
+    echo "Other also needs LIGHTSPEED_API_URL." >&2
     return 1
   fi
 
   if [[ "${keep_current}" == true && "${configured}" != true ]]; then
-    echo "Error: no Lightspeed provider is configured yet. Set LIGHTSPEED_PROVIDER to openai or azure_openai." >&2
-    lightspeed_tty_say "Error: no Lightspeed provider is configured yet. Set LIGHTSPEED_PROVIDER to openai or azure_openai."
+    echo "Error: no Lightspeed provider is configured yet. Set LIGHTSPEED_PROVIDER to openai, azure_openai, anthropic, gemini, or other." >&2
+    lightspeed_tty_say "Error: no Lightspeed provider is configured yet. Set LIGHTSPEED_PROVIDER to openai, azure_openai, anthropic, gemini, or other."
     return 1
   fi
 
@@ -846,6 +973,7 @@ configure_lightspeed_token() {
 
   if [[ "${keep_current}" != true ]]; then
     while true; do
+      lightspeed_apply_default_url
       lightspeed_prompt_provider_fields
       if lightspeed_fields_ok; then
         break
@@ -910,11 +1038,11 @@ configure_lightspeed_token() {
     return 0
   fi
 
-  if [[ "${provider}" == "azure_openai" ]]; then
-    secret_mode="azure"
-  else
-    secret_mode="openai"
-  fi
+  case "${provider}" in
+    azure_openai) secret_mode="azure" ;;
+    anthropic) secret_mode="anthropic" ;;
+    *) secret_mode="openai" ;;
+  esac
   lightspeed_write_secrets "${ns}" "${token}" "${secret_mode}"
   lightspeed_apply_resource olsconfig cluster ols
   lightspeed_apply_resource llmprovider openai llmprovider

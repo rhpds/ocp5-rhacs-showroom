@@ -13,19 +13,22 @@ This course offers hands-on experience with Kubernetes-native security on Red Ha
 * *Cluster setup and services are managed by GitOps* — RHACS, Quay, GitOps, Compliance Operator, and the vulnerable demo apps are already synced by Argo CD. Deleting resources by accident is no problem, as they will be recreated by GitOps.
 * *You can go through the catalog in order, or jump in. The modules are designed to not be influenced by each other.* — 101 → 201 → 301, then the product deep-dives (RHACS, Virtualization, Lightwell TSSC).
 
-IMPORTANT: Make sure to run the setup script below! It asks you to choose a Lightspeed LLM provider (ChatGPT, Azure OpenAI, or another OpenAI-compatible API) and paste that provider's API key. Press Enter at the token prompt to skip. The script then saves your CLI credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
+IMPORTANT: Make sure to run the setup script below! It asks you to choose a Lightspeed LLM provider (OpenAI, Azure AI, Anthropic, Google Gemini, or another endpoint) and paste that provider's API key. Press Enter at the token prompt to skip. The script then saves your CLI credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
 
 [[environment-setup]]
 == Environment setup
 
-Cluster-wide install is already applied by OpenShift GitOps. That includes RHACS, Quay, the workshop images, the MCP servers, and OpenShift Lightspeed. The bastion script asks you to choose the Lightspeed LLM provider and paste that provider's API key, reads Quay and RHACS credentials into your shell, and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
+The following script asks you to choose the Lightspeed LLM provider and paste that provider's API key, reads Quay and RHACS credentials into your shell, and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
 
-OpenShift Lightspeed uses an LLM API key. This is not your OpenShift, RHACS, or Quay password. The choice is cluster-wide: everyone on this cluster shares the provider you save. Press Enter at the token prompt to leave Lightspeed unchanged.
+OpenShift Lightspeed uses an LLM API key. The choice is cluster-wide, meaning everyone on this cluster shares the provider you save. Press Enter at the token prompt to leave Lightspeed unchanged.
 
-* *ChatGPT (OpenAI)* — Paste an OpenAI API key. The script uses `https://api.openai.com/v1`. Type the model name that key can call, for example `gpt-4o`.
-* *Azure OpenAI* — Paste the Azure OpenAI key, then the resource endpoint (for example `https://my-resource.openai.azure.com`), the deployment name, the API version (`YYYY-MM-DD`; Enter accepts `2024-10-21`), and the model name (Enter uses the deployment name).
-* *Other OpenAI-compatible API* — Paste the key, an `http` or `https` endpoint, and the model name.
-* *Keep the current provider* — Store a new key and leave the provider and model as they are. Choose this when Lightspeed is already configured.
+* *OpenAI* — Paste an OpenAI API key. The script uses `https://api.openai.com/v1`. Type the model name that key can call, for example `gpt-4o`.
+* *Azure AI* — Paste the Azure AI key, then the resource endpoint (for example `https://my-resource.openai.azure.com`), the deployment name, the API version (`YYYY-MM-DD`; Enter accepts `2024-10-21`), and the model name (Enter uses the deployment name).
+* *Anthropic* — Paste an Anthropic API key. The script uses `https://api.anthropic.com/v1/`. Type the Claude model name, for example `claude-sonnet-4-5`.
+* *Google Gemini* — Paste a Gemini API key. The script uses `https://generativelanguage.googleapis.com/v1beta/openai/`. Type the Gemini model name, for example `gemini-2.5-flash`.
+* *Other* — Paste the key, an `http` or `https` endpoint, and the model name.
+
+When a provider is already saved, the script also offers *Keep the current provider*. That stores a new key and leaves the provider and model as they are.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
@@ -33,6 +36,12 @@ git clone https://github.com/rhpds/ocp5-rhacs-showroom.git
 cd ocp5-rhacs-showroom
 bash setup/lab-environment.sh
 source ~/.bashrc
+----
+
+.console output
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+
 ----
 
 TIP: Feel free to sign into the consoles while the lab environment script runs in the background.

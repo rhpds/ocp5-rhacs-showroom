@@ -48,10 +48,13 @@ IMPORTANT: This will run quickly if it has already been run as part of the initi
 
 The script asks you to choose the LLM provider for OpenShift Lightspeed, then paste that provider's API key. This is not your OpenShift, RHACS, or Quay password. The choice is cluster-wide. Press Enter at the token prompt to leave Lightspeed unchanged and continue.
 
-* *ChatGPT (OpenAI)* — An OpenAI API key. The endpoint is `https://api.openai.com/v1`. Type the model name, for example `gpt-4o`.
-* *Azure OpenAI* — The Azure OpenAI key, resource endpoint (for example `https://my-resource.openai.azure.com`), deployment name, API version (`YYYY-MM-DD`; Enter accepts `2024-10-21`), and model name (Enter uses the deployment name).
-* *Other OpenAI-compatible API* — The key, an `http` or `https` endpoint, and the model name.
-* *Keep the current provider* — Store a new key and leave the provider and model as they are.
+* *OpenAI* — An OpenAI API key. The endpoint is `https://api.openai.com/v1`. Type the model name, for example `gpt-4o`.
+* *Azure AI* — The Azure AI key, resource endpoint (for example `https://my-resource.openai.azure.com`), deployment name, API version (`YYYY-MM-DD`; Enter accepts `2024-10-21`), and model name (Enter uses the deployment name).
+* *Anthropic* — An Anthropic API key. The endpoint is `https://api.anthropic.com/v1/`. Type the Claude model name, for example `claude-sonnet-4-5`.
+* *Google Gemini* — A Gemini API key. The endpoint is `https://generativelanguage.googleapis.com/v1beta/openai/`. Type the Gemini model name, for example `gemini-2.5-flash`.
+* *Other* — The key, an `http` or `https` endpoint, and the model name.
+
+When a provider is already saved, choose *Keep the current provider* to store a new key and leave the provider and model as they are.
 
 You can skip this step and run the verification step below if you've already run the script.
 
@@ -82,11 +85,12 @@ OpenShift Lightspeed uses an LLM API key. This is not your OpenShift, RHACS, or 
 The choice is cluster-wide. Press Enter at the token prompt to leave Lightspeed unchanged.
 
 Select the LLM provider:
-  1) ChatGPT (OpenAI)
-  2) Azure OpenAI
-  3) Other OpenAI-compatible API
-  4) Keep the current provider
-Choice [4]: 1
+  1) OpenAI
+  2) Azure AI
+  3) Anthropic
+  4) Google Gemini
+  5) Other
+Choice [1]: 1
 Using https://api.openai.com/v1
 Model name (for example gpt-4o): gpt-4o
 Paste the OpenAI API key (press Enter to skip):
@@ -97,7 +101,7 @@ Paste the OpenAI API key (press Enter to skip):
   SUCCESS: Lab environment setup completed successfully
 ================================================================
 
-  ✓ Lightspeed configured (ChatGPT / gpt-4o)
+  ✓ Lightspeed configured (OpenAI / gpt-4o)
   ✓ Quay credentials read from the cluster
   ✓ RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)
   ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)

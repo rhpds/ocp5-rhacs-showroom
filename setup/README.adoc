@@ -79,7 +79,7 @@ Attendees use the Showroom attribute `{workshop_user_suffix}` matching their ass
 
 == Attendee lab environment (bastion)
 
-Attendees clone `ocp5-rhacs-showroom`, then run `setup/lab-environment.sh`. OpenShift GitOps already syncs RHACS, Quay (including the public MinIO image and the private workshop images), the Central Quay integration, Compliance Operator, collector networking, demo-apps, the MCP servers, and OpenShift Lightspeed. The bastion script asks for a Lightspeed provider (ChatGPT / OpenAI, Azure OpenAI, or another OpenAI-compatible endpoint) and that provider's API key, reads Quay and RHACS credentials into `~/.bashrc`, and installs `cosign`, `oc-mirror`, and `ec`. Press Enter at the token prompt to skip. The choice is cluster-wide.
+Attendees clone `ocp5-rhacs-showroom`, then run `setup/lab-environment.sh`. OpenShift GitOps already syncs RHACS, Quay (including the public MinIO image and the private workshop images), the Central Quay integration, Compliance Operator, collector networking, demo-apps, the MCP servers, and OpenShift Lightspeed. The bastion script asks for a Lightspeed provider (OpenAI, Azure AI, Anthropic, Google Gemini, or another endpoint) and that provider's API key, reads Quay and RHACS credentials into `~/.bashrc`, and installs `cosign`, `oc-mirror`, and `ec`. Press Enter at the token prompt to skip. The choice is cluster-wide.
 
 Patient-portal is not part of that init. ACS module 1 makes the Quay repositories public, then runs `--deploy-skupper-only`.
 
@@ -96,12 +96,13 @@ Unattended runs can export the provider before the script. When `LIGHTSPEED_API_
 [source,bash]
 ----
 export LIGHTSPEED_API_TOKEN='...'
-export LIGHTSPEED_PROVIDER=openai          # or azure_openai, or keep
+export LIGHTSPEED_PROVIDER=openai          # openai, azure_openai, anthropic, gemini, other, or keep
 export LIGHTSPEED_MODEL=gpt-4o
 export LIGHTSPEED_API_URL=https://api.openai.com/v1
-# Azure OpenAI also needs:
+# Azure AI also needs:
 # export LIGHTSPEED_AZURE_DEPLOYMENT=my-deployment
 # export LIGHTSPEED_AZURE_API_VERSION=2024-10-21
+# Anthropic and Gemini use their public endpoints when LIGHTSPEED_API_URL is unset.
 ----
 
 Use `--rhacs-configure` or `--apply-demo-apps` only on brownfield clusters that are not GitOps-managed.
