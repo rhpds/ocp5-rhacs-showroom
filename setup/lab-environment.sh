@@ -116,13 +116,15 @@ Environment:
                             quay.io/thanos/minio:RELEASE.2025-09-07T16-13-09Z
   LIGHTSPEED_API_TOKEN      LLM API key. Empty skips Lightspeed configuration.
   LIGHTSPEED_PROVIDER       openai, azure_openai, anthropic, gemini, other, or keep.
-  LIGHTSPEED_MODEL          Model name for that provider.
-  LIGHTSPEED_API_URL        Provider URL. OpenAI, Anthropic, and Gemini
-                            use their public endpoints when this is unset.
+  LIGHTSPEED_MODEL          Optional. Defaults: OpenAI and Azure gpt-6.1-sol,
+                            Anthropic claude-sonnet-5-5, Gemini gemini-3.8-flash.
+                            Required for other.
+  LIGHTSPEED_API_URL        Optional for OpenAI, Anthropic, and Gemini.
+                            Required for Azure AI and Other.
   LIGHTSPEED_AZURE_DEPLOYMENT
+                            Optional. Defaults to the model name.
   LIGHTSPEED_AZURE_API_VERSION
-                            Required for azure_openai. Version looks like
-                            2024-10-21.
+                            Optional. Defaults to 2024-10-21.
 EOF
 }
 
@@ -458,7 +460,8 @@ lightspeed_choose_provider() {
   done
 }
 
-# Public endpoints used when the caller does not pass LIGHTSPEED_API_URL.
+# Public endpoints and a current mid-tier model for each known provider.
+# Callers can still override with LIGHTSPEED_MODEL or LIGHTSPEED_API_URL.
 lightspeed_apply_default_url() {
   [[ -n "${url}" ]] && return 0
   case "${provider}" in
@@ -471,55 +474,61 @@ lightspeed_apply_default_url() {
     gemini)
       url="https://generativelanguage.googleapis.com/v1beta/openai/"
       ;;
-    *)
-      return 0
-      ;;
   esac
-  if [[ "${interactive}" == true ]]; then
-    lightspeed_tty_say "Using ${url}"
+}
+
+lightspeed_apply_defaults() {
+  local announced_model=false
+  lightspeed_apply_default_url
+  if [[ "${provider}" == "azure_openai" && -z "${api_version}" ]]; then
+    api_version="2024-10-21"
+  fi
+  if [[ -z "${model}" ]]; then
+    case "${provider}" in
+      openai)
+        model="gpt-6.1-sol"
+        ;;
+      anthropic)
+        model="claude-sonnet-5-5"
+        ;;
+      gemini)
+        model="gemini-3.8-flash"
+        ;;
+      azure_openai)
+        if [[ -n "${deployment}" ]]; then
+          model="${deployment}"
+        else
+          model="gpt-6.1-sol"
+        fi
+        ;;
+    esac
+    announced_model=true
+  fi
+  if [[ "${provider}" == "azure_openai" && -z "${deployment}" && -n "${model}" ]]; then
+    deployment="${model}"
+  fi
+  if [[ "${announced_model}" == true && -n "${model}" && "${interactive}" == true ]]; then
+    lightspeed_tty_say "Using ${model}"
   fi
 }
 
+# Known providers need only the API key. Azure still needs the resource
+# endpoint. Other needs an endpoint and a model name.
 lightspeed_prompt_provider_fields() {
   if [[ "${provider}" == "azure_openai" ]]; then
     if [[ -z "${url}" && "${interactive}" == true ]]; then
       lightspeed_tty_prompt url "Azure resource endpoint (https://my-resource.openai.azure.com): "
     fi
-    if [[ -z "${deployment}" && "${interactive}" == true ]]; then
-      lightspeed_tty_prompt deployment "Deployment name: "
-    fi
-    if [[ -z "${api_version}" && "${interactive}" == true ]]; then
-      lightspeed_tty_prompt api_version "API version [2024-10-21]: "
-      if [[ -z "${api_version}" ]]; then
-        api_version="2024-10-21"
-      fi
-    fi
-    if [[ -z "${model}" && "${interactive}" == true ]]; then
-      lightspeed_tty_prompt model "Model name (press Enter to use the deployment name): "
-      if [[ -z "${model}" && -n "${deployment}" ]]; then
-        model="${deployment}"
-      fi
-    fi
     return 0
   fi
-  if [[ -z "${url}" && "${provider}" == "other" && "${interactive}" == true ]]; then
-    lightspeed_tty_prompt url "API URL (http or https, for example https://example.com/v1): "
+  if [[ "${provider}" != "other" ]]; then
+    return 0
+  fi
+  if [[ -z "${url}" && "${interactive}" == true ]]; then
+    lightspeed_tty_prompt url "API URL (http or https): "
   fi
   if [[ -z "${model}" && "${interactive}" == true ]]; then
-    case "${provider}" in
-      openai)
-        lightspeed_tty_prompt model "Model name (for example gpt-4o): "
-        ;;
-      anthropic)
-        lightspeed_tty_prompt model "Model name (for example claude-sonnet-4-5): "
-        ;;
-      gemini)
-        lightspeed_tty_prompt model "Model name (for example gemini-2.5-flash): "
-        ;;
-      *)
-        lightspeed_tty_prompt model "Model name: "
-        ;;
-    esac
+    lightspeed_tty_prompt model "Model name: "
   fi
 }
 
@@ -957,9 +966,8 @@ configure_lightspeed_token() {
     keep_current=true
     choice_label="current provider"
   else
-    echo "Error: Lightspeed is not configured. Set LIGHTSPEED_PROVIDER (openai, azure_openai, anthropic, gemini, or other), LIGHTSPEED_MODEL, and LIGHTSPEED_API_TOKEN." >&2
-    echo "Azure AI also needs LIGHTSPEED_API_URL, LIGHTSPEED_AZURE_DEPLOYMENT, and LIGHTSPEED_AZURE_API_VERSION." >&2
-    echo "Other also needs LIGHTSPEED_API_URL." >&2
+    echo "Error: Lightspeed is not configured. Set LIGHTSPEED_PROVIDER (openai, azure_openai, anthropic, gemini, or other) and LIGHTSPEED_API_TOKEN." >&2
+    echo "The script selects the model. Azure AI and Other also need LIGHTSPEED_API_URL. Other also needs LIGHTSPEED_MODEL." >&2
     return 1
   fi
 
@@ -973,7 +981,7 @@ configure_lightspeed_token() {
 
   if [[ "${keep_current}" != true ]]; then
     while true; do
-      lightspeed_apply_default_url
+      lightspeed_apply_defaults
       lightspeed_prompt_provider_fields
       if lightspeed_fields_ok; then
         break
