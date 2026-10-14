@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Provision the ACS roadshow lab environment on the bastion host.
 # Quay, MinIO, workshop images, and the Central Quay integration are applied
-# by OpenShift GitOps. This script stores the shared Lightspeed token, reads
-# Quay and RHACS credentials into the shell, and installs TSSC CLIs.
+# by OpenShift GitOps. This script stores the Lightspeed provider and API key,
+# reads Quay and RHACS credentials into the shell, and installs TSSC CLIs.
 # Cluster-wide RHACS/Compliance/demo-app deploy is owned by OpenShift GitOps
 # (roadshow-prereqs + roadshow-demo-apps).
 #
@@ -114,6 +114,15 @@ Environment:
   MINIO_REPLACEMENT_IMAGE   Public image used when Quay's MinIO pod cannot pull
                             quay.io/minio/minio. Default:
                             quay.io/thanos/minio:RELEASE.2025-09-07T16-13-09Z
+  LIGHTSPEED_API_TOKEN      LLM API key. Empty skips Lightspeed configuration.
+  LIGHTSPEED_PROVIDER       openai, azure_openai, or keep.
+  LIGHTSPEED_MODEL          Model name for that provider.
+  LIGHTSPEED_API_URL        Provider URL. Interactive ChatGPT uses
+                            https://api.openai.com/v1 when this is unset.
+  LIGHTSPEED_AZURE_DEPLOYMENT
+  LIGHTSPEED_AZURE_API_VERSION
+                            Required for azure_openai. Version looks like
+                            2024-10-21.
 EOF
 }
 
@@ -283,12 +292,12 @@ if [[ "${INSTALL_TSSC_CLIS_ONLY}" == true ]]; then
 fi
 
 # Quay, workshop images, and the Central registry integration come from GitOps.
-# This script only writes the shared Lightspeed token, local CLI env, and TSSC binaries.
+# This script only writes the Lightspeed provider and API key, local CLI env, and TSSC binaries.
 load_roadshow_env
 
 # Count top-level lab steps.
 TOTAL=0
-TOTAL=$((TOTAL + 6)) # admin + lightspeed token + quay env + tssc clis + CLI vars + verify API
+TOTAL=$((TOTAL + 6)) # admin + lightspeed provider + quay env + tssc clis + CLI vars + verify API
 [[ "${SKIP_RHACS_CONFIGURE}" != true ]] && TOTAL=$((TOTAL + 1))
 [[ "${SKIP_DEMO_APPS}" != true ]] && TOTAL=$((TOTAL + 1)) # clone
 [[ "${SKIP_DEMO_APPS}" != true && "${SKIP_DEMO_APPLY}" != true ]] && TOTAL=$((TOTAL + 1)) # apply
@@ -298,104 +307,622 @@ mkdir -p "${LOG_DIR}"
 LOG_FILE="${LOG_DIR}/lab-environment-$(date +%Y%m%d-%H%M%S).log"
 progress_init "${TOTAL}" "${LOG_FILE}" "Lab environment setup"
 
-# Ask for the shared Lightspeed token and store it in the secrets Argo already ignores.
-# progress_run sends this function's stdout and stderr to the log, so the prompt
-# has to use the terminal directly. An empty answer skips Lightspeed and continues.
-configure_lightspeed_token() {
-  local ns="openshift-lightspeed"
-  local token="${LIGHTSPEED_API_TOKEN:-}"
-  local url="${LIGHTSPEED_API_URL:-}"
-  local provider="${LIGHTSPEED_PROVIDER:-openai}"
-  local model="${LIGHTSPEED_MODEL:-}"
-  LIGHTSPEED_TOKEN_SAVED=false
-  if [[ -z "${token}" && -r /dev/tty && -w /dev/tty ]]; then
-    printf '\n%s' "Paste the shared Lightspeed API token (press Enter to skip): " >/dev/tty
-    IFS= read -r -s token </dev/tty || token=""
-    printf '\n' >/dev/tty
+# Lightspeed prompts write to /dev/tty because progress_run sends stdout and
+# stderr to the log. Helpers assign provider, model, url, and the related
+# fields on the caller. Do not mark those names local inside the helpers.
+lightspeed_trim() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "${value}"
+}
+
+# Permission bits on /dev/tty can say writable when this process has no
+# controlling terminal. Open it, and treat a failed open as non-interactive.
+lightspeed_have_tty() {
+  ( : >/dev/tty && : </dev/tty ) >/dev/null 2>&1
+}
+
+lightspeed_tty_say() {
+  lightspeed_have_tty || return 0
+  printf '%s\n' "$1" >/dev/tty || true
+}
+
+lightspeed_tty_prompt() {
+  local dest="$1"
+  local prompt="$2"
+  local secret="${3:-false}"
+  local answer=""
+  printf '%s' "${prompt}" >/dev/tty 2>/dev/null || return 1
+  if [[ "${secret}" == true ]]; then
+    IFS= read -r -s answer </dev/tty || return 1
+    printf '\n' >/dev/tty 2>/dev/null || true
+  else
+    IFS= read -r answer </dev/tty || return 1
   fi
-  if [[ -z "${token}" ]]; then
-    echo "No Lightspeed API token provided. Continuing." >/dev/tty
-    echo "No Lightspeed API token provided. Continuing."
+  answer="$(lightspeed_trim "${answer}")"
+  printf -v "${dest}" '%s' "${answer}"
+}
+
+lightspeed_token_prompt_text() {
+  case "$1" in
+    ChatGPT)
+      printf '%s' "Paste the OpenAI API key (press Enter to skip): "
+      ;;
+    "Azure OpenAI")
+      printf '%s' "Paste the Azure OpenAI key (press Enter to skip): "
+      ;;
+    OpenAI-compatible)
+      printf '%s' "Paste the API key for this endpoint (press Enter to skip): "
+      ;;
+    *)
+      printf '%s' "Paste the API key for the current Lightspeed provider (press Enter to skip): "
+      ;;
+  esac
+}
+
+lightspeed_skip() {
+  local msg="No Lightspeed API token provided. Continuing."
+  echo "${msg}"
+  lightspeed_tty_say "${msg}"
+}
+
+lightspeed_choose_provider() {
+  local default_choice="1"
+  local pick=""
+  if [[ "${configured}" == true ]]; then
+    default_choice="4"
+  fi
+  lightspeed_tty_say ""
+  lightspeed_tty_say "OpenShift Lightspeed uses an LLM API key. This is not your OpenShift, RHACS, or Quay password."
+  lightspeed_tty_say "The choice is cluster-wide. Press Enter at the token prompt to leave Lightspeed unchanged."
+  lightspeed_tty_say ""
+  lightspeed_tty_say "Select the LLM provider:"
+  lightspeed_tty_say "  1) ChatGPT (OpenAI)"
+  lightspeed_tty_say "  2) Azure OpenAI"
+  lightspeed_tty_say "  3) Other OpenAI-compatible API"
+  if [[ "${configured}" == true ]]; then
+    lightspeed_tty_say "  4) Keep the current provider"
+  fi
+  while true; do
+    lightspeed_tty_prompt pick "Choice [${default_choice}]: "
+    if [[ -z "${pick}" ]]; then
+      pick="${default_choice}"
+    fi
+    case "${pick}" in
+      1)
+        provider="openai"
+        choice_label="ChatGPT"
+        if [[ "${url_from_env}" != true ]]; then
+          url=""
+        fi
+        return 0
+        ;;
+      2)
+        provider="azure_openai"
+        choice_label="Azure OpenAI"
+        if [[ "${url_from_env}" != true ]]; then
+          url=""
+        fi
+        return 0
+        ;;
+      3)
+        provider="openai"
+        choice_label="OpenAI-compatible"
+        if [[ "${url_from_env}" != true ]]; then
+          url=""
+        fi
+        return 0
+        ;;
+      4)
+        if [[ "${configured}" == true ]]; then
+          keep_current=true
+          choice_label="current provider"
+          return 0
+        fi
+        lightspeed_tty_say "No Lightspeed provider is configured yet. Choose 1, 2, or 3."
+        ;;
+      *)
+        if [[ "${configured}" == true ]]; then
+          lightspeed_tty_say "Enter 1, 2, 3, or 4."
+        else
+          lightspeed_tty_say "Enter 1, 2, or 3."
+        fi
+        ;;
+    esac
+    pick=""
+  done
+}
+
+lightspeed_prompt_provider_fields() {
+  if [[ "${provider}" == "azure_openai" ]]; then
+    if [[ -z "${url}" && "${interactive}" == true ]]; then
+      lightspeed_tty_prompt url "Azure resource endpoint (https://my-resource.openai.azure.com): "
+    fi
+    if [[ -z "${deployment}" && "${interactive}" == true ]]; then
+      lightspeed_tty_prompt deployment "Deployment name: "
+    fi
+    if [[ -z "${api_version}" && "${interactive}" == true ]]; then
+      lightspeed_tty_prompt api_version "API version [2024-10-21]: "
+      if [[ -z "${api_version}" ]]; then
+        api_version="2024-10-21"
+      fi
+    fi
+    if [[ -z "${model}" && "${interactive}" == true ]]; then
+      lightspeed_tty_prompt model "Model name (press Enter to use the deployment name): "
+      if [[ -z "${model}" && -n "${deployment}" ]]; then
+        model="${deployment}"
+      fi
+    fi
     return 0
   fi
-  if ! oc get namespace "${ns}" >/dev/null 2>&1; then
-    echo "Error: namespace ${ns} is missing. Wait for the OpenShift Lightspeed GitOps application." >&2
+  if [[ -z "${url}" && "${interactive}" == true ]]; then
+    if [[ "${choice_label}" == "ChatGPT" ]]; then
+      url="https://api.openai.com/v1"
+      lightspeed_tty_say "Using https://api.openai.com/v1"
+    elif [[ "${choice_label}" == "OpenAI-compatible" ]]; then
+      lightspeed_tty_prompt url "API URL (http or https, for example https://example.com/v1): "
+    else
+      lightspeed_tty_prompt url "API URL [https://api.openai.com/v1]: "
+      if [[ -z "${url}" ]]; then
+        url="https://api.openai.com/v1"
+      fi
+    fi
+  fi
+  if [[ -z "${model}" && "${interactive}" == true ]]; then
+    lightspeed_tty_prompt model "Model name (for example gpt-4o): "
+  fi
+}
+
+lightspeed_fields_ok() {
+  ls_field_error=""
+  ls_clear_field=""
+  if [[ "${provider}" != "openai" && "${provider}" != "azure_openai" ]]; then
+    ls_field_error="LIGHTSPEED_PROVIDER must be openai or azure_openai."
+    ls_clear_field="provider"
     return 1
   fi
   if [[ -z "${url}" ]]; then
-    url="$(oc -n "${ns}" get olsconfig cluster -o jsonpath='{.spec.llm.providers[0].url}' 2>/dev/null || true)"
-  fi
-  if [[ -z "${url}" ]]; then
-    if [[ -t 0 ]]; then
-      read -r -p "Lightspeed API URL (Azure or other OpenAI-compatible endpoint): " url
-    fi
-  fi
-  if [[ -z "${url}" ]]; then
-    echo "Error: Lightspeed API URL is unset. Set llm.apiUrl in GitOps or LIGHTSPEED_API_URL." >&2
+    ls_field_error="API URL is required. Set LIGHTSPEED_API_URL."
+    ls_clear_field="url"
     return 1
   fi
-  oc -n "${ns}" create secret generic llm-credentials \
-    --from-literal=apitoken="${token}" \
-    --dry-run=client -o yaml | oc apply -f - >/dev/null
-  oc -n "${ns}" create secret generic llm-creds-openai \
-    --from-literal=OPENAI_API_KEY="${token}" \
-    --dry-run=client -o yaml | oc apply -f - >/dev/null
-  LIGHTSPEED_TOKEN_SAVED=true
-  echo "Lightspeed token stored in ${ns}"
-  if oc -n "${ns}" get olsconfig cluster >/dev/null 2>&1; then
-    oc -n "${ns}" patch olsconfig cluster --type=json \
-      -p "[{\"op\":\"add\",\"path\":\"/spec/llm/providers/0/url\",\"value\":\"${url}\"}]" >/dev/null
-  else
-    if [[ -z "${model}" && -t 0 ]]; then
-      read -r -p "Lightspeed model name: " model
-    fi
-    if [[ -z "${model}" ]]; then
-      echo "Error: OLSConfig is missing and LIGHTSPEED_MODEL is unset." >&2
+  if [[ ! "${url}" =~ ^https?://[^[:space:]]+$ ]]; then
+    ls_field_error="API URL must start with http:// or https://."
+    ls_clear_field="url"
+    return 1
+  fi
+  if [[ "${provider}" == "azure_openai" ]]; then
+    if [[ -z "${deployment}" ]]; then
+      ls_field_error="Azure OpenAI needs a deployment name. Set LIGHTSPEED_AZURE_DEPLOYMENT."
+      ls_clear_field="deployment"
       return 1
     fi
-    local azure=""
-    if [[ "${provider}" == "azure_openai" ]]; then
-      local deployment="${LIGHTSPEED_AZURE_DEPLOYMENT:-}"
-      local api_version="${LIGHTSPEED_AZURE_API_VERSION:-}"
-      if [[ -z "${deployment}" && -t 0 ]]; then
-        read -r -p "Azure OpenAI deployment name: " deployment
+    if [[ ! "${api_version}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}(-preview)?$ ]]; then
+      ls_field_error="Azure API version must look like YYYY-MM-DD. Set LIGHTSPEED_AZURE_API_VERSION."
+      ls_clear_field="api_version"
+      return 1
+    fi
+  fi
+  if [[ -z "${model}" ]]; then
+    ls_field_error="Model name is required. Set LIGHTSPEED_MODEL."
+    ls_clear_field="model"
+    return 1
+  fi
+  return 0
+}
+
+# Read an oc JSON document on stdin. Print {"action":"create|patch","body":...}.
+# The heredoc is Python's program, so the document is passed on fd 3.
+lightspeed_emit_json() {
+  python3 - "$@" 3<&0 <<'PY'
+import json
+import os
+import sys
+
+mode = sys.argv[1] if len(sys.argv) > 1 else ""
+if mode not in ("ols", "llmprovider"):
+    sys.stderr.write("lightspeed_emit_json expects ols or llmprovider\n")
+    sys.exit(2)
+
+raw = os.fdopen(3).read().strip()
+if raw:
+    doc = json.loads(raw)
+    if not isinstance(doc, dict):
+        sys.stderr.write("expected a JSON object from oc get\n")
+        sys.exit(2)
+else:
+    doc = None
+
+provider = os.environ["LS_PROVIDER"]
+model = os.environ["LS_MODEL"]
+url = os.environ["LS_URL"]
+ns = os.environ["LS_NS"]
+deployment = os.environ.get("LS_AZURE_DEPLOYMENT", "")
+api_version = os.environ.get("LS_AZURE_API_VERSION", "")
+pname = "azure" if provider == "azure_openai" else "openai"
+
+
+def emit(payload):
+    json.dump(payload, sys.stdout)
+
+
+if mode == "ols":
+    entry = {
+        "credentialsSecretRef": {"name": "llm-credentials"},
+        "models": [{"name": model}],
+        "name": pname,
+        "type": provider,
+        "url": url,
+    }
+    if provider == "azure_openai":
+        entry["deploymentName"] = deployment
+        entry["apiVersion"] = api_version
+    created = {
+        "apiVersion": "ols.openshift.io/v1alpha1",
+        "kind": "OLSConfig",
+        "metadata": {"name": "cluster", "namespace": ns},
+        "spec": {
+            "featureGates": ["MCPServer"],
+            "llm": {"providers": [entry]},
+            "ols": {"defaultModel": model, "defaultProvider": pname},
+        },
+    }
+    if doc is None:
+        emit({"action": "create", "body": created})
+        sys.exit(0)
+    spec = doc.get("spec") if isinstance(doc.get("spec"), dict) else None
+    if spec is None:
+        emit({
+            "action": "patch",
+            "body": [{
+                "op": "add",
+                "path": "/spec",
+                "value": created["spec"],
+            }],
+        })
+        sys.exit(0)
+    ops = []
+    llm = spec.get("llm")
+    if not isinstance(llm, dict):
+        op = "replace" if "llm" in spec else "add"
+        ops.append({"op": op, "path": "/spec/llm", "value": {"providers": [entry]}})
+    else:
+        providers = llm.get("providers")
+        if isinstance(providers, list) and providers:
+            ops.append({"op": "replace", "path": "/spec/llm/providers/0", "value": entry})
+        elif "providers" in llm:
+            ops.append({"op": "replace", "path": "/spec/llm/providers", "value": [entry]})
+        else:
+            ops.append({"op": "add", "path": "/spec/llm/providers", "value": [entry]})
+    ols = spec.get("ols")
+    if not isinstance(ols, dict):
+        op = "replace" if "ols" in spec else "add"
+        ops.append({
+            "op": op,
+            "path": "/spec/ols",
+            "value": {"defaultModel": model, "defaultProvider": pname},
+        })
+    else:
+        for key, value in (("defaultModel", model), ("defaultProvider", pname)):
+            op = "replace" if key in ols else "add"
+            ops.append({"op": op, "path": "/spec/ols/" + key, "value": value})
+    emit({"action": "patch", "body": ops})
+    sys.exit(0)
+
+if provider == "azure_openai":
+    spec_body = {
+        "type": "AzureOpenAI",
+        "azureOpenAI": {
+            "credentialsSecret": {"name": "llm-creds-openai"},
+            "endpoint": url,
+            "apiVersion": api_version,
+        },
+    }
+else:
+    spec_body = {
+        "type": "OpenAI",
+        "openAI": {
+            "credentialsSecret": {"name": "llm-creds-openai"},
+            "url": url,
+        },
+    }
+if doc is None:
+    emit({
+        "action": "create",
+        "body": {
+            "apiVersion": "agentic.openshift.io/v1alpha1",
+            "kind": "LLMProvider",
+            "metadata": {"name": "openai", "namespace": ns},
+            "spec": spec_body,
+        },
+    })
+    sys.exit(0)
+op = "replace" if isinstance(doc.get("spec"), dict) else "add"
+emit({"action": "patch", "body": [{"op": op, "path": "/spec", "value": spec_body}]})
+PY
+}
+
+lightspeed_apply_resource() {
+  local kind="$1"
+  local name="$2"
+  local mode="$3"
+  local errfile jsonfile wrapped action body
+  errfile="$(mktemp)"
+  jsonfile="$(mktemp)"
+  if oc -n "${ns}" get "${kind}" "${name}" -o json >"${jsonfile}" 2>"${errfile}"; then
+    rm -f "${errfile}"
+  elif grep -E -q 'NotFound|not found' "${errfile}"; then
+    rm -f "${errfile}"
+    : >"${jsonfile}"
+  else
+    cat "${errfile}" >&2
+    rm -f "${errfile}" "${jsonfile}"
+    return 1
+  fi
+  wrapped="$(
+    LS_NS="${ns}" \
+      LS_PROVIDER="${provider}" \
+      LS_MODEL="${model}" \
+      LS_URL="${url}" \
+      LS_AZURE_DEPLOYMENT="${deployment}" \
+      LS_AZURE_API_VERSION="${api_version}" \
+      lightspeed_emit_json "${mode}" <"${jsonfile}"
+  )" || {
+    rm -f "${jsonfile}"
+    return 1
+  }
+  rm -f "${jsonfile}"
+  action="$(printf '%s' "${wrapped}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["action"])')"
+  body="$(printf '%s' "${wrapped}" | python3 -c 'import json,sys; json.dump(json.load(sys.stdin)["body"], sys.stdout)')"
+  if [[ "${action}" == "create" ]]; then
+    printf '%s' "${body}" | oc apply -f - >/dev/null
+    echo "Created ${kind}/${name}"
+  elif [[ "${action}" == "patch" ]]; then
+    oc -n "${ns}" patch "${kind}" "${name}" --type=json -p "${body}" >/dev/null
+    echo "Patched ${kind}/${name}"
+  else
+    echo "Error: unexpected Lightspeed apply action '${action}'." >&2
+    return 1
+  fi
+}
+
+lightspeed_patch_agents() {
+  local ns="$1"
+  local model_name="$2"
+  local agent payload
+  for agent in default smart; do
+    if oc -n "${ns}" get agent "${agent}" >/dev/null 2>&1; then
+      payload="$(LS_MODEL="${model_name}" python3 -c 'import json,os; print(json.dumps({"spec":{"model":os.environ["LS_MODEL"]}}))')"
+      oc -n "${ns}" patch agent "${agent}" --type=merge -p "${payload}" >/dev/null
+      echo "Updated Agent ${agent} model to ${model_name}"
+    fi
+  done
+}
+
+lightspeed_write_secrets() {
+  local ns="$1"
+  local api_token="$2"
+  local mode="$3"
+  oc -n "${ns}" create secret generic llm-credentials \
+    --from-literal=apitoken="${api_token}" \
+    --dry-run=client -o yaml | oc apply -f - >/dev/null
+  case "${mode}" in
+    openai)
+      oc -n "${ns}" create secret generic llm-creds-openai \
+        --from-literal=OPENAI_API_KEY="${api_token}" \
+        --dry-run=client -o yaml | oc apply -f - >/dev/null
+      ;;
+    azure)
+      oc -n "${ns}" create secret generic llm-creds-openai \
+        --from-literal=AZURE_OPENAI_API_KEY="${api_token}" \
+        --dry-run=client -o yaml | oc apply -f - >/dev/null
+      ;;
+    both)
+      oc -n "${ns}" create secret generic llm-creds-openai \
+        --from-literal=OPENAI_API_KEY="${api_token}" \
+        --from-literal=AZURE_OPENAI_API_KEY="${api_token}" \
+        --dry-run=client -o yaml | oc apply -f - >/dev/null
+      ;;
+    *)
+      echo "Error: unknown Lightspeed secret mode ${mode}." >&2
+      return 1
+      ;;
+  esac
+  echo "Stored Lightspeed credentials in namespace ${ns}"
+}
+
+lightspeed_current_secret_mode() {
+  local ns="$1"
+  local ols_type="" agentic_type=""
+  local azure=false openai_key=false
+  ols_type="$(oc -n "${ns}" get olsconfig cluster -o jsonpath='{.spec.llm.providers[0].type}' 2>/dev/null || true)"
+  agentic_type="$(oc -n "${ns}" get llmprovider openai -o jsonpath='{.spec.type}' 2>/dev/null || true)"
+  if [[ "${ols_type}" == "azure_openai" || "${agentic_type}" == "AzureOpenAI" ]]; then
+    azure=true
+  fi
+  if [[ "${ols_type}" == "openai" || "${agentic_type}" == "OpenAI" ]]; then
+    openai_key=true
+  fi
+  if [[ "${azure}" == true && "${openai_key}" == true ]]; then
+    printf '%s' "both"
+  elif [[ "${azure}" == true ]]; then
+    printf '%s' "azure"
+  elif [[ "${openai_key}" == true ]]; then
+    printf '%s' "openai"
+  else
+    printf '%s' "both"
+  fi
+}
+
+lightspeed_restart_appserver() {
+  local ns="$1"
+  if ! oc -n "${ns}" get deployment lightspeed-app-server >/dev/null 2>&1; then
+    echo "lightspeed-app-server is not installed yet; skip restart."
+    return 0
+  fi
+  if oc -n "${ns}" rollout restart deployment/lightspeed-app-server >/dev/null 2>&1; then
+    echo "Restarted lightspeed-app-server so it reloads the provider."
+  else
+    echo "Warning: could not restart lightspeed-app-server. The provider settings are saved." >&2
+    lightspeed_tty_say "Warning: could not restart lightspeed-app-server. The provider settings are saved."
+  fi
+}
+
+# Ask for the Lightspeed provider and API key, then store them in the secrets
+# and CRs Argo already ignores. An empty token skips Lightspeed and continues.
+configure_lightspeed_token() {
+  local ns="openshift-lightspeed"
+  local token="" url="" provider="" model="" deployment="" api_version=""
+  local choice_label="" keep_current=false interactive=false configured=false
+  local url_from_env=false model_from_env=false
+  local deployment_from_env=false api_version_from_env=false
+  local ls_field_error="" ls_clear_field="" attempts=0 secret_mode="" token_prompt=""
+
+  token="$(lightspeed_trim "${LIGHTSPEED_API_TOKEN:-}")"
+  url="$(lightspeed_trim "${LIGHTSPEED_API_URL:-}")"
+  provider="$(lightspeed_trim "${LIGHTSPEED_PROVIDER:-}")"
+  model="$(lightspeed_trim "${LIGHTSPEED_MODEL:-}")"
+  deployment="$(lightspeed_trim "${LIGHTSPEED_AZURE_DEPLOYMENT:-}")"
+  api_version="$(lightspeed_trim "${LIGHTSPEED_AZURE_API_VERSION:-}")"
+  [[ -n "${url}" ]] && url_from_env=true
+  [[ -n "${model}" ]] && model_from_env=true
+  [[ -n "${deployment}" ]] && deployment_from_env=true
+  [[ -n "${api_version}" ]] && api_version_from_env=true
+  lightspeed_have_tty && interactive=true
+  LIGHTSPEED_TOKEN_SAVED=false
+  LIGHTSPEED_BANNER_DETAIL=""
+
+  if oc get namespace "${ns}" >/dev/null 2>&1; then
+    if oc -n "${ns}" get olsconfig cluster >/dev/null 2>&1 \
+      || oc -n "${ns}" get llmprovider openai >/dev/null 2>&1; then
+      configured=true
+    fi
+  fi
+
+  if [[ -n "${provider}" ]]; then
+    case "${provider}" in
+      keep)
+        keep_current=true
+        choice_label="current provider"
+        ;;
+      azure_openai)
+        choice_label="Azure OpenAI"
+        ;;
+      openai)
+        if [[ -z "${url}" || "${url}" == "https://api.openai.com/v1" || "${url}" == "https://api.openai.com/v1/" ]]; then
+          choice_label="ChatGPT"
+        else
+          choice_label="OpenAI-compatible"
+        fi
+        ;;
+      *)
+        echo "Error: LIGHTSPEED_PROVIDER must be openai, azure_openai, or keep." >&2
+        lightspeed_tty_say "Error: LIGHTSPEED_PROVIDER must be openai, azure_openai, or keep."
+        return 1
+        ;;
+    esac
+  elif [[ "${interactive}" == true ]]; then
+    lightspeed_choose_provider
+  elif [[ -z "${token}" ]]; then
+    lightspeed_skip
+    return 0
+  elif [[ "${configured}" == true ]]; then
+    keep_current=true
+    choice_label="current provider"
+  else
+    echo "Error: Lightspeed is not configured. Set LIGHTSPEED_PROVIDER (openai or azure_openai), LIGHTSPEED_MODEL, LIGHTSPEED_API_URL, and LIGHTSPEED_API_TOKEN." >&2
+    echo "Azure OpenAI also needs LIGHTSPEED_AZURE_DEPLOYMENT and LIGHTSPEED_AZURE_API_VERSION." >&2
+    return 1
+  fi
+
+  if [[ "${keep_current}" == true && "${configured}" != true ]]; then
+    echo "Error: no Lightspeed provider is configured yet. Set LIGHTSPEED_PROVIDER to openai or azure_openai." >&2
+    lightspeed_tty_say "Error: no Lightspeed provider is configured yet. Set LIGHTSPEED_PROVIDER to openai or azure_openai."
+    return 1
+  fi
+
+  echo "Lightspeed selection: ${choice_label}"
+
+  if [[ "${keep_current}" != true ]]; then
+    while true; do
+      lightspeed_prompt_provider_fields
+      if lightspeed_fields_ok; then
+        break
       fi
-      if [[ -z "${api_version}" && -t 0 ]]; then
-        read -r -p "Azure OpenAI API version: " api_version
-      fi
-      if [[ -z "${deployment}" || -z "${api_version}" ]]; then
-        echo "Error: azure_openai needs LIGHTSPEED_AZURE_DEPLOYMENT and LIGHTSPEED_AZURE_API_VERSION." >&2
+      echo "Error: ${ls_field_error}" >&2
+      lightspeed_tty_say "Error: ${ls_field_error}"
+      if [[ "${interactive}" != true ]]; then
         return 1
       fi
-      azure="$(printf '        deploymentName: %s\n        apiVersion: %s\n' "${deployment}" "${api_version}")"
-    fi
-    oc apply -f - >/dev/null <<EOF
-apiVersion: ols.openshift.io/v1alpha1
-kind: OLSConfig
-metadata:
-  name: cluster
-  namespace: ${ns}
-spec:
-  featureGates:
-    - MCPServer
-  llm:
-    providers:
-      - credentialsSecretRef:
-          name: llm-credentials
-        models:
-          - name: ${model}
-        name: ${provider}
-        type: ${provider}
-        url: ${url}
-${azure}  ols:
-    defaultModel: ${model}
-    defaultProvider: ${provider}
-EOF
+      case "${ls_clear_field}" in
+        url)
+          [[ "${url_from_env}" == true ]] && return 1
+          url=""
+          ;;
+        model)
+          [[ "${model_from_env}" == true ]] && return 1
+          model=""
+          ;;
+        deployment)
+          [[ "${deployment_from_env}" == true ]] && return 1
+          deployment=""
+          ;;
+        api_version)
+          [[ "${api_version_from_env}" == true ]] && return 1
+          api_version=""
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+      attempts=$((attempts + 1))
+      if [[ "${attempts}" -ge 5 ]]; then
+        echo "Error: too many invalid Lightspeed answers." >&2
+        lightspeed_tty_say "Error: too many invalid Lightspeed answers."
+        return 1
+      fi
+    done
   fi
-  if oc -n "${ns}" get llmprovider openai >/dev/null 2>&1; then
-    oc -n "${ns}" patch llmprovider openai --type=merge \
-      -p "{\"spec\":{\"openAI\":{\"url\":\"${url}\"}}}" >/dev/null || true
+
+  if [[ -z "${token}" && "${interactive}" == true ]]; then
+    token_prompt="$(lightspeed_token_prompt_text "${choice_label}")"
+    lightspeed_tty_prompt token "${token_prompt}" true
   fi
+  if [[ -z "${token}" ]]; then
+    lightspeed_skip
+    return 0
+  fi
+
+  if ! oc get namespace "${ns}" >/dev/null 2>&1; then
+    echo "Error: namespace ${ns} is missing. Wait for the OpenShift Lightspeed GitOps application." >&2
+    lightspeed_tty_say "Error: namespace ${ns} is missing. Wait for the OpenShift Lightspeed GitOps application."
+    return 1
+  fi
+
+  if [[ "${keep_current}" == true ]]; then
+    secret_mode="$(lightspeed_current_secret_mode "${ns}")"
+    lightspeed_write_secrets "${ns}" "${token}" "${secret_mode}"
+    lightspeed_restart_appserver "${ns}"
+    LIGHTSPEED_TOKEN_SAVED=true
+    LIGHTSPEED_BANNER_DETAIL="Lightspeed API token stored (current provider kept)"
+    echo "Lightspeed token stored; provider unchanged"
+    return 0
+  fi
+
+  if [[ "${provider}" == "azure_openai" ]]; then
+    secret_mode="azure"
+  else
+    secret_mode="openai"
+  fi
+  lightspeed_write_secrets "${ns}" "${token}" "${secret_mode}"
+  lightspeed_apply_resource olsconfig cluster ols
+  lightspeed_apply_resource llmprovider openai llmprovider
+  lightspeed_patch_agents "${ns}" "${model}"
+  lightspeed_restart_appserver "${ns}"
+  LIGHTSPEED_TOKEN_SAVED=true
+  LIGHTSPEED_BANNER_DETAIL="Lightspeed configured (${choice_label} / ${model})"
+  echo "Lightspeed configured provider=${provider} model=${model} url=${url}"
 }
 
 # Read the Quay admin account GitOps already created. Do not generate another password.
@@ -1403,7 +1930,7 @@ do_ensure_quay() {
 }
 
 progress_run "Verify OpenShift access" do_verify_admin
-progress_run "Store Lightspeed API token" configure_lightspeed_token
+progress_run "Configure Lightspeed provider" configure_lightspeed_token
 progress_run "Read Quay credentials" load_quay_env
 progress_run "Install TSSC CLIs (cosign, oc-mirror, ec)" do_tssc_clis
 
@@ -1466,7 +1993,7 @@ progress_done "Lab environment setup complete"
 load_roadshow_env
 
 if [[ "${LIGHTSPEED_TOKEN_SAVED:-false}" == true ]]; then
-  lightspeed_banner="Lightspeed API token stored"
+  lightspeed_banner="${LIGHTSPEED_BANNER_DETAIL:-Lightspeed API token stored}"
 else
   lightspeed_banner="Lightspeed API token skipped"
 fi

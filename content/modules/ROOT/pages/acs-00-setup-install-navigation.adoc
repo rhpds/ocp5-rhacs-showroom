@@ -40,13 +40,20 @@ image::01-rhacs-console-dashboard.png[RHACS console,link=self, window=blank, wid
 
 == Lab environment setup
 
-The setup script below is the remaining *bastion* work: the shared Lightspeed API token, RHACS and Quay CLI variables, a local clone of `demo-apps`, and the TSSC CLIs. Quay, the workshop images, MCP, and OpenShift Lightspeed are already synced by OpenShift GitOps.
+The setup script below is the remaining *bastion* work: the Lightspeed LLM provider and API key, RHACS and Quay CLI variables, a local clone of `demo-apps`, and the TSSC CLIs. Quay, the workshop images, MCP, and OpenShift Lightspeed are already synced by OpenShift GitOps.
 
-IMPORTANT: This will run quickly if it has already been run as part of the initial setup.4
+IMPORTANT: This will run quickly if it has already been run as part of the initial setup.
 
 === Run the setup script
 
-The script prompts for the shared Lightspeed API token. Press Enter to continue without one. It then writes CLI variables and installs the TSSC CLIs. You can skip this step and run the verification step below if you've already run the script.
+The script asks you to choose the LLM provider for OpenShift Lightspeed, then paste that provider's API key. This is not your OpenShift, RHACS, or Quay password. The choice is cluster-wide. Press Enter at the token prompt to leave Lightspeed unchanged and continue.
+
+* *ChatGPT (OpenAI)* — An OpenAI API key. The endpoint is `https://api.openai.com/v1`. Type the model name, for example `gpt-4o`.
+* *Azure OpenAI* — The Azure OpenAI key, resource endpoint (for example `https://my-resource.openai.azure.com`), deployment name, API version (`YYYY-MM-DD`; Enter accepts `2024-10-21`), and model name (Enter uses the deployment name).
+* *Other OpenAI-compatible API* — The key, an `http` or `https` endpoint, and the model name.
+* *Keep the current provider* — Store a new key and leave the provider and model as they are.
+
+You can skip this step and run the verification step below if you've already run the script.
 
 *Procedure*
 
@@ -69,13 +76,28 @@ bash setup/lab-environment.sh
 Lab environment setup
 Details: /home/lab-user/.acs-roadshow/lab-environment-YYYYMMDD-HHMMSS.log
 
-[############################] 10/10  Lab environment setup complete
+[########--------------------] 2/7  Configure Lightspeed provider
+
+OpenShift Lightspeed uses an LLM API key. This is not your OpenShift, RHACS, or Quay password.
+The choice is cluster-wide. Press Enter at the token prompt to leave Lightspeed unchanged.
+
+Select the LLM provider:
+  1) ChatGPT (OpenAI)
+  2) Azure OpenAI
+  3) Other OpenAI-compatible API
+  4) Keep the current provider
+Choice [4]: 1
+Using https://api.openai.com/v1
+Model name (for example gpt-4o): gpt-4o
+Paste the OpenAI API key (press Enter to skip):
+
+[############################] 7/7  Lab environment setup complete
 
 ================================================================
   SUCCESS: Lab environment setup completed successfully
 ================================================================
 
-  ✓ Lightspeed API token stored
+  ✓ Lightspeed configured (ChatGPT / gpt-4o)
   ✓ Quay credentials read from the cluster
   ✓ RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)
   ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)

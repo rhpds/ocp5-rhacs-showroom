@@ -79,7 +79,7 @@ Attendees use the Showroom attribute `{workshop_user_suffix}` matching their ass
 
 == Attendee lab environment (bastion)
 
-Attendees clone `ocp5-rhacs-showroom`, then run `setup/lab-environment.sh`. OpenShift GitOps already syncs RHACS, Quay (including the public MinIO image and the private workshop images), the Central Quay integration, Compliance Operator, collector networking, demo-apps, the MCP servers, and OpenShift Lightspeed. The bastion script prompts for the shared Lightspeed API token, reads Quay and RHACS credentials into `~/.bashrc`, and installs `cosign`, `oc-mirror`, and `ec`.
+Attendees clone `ocp5-rhacs-showroom`, then run `setup/lab-environment.sh`. OpenShift GitOps already syncs RHACS, Quay (including the public MinIO image and the private workshop images), the Central Quay integration, Compliance Operator, collector networking, demo-apps, the MCP servers, and OpenShift Lightspeed. The bastion script asks for a Lightspeed provider (ChatGPT / OpenAI, Azure OpenAI, or another OpenAI-compatible endpoint) and that provider's API key, reads Quay and RHACS credentials into `~/.bashrc`, and installs `cosign`, `oc-mirror`, and `ec`. Press Enter at the token prompt to skip. The choice is cluster-wide.
 
 Patient-portal is not part of that init. ACS module 1 makes the Quay repositories public, then runs `--deploy-skupper-only`.
 
@@ -89,6 +89,19 @@ git clone https://github.com/rhpds/ocp5-rhacs-showroom.git
 cd ocp5-rhacs-showroom
 bash setup/lab-environment.sh
 source ~/.bashrc
+----
+
+Unattended runs can export the provider before the script. When `LIGHTSPEED_API_TOKEN` is set and `LIGHTSPEED_PROVIDER` is unset, and Lightspeed is already configured, the script stores the key and leaves the provider and model alone.
+
+[source,bash]
+----
+export LIGHTSPEED_API_TOKEN='...'
+export LIGHTSPEED_PROVIDER=openai          # or azure_openai, or keep
+export LIGHTSPEED_MODEL=gpt-4o
+export LIGHTSPEED_API_URL=https://api.openai.com/v1
+# Azure OpenAI also needs:
+# export LIGHTSPEED_AZURE_DEPLOYMENT=my-deployment
+# export LIGHTSPEED_AZURE_API_VERSION=2024-10-21
 ----
 
 Use `--rhacs-configure` or `--apply-demo-apps` only on brownfield clusters that are not GitOps-managed.
