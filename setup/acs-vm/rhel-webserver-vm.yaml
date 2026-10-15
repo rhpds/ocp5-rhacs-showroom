@@ -39,7 +39,10 @@ spec:
             enabled: true
         firmware:
           bootloader:
-            efi: {}
+            # EFI defaults to Secure Boot. That locks down the guest kernel
+            # and roxagent cannot read debugfs.
+            efi:
+              secureBoot: false
         machine:
           type: pc-q35-rhel9.6.0
         memory:

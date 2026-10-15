@@ -2095,7 +2095,8 @@ do_acs_vm() {
 
   if oc -n "${ns}" get "vm/${vm}" >/dev/null 2>&1; then
     machine="$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.spec.template.spec.domain.machine.type}' 2>/dev/null || true)"
-    if [[ "${machine}" != "pc-q35-rhel9.6.0" || "$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || true)" != "" ]]; then
+    secure="$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.spec.template.spec.domain.firmware.bootloader.efi.secureBoot}' 2>/dev/null || true)"
+    if [[ "${machine}" != "pc-q35-rhel9.6.0" || "${secure}" != "false" || "$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || true)" != "" ]]; then
       acs_vm_status "Deploy rhel-webserver (removing previous guest)"
       oc -n "${ns}" delete "vm/${vm}" --wait=false --ignore-not-found || true
       deadline=$((SECONDS + 120))
@@ -2116,6 +2117,15 @@ do_acs_vm() {
   acs_vm_status "Deploy rhel-webserver (applying lab manifest)"
   oc apply -f "${SCRIPT_DIR}/acs-vm/rhel-webserver-cloudinit-secret.yaml"
   oc apply -f "${SCRIPT_DIR}/acs-vm/rhel-webserver-vm.yaml"
+  # Firmware is fixed at guest start. A VMI that booted with Secure Boot
+  # keeps kernel lockdown until it is replaced.
+  if oc -n "${ns}" get "vmi/${vm}" >/dev/null 2>&1; then
+    secure="$(oc -n "${ns}" get "vmi/${vm}" -o jsonpath='{.spec.domain.firmware.bootloader.efi.secureBoot}' 2>/dev/null || true)"
+    if [[ "${secure}" != "false" ]]; then
+      acs_vm_status "Deploy rhel-webserver (restarting guest without Secure Boot)"
+      oc -n "${ns}" delete "vmi/${vm}" --wait=false
+    fi
+  fi
 
   deadline=$((SECONDS + 600))
   while true; do
