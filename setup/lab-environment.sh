@@ -4,8 +4,8 @@
 # by OpenShift GitOps. This script stores the Lightspeed provider and API key,
 # reads Quay and RHACS credentials into the shell, and installs TSSC CLIs.
 # Cluster-wide RHACS/Compliance/demo-app deploy is owned by OpenShift GitOps
-# (roadshow-prereqs + roadshow-demo-apps). This script also applies rhel9-vm,
-# the same guest the rhacs-virt chart syncs.
+# (roadshow-prereqs + roadshow-demo-apps). This script also applies
+# rhel-webserver in rhacs-virt-webserver. GitOps keeps rhel9-vm in rhacs-virt.
 #
 # Quiet by default (progress bar + current step). Use --verbose for full logs.
 #
@@ -2084,69 +2084,68 @@ acs_vm_status() {
   fi
 }
 
-# Same guest the rhacs-virt chart syncs. Apply it here too so a bastion run
-# still brings the VM up when GitOps has not synced yet. Leave Argo CD
-# tracking annotations in place.
+# rhel-webserver is the second guest. GitOps keeps rhel9-vm in rhacs-virt.
+# The agent binary is still served by roxagent-bin in that namespace.
 do_acs_vm() {
-  local ns=rhacs-virt
+  local ns=rhacs-virt-webserver
+  local vm=rhel-webserver
   local deadline phase status machine
-  if ! oc get ns "${ns}" >/dev/null 2>&1; then
-    oc create ns "${ns}"
-  fi
+  acs_vm_status "Deploy rhel-webserver (namespace ${ns})"
+  oc apply -f "${SCRIPT_DIR}/acs-vm/namespace.yaml"
 
-  if oc -n "${ns}" get vm rhel9-vm >/dev/null 2>&1; then
-    machine="$(oc -n "${ns}" get vm rhel9-vm -o jsonpath='{.spec.template.spec.domain.machine.type}' 2>/dev/null || true)"
-    if [[ "${machine}" != "pc-q35-rhel9.6.0" || "$(oc -n "${ns}" get vm rhel9-vm -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || true)" != "" ]]; then
-      acs_vm_status "Deploy ACS virtual machine (removing previous guest)"
-      oc -n "${ns}" delete vm rhel9-vm --wait=false --ignore-not-found || true
+  if oc -n "${ns}" get "vm/${vm}" >/dev/null 2>&1; then
+    machine="$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.spec.template.spec.domain.machine.type}' 2>/dev/null || true)"
+    if [[ "${machine}" != "pc-q35-rhel9.6.0" || "$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || true)" != "" ]]; then
+      acs_vm_status "Deploy rhel-webserver (removing previous guest)"
+      oc -n "${ns}" delete "vm/${vm}" --wait=false --ignore-not-found || true
       deadline=$((SECONDS + 120))
-      while oc -n "${ns}" get vm rhel9-vm >/dev/null 2>&1; do
+      while oc -n "${ns}" get "vm/${vm}" >/dev/null 2>&1; do
         if (( SECONDS >= deadline )); then
-          echo "Previous rhel9-vm did not finish deleting; clearing finalizers."
-          oc -n "${ns}" patch vm rhel9-vm --type=json -p '[{"op":"remove","path":"/metadata/finalizers"}]' >/dev/null 2>&1 || true
-          oc -n "${ns}" delete vmi rhel9-vm --wait=false --ignore-not-found >/dev/null 2>&1 || true
+          echo "Previous ${vm} did not finish deleting; clearing finalizers."
+          oc -n "${ns}" patch "vm/${vm}" --type=json -p '[{"op":"remove","path":"/metadata/finalizers"}]' >/dev/null 2>&1 || true
+          oc -n "${ns}" delete "vmi/${vm}" --wait=false --ignore-not-found >/dev/null 2>&1 || true
           sleep 2
           break
         fi
-        acs_vm_status "Deploy ACS virtual machine (previous guest is terminating)"
+        acs_vm_status "Deploy rhel-webserver (previous guest is terminating)"
         sleep 5
       done
     fi
   fi
 
-  acs_vm_status "Deploy ACS virtual machine (applying lab manifest)"
-  oc apply -f "${SCRIPT_DIR}/acs-vm/rhel9-vm-cloudinit-secret.yaml"
-  oc apply -f "${SCRIPT_DIR}/acs-vm/rhel9-vm.yaml"
+  acs_vm_status "Deploy rhel-webserver (applying lab manifest)"
+  oc apply -f "${SCRIPT_DIR}/acs-vm/rhel-webserver-cloudinit-secret.yaml"
+  oc apply -f "${SCRIPT_DIR}/acs-vm/rhel-webserver-vm.yaml"
 
   deadline=$((SECONDS + 600))
   while true; do
-    phase="$(oc -n "${ns}" get vmi rhel9-vm -o jsonpath='{.status.phase}' 2>/dev/null || true)"
-    status="$(oc -n "${ns}" get vm rhel9-vm -o jsonpath='{.status.printableStatus}' 2>/dev/null || true)"
+    phase="$(oc -n "${ns}" get "vmi/${vm}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    status="$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.status.printableStatus}' 2>/dev/null || true)"
     if [[ "${phase}" == "Running" ]]; then
-      echo "rhel9-vm is Running. Cloud-init still registers the guest and starts roxagent."
+      echo "${vm} is Running in ${ns}. Cloud-init still registers the guest and starts roxagent."
       return 0
     fi
     case "${status}" in
       Error|CrashLoop|ErrImagePull|ImagePullBackOff|DataVolumeError)
-        echo "Error: rhel9-vm is ${status} (VMI phase=${phase:-absent})." >&2
-        oc -n "${ns}" describe vm rhel9-vm >&2 || true
-        oc -n "${ns}" describe vmi rhel9-vm >&2 || true
+        echo "Error: ${vm} is ${status} (VMI phase=${phase:-absent})." >&2
+        oc -n "${ns}" describe "vm/${vm}" >&2 || true
+        oc -n "${ns}" describe "vmi/${vm}" >&2 || true
         return 1
         ;;
     esac
     if (( SECONDS >= deadline )); then
-      echo "Error: rhel9-vm did not reach Running within 600s (vm=${status:-absent} vmi=${phase:-absent})." >&2
+      echo "Error: ${vm} did not reach Running within 600s (vm=${status:-absent} vmi=${phase:-absent})." >&2
       oc -n "${ns}" get vm,vmi,pod >&2 || true
-      oc -n "${ns}" describe vm rhel9-vm >&2 || true
+      oc -n "${ns}" describe "vm/${vm}" >&2 || true
       return 1
     fi
-    acs_vm_status "Deploy ACS virtual machine (${status:-starting})"
+    acs_vm_status "Deploy rhel-webserver (${status:-starting})"
     sleep 5
   done
 }
 
 progress_run "Verify OpenShift access" do_verify_admin
-progress_run "Deploy ACS virtual machine" do_acs_vm
+progress_run "Deploy rhel-webserver" do_acs_vm
 progress_run "Configure Lightspeed provider" configure_lightspeed_token
 progress_run "Read Quay credentials" load_quay_env
 progress_run "Install TSSC CLIs (cosign, oc-mirror, ec)" do_tssc_clis

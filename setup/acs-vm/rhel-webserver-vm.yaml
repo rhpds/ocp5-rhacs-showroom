@@ -1,19 +1,17 @@
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
-  name: rhel9-vm
-  namespace: rhacs-virt
+  name: rhel-webserver
+  namespace: rhacs-virt-webserver
   labels:
-    app: rhel9-vm
+    app: rhel-webserver
 spec:
   runStrategy: Always
   template:
     metadata:
       labels:
-        kubevirt.io/domain: rhel9-vm
+        kubevirt.io/domain: rhel-webserver
         kubevirt.io/size: small
-      annotations:
-        rhacs.demo/agent: lab-rhel-webserver-spec
     spec:
       domain:
         cpu:
@@ -59,4 +57,4 @@ spec:
         - name: cloudinitdisk
           cloudInitNoCloud:
             secretRef:
-              name: rhel9-vm-cloudinit
+              name: rhel-webserver-cloudinit
