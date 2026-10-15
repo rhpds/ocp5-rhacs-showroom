@@ -2073,46 +2073,83 @@ do_ensure_quay() {
   return 1
 }
 
+# progress_run sends this function's stdout to the log. Write step updates to
+# the terminal so a long VM start does not look frozen.
+acs_vm_status() {
+  local label="$1"
+  echo "${label}"
+  if [[ -w /dev/tty ]]; then
+    progress_render "${label}" >/dev/tty
+  fi
+}
+
 # rhel9-vm uses the ACS module manifest: EFI q35, a worker nodeSelector, and
-# roxagent serve --host-path /. GitOps keeps the VSOCK gate and roxagent-bin.
+# roxagent serve --host-path /. GitOps still applies the VSOCK gate and the
+# roxagent-bin Service. It does not create this guest.
 do_acs_vm() {
   local ns=rhacs-virt
-  local deadline phase
+  local deadline phase status machine
   if ! oc get ns "${ns}" >/dev/null 2>&1; then
     oc create ns "${ns}"
   fi
-  echo "Waiting for Service ${ns}/roxagent-bin"
-  deadline=$((SECONDS + 300))
-  while ! oc -n "${ns}" get svc roxagent-bin >/dev/null 2>&1; do
-    if (( SECONDS >= deadline )); then
-      echo "Error: ${ns}/roxagent-bin did not appear within 300s." >&2
-      echo "Sync the rhacs-virt Argo CD Application, then rerun this script." >&2
-      return 1
+
+  # Replace only a guest that is not already the lab spec. An unbounded
+  # `oc delete --wait` here stalls the setup bar while the old VM terminates.
+  if oc -n "${ns}" get vm rhel9-vm >/dev/null 2>&1; then
+    machine="$(oc -n "${ns}" get vm rhel9-vm -o jsonpath='{.spec.template.spec.domain.machine.type}' 2>/dev/null || true)"
+    if [[ "${machine}" != "pc-q35-rhel9.6.0" || "$(oc -n "${ns}" get vm rhel9-vm -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || true)" != "" ]]; then
+      acs_vm_status "Deploy ACS virtual machine (removing previous guest)"
+      oc -n "${ns}" delete vm rhel9-vm --wait=false --ignore-not-found || true
+      deadline=$((SECONDS + 120))
+      while oc -n "${ns}" get vm rhel9-vm >/dev/null 2>&1; do
+        if (( SECONDS >= deadline )); then
+          echo "Previous rhel9-vm did not finish deleting; clearing finalizers."
+          oc -n "${ns}" patch vm rhel9-vm --type=json -p '[{"op":"remove","path":"/metadata/finalizers"}]' >/dev/null 2>&1 || true
+          oc -n "${ns}" delete vmi rhel9-vm --wait=false --ignore-not-found >/dev/null 2>&1 || true
+          sleep 2
+          break
+        fi
+        acs_vm_status "Deploy ACS virtual machine (previous guest is terminating)"
+        sleep 5
+      done
     fi
-    sleep 5
-  done
-  oc -n "${ns}" delete vm rhel9-vm --ignore-not-found --wait=true
-  oc -n "${ns}" delete secret rhel9-vm-cloudinit --ignore-not-found
+  fi
+
+  acs_vm_status "Deploy ACS virtual machine (applying lab manifest)"
   oc apply -f "${SCRIPT_DIR}/acs-vm/rhel9-vm-cloudinit-secret.yaml"
   oc apply -f "${SCRIPT_DIR}/acs-vm/rhel9-vm.yaml"
-  # The previous VM was an Argo CD resource. Drop tracking so prune leaves this one.
+  # Drop Argo tracking so a later rhacs-virt sync does not prune this guest.
   oc -n "${ns}" annotate secret/rhel9-vm-cloudinit vm/rhel9-vm \
     argocd.argoproj.io/tracking-id- \
     argocd.argoproj.io/instance- \
     --overwrite >/dev/null 2>&1 || true
-  echo "Waiting for rhel9-vm to reach Running"
-  deadline=$((SECONDS + 300))
+
+  deadline=$((SECONDS + 600))
   while true; do
-    phase="$(oc get vmi rhel9-vm -n "${ns}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    phase="$(oc -n "${ns}" get vmi rhel9-vm -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    status="$(oc -n "${ns}" get vm rhel9-vm -o jsonpath='{.status.printableStatus}' 2>/dev/null || true)"
     if [[ "${phase}" == "Running" ]]; then
       echo "rhel9-vm is Running. Cloud-init still registers the guest and starts roxagent."
+      if ! oc -n "${ns}" get svc roxagent-bin >/dev/null 2>&1; then
+        echo "Warning: Service ${ns}/roxagent-bin is not present yet. The rhacs-virt Argo CD app provides it. Cloud-init retries the agent download."
+      fi
       return 0
     fi
+    case "${status}" in
+      Error|CrashLoop|ErrImagePull|ImagePullBackOff|DataVolumeError)
+        echo "Error: rhel9-vm is ${status} (VMI phase=${phase:-absent})." >&2
+        oc -n "${ns}" describe vm rhel9-vm >&2 || true
+        oc -n "${ns}" describe vmi rhel9-vm >&2 || true
+        return 1
+        ;;
+    esac
     if (( SECONDS >= deadline )); then
-      echo "Error: rhel9-vm did not reach Running within 300s (phase=${phase:-absent})." >&2
-      oc get vm,vmi -n "${ns}" >&2 || true
+      echo "Error: rhel9-vm did not reach Running within 600s (vm=${status:-absent} vmi=${phase:-absent})." >&2
+      oc -n "${ns}" get vm,vmi,pod >&2 || true
+      oc -n "${ns}" describe vm rhel9-vm >&2 || true
       return 1
     fi
+    acs_vm_status "Deploy ACS virtual machine (${status:-starting})"
     sleep 5
   done
 }
