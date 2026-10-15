@@ -50,7 +50,7 @@ The script asks you to choose the LLM provider for OpenShift Lightspeed, then pa
 
 Choose OpenAI, Azure AI, Anthropic, Google Gemini, or Other, then paste that provider's API key. The script selects the model and the endpoint. Press Enter to accept a shown default, or type a value to replace it. Other asks for the endpoint and model name.
 
-When a provider is already saved, choose *Keep the current provider* to store a new key and leave the provider and model as they are.
+When a saved API key still authenticates, the script skips the provider prompt. To replace that key, export `LIGHTSPEED_PROVIDER` and `LIGHTSPEED_API_TOKEN` before running the script. When the saved key is missing or the provider rejects it, choose *Keep the current provider* to store a new key and leave the provider and model as they are.
 
 You can skip this step and run the verification step below if you've already run the script.
 

@@ -2,7 +2,8 @@
 # Provision the ACS roadshow lab environment on the bastion host.
 # Quay, MinIO, workshop images, and the Central Quay integration are applied
 # by OpenShift GitOps. This script stores the Lightspeed provider and API key,
-# reads Quay and RHACS credentials into the shell, and installs TSSC CLIs.
+# skips that prompt when the saved key still authenticates, reads Quay and
+# RHACS credentials into the shell, and installs TSSC CLIs.
 # Cluster-wide RHACS/Compliance/demo-app deploy is owned by OpenShift GitOps
 # (roadshow-prereqs + roadshow-demo-apps). This script also applies
 # rhel-webserver in rhacs-virt-webserver. GitOps keeps rhel9-vm in rhacs-virt.
@@ -115,8 +116,12 @@ Environment:
   MINIO_REPLACEMENT_IMAGE   Public image used when Quay's MinIO pod cannot pull
                             quay.io/minio/minio. Default:
                             quay.io/thanos/minio:RELEASE.2025-09-07T16-13-09Z
-  LIGHTSPEED_API_TOKEN      LLM API key. Empty skips Lightspeed configuration.
+  LIGHTSPEED_API_TOKEN      LLM API key. Empty skips Lightspeed configuration
+                            unless a saved key still authenticates, in which
+                            case the provider prompt is skipped.
   LIGHTSPEED_PROVIDER       openai, azure_openai, anthropic, gemini, other, or keep.
+                            Set this with LIGHTSPEED_API_TOKEN to replace a
+                            saved key that still works.
   LIGHTSPEED_MODEL          Optional. Defaults: OpenAI and Azure gpt-6.1-sol,
                             Anthropic claude-sonnet-5-5, Gemini gemini-3.8-flash.
                             Required for other.
@@ -891,8 +896,296 @@ lightspeed_restart_appserver() {
   fi
 }
 
+# Build the models URL used to check a saved key. kind is bearer, anthropic, or azure.
+lightspeed_probe_models_url() {
+  local kind="$1"
+  local url="$2"
+  local api_version="$3"
+  local base="${url%/}"
+  case "${kind}" in
+    azure)
+      if [[ ! "${api_version}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}(-preview)?$ ]]; then
+        api_version="2024-10-21"
+      fi
+      if [[ "${base}" == *"/openai/models"* ]]; then
+        if [[ "${base}" == *"?"* ]]; then
+          printf '%s' "${base}"
+        else
+          printf '%s?api-version=%s' "${base}" "${api_version}"
+        fi
+      elif [[ "${base}" == */openai ]]; then
+        printf '%s/models?api-version=%s' "${base}" "${api_version}"
+      else
+        printf '%s/openai/models?api-version=%s' "${base}" "${api_version}"
+      fi
+      ;;
+    *)
+      if [[ "${base}" == */models ]]; then
+        printf '%s' "${base}"
+      else
+        printf '%s/models' "${base}"
+      fi
+      ;;
+  esac
+}
+
+lightspeed_provider_label() {
+  local name="$1"
+  local model="$2"
+  local kind="$3"
+  local label=""
+  case "${name}" in
+    openai) label="OpenAI" ;;
+    azure) label="Azure AI" ;;
+    anthropic) label="Anthropic" ;;
+    gemini) label="Google Gemini" ;;
+    other) label="custom endpoint" ;;
+    *)
+      case "${kind}" in
+        azure) label="Azure AI" ;;
+        anthropic) label="Anthropic" ;;
+        *) label="Lightspeed" ;;
+      esac
+      ;;
+  esac
+  if [[ -n "${model}" ]]; then
+    printf '%s / %s' "${label}" "${model}"
+  else
+    printf '%s' "${label}"
+  fi
+}
+
+# 2xx and 429 mean the provider accepted the key. 429 is a rate limit.
+lightspeed_http_means_token_works() {
+  case "$1" in
+    2[0-9][0-9]|429) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Read provider, model, and URL from OLSConfig, then LLMProvider. Prints
+# shell assignments for probe_kind, probe_url, probe_name, probe_model, and
+# probe_api_version. The token is not part of this output.
+lightspeed_saved_provider_assignments() {
+  local ns="$1"
+  local ols_json="" llm_json=""
+  ols_json="$(oc -n "${ns}" get olsconfig cluster -o json 2>/dev/null || true)"
+  llm_json="$(oc -n "${ns}" get llmprovider openai -o json 2>/dev/null || true)"
+  LS_OLS_JSON="${ols_json}" LS_LLM_JSON="${llm_json}" python3 <<'PY'
+import json
+import os
+import shlex
+import sys
+
+
+def load(raw):
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    try:
+        doc = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
+def model_name(provider):
+    models = provider.get("models") or []
+    if models and isinstance(models[0], dict):
+        return str(models[0].get("name") or "")
+    return ""
+
+
+def from_ols(doc):
+    if not doc:
+        return None
+    providers = (((doc.get("spec") or {}).get("llm") or {}).get("providers") or [])
+    if not providers or not isinstance(providers[0], dict):
+        return None
+    provider = providers[0]
+    url = str(provider.get("url") or "")
+    if not url:
+        return None
+    return {
+        "type": str(provider.get("type") or ""),
+        "name": str(provider.get("name") or ""),
+        "url": url,
+        "model": model_name(provider),
+        "api_version": str(provider.get("apiVersion") or ""),
+    }
+
+
+def from_llm(doc):
+    if not doc:
+        return None
+    spec = doc.get("spec") or {}
+    provider_type = str(spec.get("type") or "")
+    if provider_type == "AzureOpenAI":
+        azure = spec.get("azureOpenAI") or {}
+        url = str(azure.get("endpoint") or "")
+        if not url:
+            return None
+        return {
+            "type": "azure_openai",
+            "name": "azure",
+            "url": url,
+            "model": "",
+            "api_version": str(azure.get("apiVersion") or ""),
+        }
+    if provider_type == "Anthropic":
+        anthropic = spec.get("anthropic") or {}
+        return {
+            "type": "openai",
+            "name": "anthropic",
+            "url": str(anthropic.get("url") or "https://api.anthropic.com/v1/"),
+            "model": "",
+            "api_version": "",
+        }
+    if provider_type == "OpenAI":
+        openai = spec.get("openAI") or {}
+        url = str(openai.get("url") or "")
+        if not url:
+            return None
+        name = "openai"
+        if "anthropic.com" in url:
+            name = "anthropic"
+        elif "generativelanguage.googleapis.com" in url:
+            name = "gemini"
+        elif "api.openai.com" not in url:
+            name = "other"
+        return {
+            "type": "openai",
+            "name": name,
+            "url": url,
+            "model": "",
+            "api_version": "",
+        }
+    return None
+
+
+chosen = from_ols(load(os.environ.get("LS_OLS_JSON", ""))) or from_llm(
+    load(os.environ.get("LS_LLM_JSON", ""))
+)
+if not chosen:
+    sys.exit(1)
+kind = "bearer"
+if chosen["type"] == "azure_openai" or chosen["name"] == "azure":
+    kind = "azure"
+elif chosen["name"] == "anthropic":
+    kind = "anthropic"
+
+
+def emit(key, value):
+    print(f"{key}={shlex.quote(value)}")
+
+
+emit("probe_kind", kind)
+emit("probe_url", chosen["url"])
+emit("probe_name", chosen["name"])
+emit("probe_model", chosen["model"])
+emit("probe_api_version", chosen["api_version"])
+PY
+}
+
+# Print the saved Lightspeed API token, or return 1 when none is stored.
+# Callers must capture stdout. Do not log it.
+lightspeed_read_saved_token() {
+  local ns="$1"
+  local raw="" decoded="" key=""
+  raw="$(oc -n "${ns}" get secret llm-credentials -o jsonpath='{.data.apitoken}' 2>/dev/null || true)"
+  if [[ -z "${raw}" ]]; then
+    for key in OPENAI_API_KEY ANTHROPIC_API_KEY AZURE_OPENAI_API_KEY; do
+      raw="$(oc -n "${ns}" get secret llm-creds-openai -o jsonpath="{.data.${key}}" 2>/dev/null || true)"
+      [[ -n "${raw}" ]] && break
+    done
+  fi
+  [[ -n "${raw}" ]] || return 1
+  decoded="$(printf '%s' "${raw}" | base64 -d 2>/dev/null || true)"
+  decoded="$(lightspeed_trim "${decoded}")"
+  [[ -n "${decoded}" ]] || return 1
+  printf '%s' "${decoded}"
+}
+
+# Ask the configured provider whether the saved key is accepted.
+# Sets existing_token_state to missing, rejected, unreachable, or ok.
+# Sets existing_label when the provider is known. Returns 0 only for ok.
+# The key is sent in a header file, not on the curl command line.
+lightspeed_existing_token_works() {
+  local ns="$1"
+  local saved="" models_url="" code="" hdr="" assignments=""
+  local probe_kind="" probe_url="" probe_name="" probe_model="" probe_api_version=""
+  existing_token_state="missing"
+  existing_label=""
+  saved="$(lightspeed_read_saved_token "${ns}" || true)"
+  [[ -n "${saved}" ]] || return 1
+  if [[ "${saved}" == *$'\n'* || "${saved}" == *$'\r'* ]]; then
+    existing_token_state="rejected"
+    echo "Saved Lightspeed token was rejected (invalid token text)."
+    return 1
+  fi
+  assignments="$(lightspeed_saved_provider_assignments "${ns}" || true)"
+  if [[ -z "${assignments}" ]]; then
+    existing_token_state="unreachable"
+    echo "Could not read the saved Lightspeed provider."
+    return 1
+  fi
+  # Assignments are shlex-quoted by lightspeed_saved_provider_assignments.
+  eval "${assignments}"
+  existing_label="$(lightspeed_provider_label "${probe_name}" "${probe_model}" "${probe_kind}")"
+  if [[ ! "${probe_url}" =~ ^https://[^[:space:]]+$ ]]; then
+    echo "Saved Lightspeed provider URL is not https. Not sending the saved token to verify it."
+    existing_token_state="unreachable"
+    return 1
+  fi
+  models_url="$(lightspeed_probe_models_url "${probe_kind}" "${probe_url}" "${probe_api_version}")"
+  if [[ "${interactive:-false}" == true ]]; then
+    lightspeed_tty_say "Checking the saved Lightspeed API token..."
+  fi
+  echo "Checking saved Lightspeed token for ${existing_label}"
+  hdr="$(mktemp)"
+  chmod 600 "${hdr}"
+  # shellcheck disable=SC2064
+  trap "rm -f '${hdr}'" RETURN
+  case "${probe_kind}" in
+    azure)
+      printf 'api-key: %s\n' "${saved}" >"${hdr}"
+      ;;
+    anthropic)
+      {
+        printf 'x-api-key: %s\n' "${saved}"
+        printf 'anthropic-version: 2023-06-01\n'
+        printf 'Authorization: Bearer %s\n' "${saved}"
+      } >"${hdr}"
+      ;;
+    *)
+      printf 'Authorization: Bearer %s\n' "${saved}" >"${hdr}"
+      ;;
+  esac
+  code="$(curl -sS -o /dev/null -w '%{http_code}' \
+    --max-time 20 --connect-timeout 8 --max-redirs 0 \
+    -H @"${hdr}" \
+    "${models_url}" 2>/dev/null || true)"
+  rm -f "${hdr}"
+  trap - RETURN
+  [[ "${code}" =~ ^[0-9]{3}$ ]] || code="000"
+  if lightspeed_http_means_token_works "${code}"; then
+    existing_token_state="ok"
+    echo "Saved Lightspeed token accepted (HTTP ${code})"
+    return 0
+  fi
+  if [[ "${code}" == "000" ]]; then
+    existing_token_state="unreachable"
+    echo "Could not reach the Lightspeed provider to check the saved token."
+  else
+    existing_token_state="rejected"
+    echo "Saved Lightspeed token was rejected (HTTP ${code})."
+  fi
+  return 1
+}
+
 # Ask for the Lightspeed provider and API key, then store them in the secrets
 # and CRs Argo already ignores. An empty token skips Lightspeed and continues.
+# A saved key that still authenticates skips the prompt.
 configure_lightspeed_token() {
   local ns="openshift-lightspeed"
   local token="" url="" provider="" model="" deployment="" api_version=""
@@ -900,6 +1193,7 @@ configure_lightspeed_token() {
   local url_from_env=false model_from_env=false
   local deployment_from_env=false api_version_from_env=false
   local ls_field_error="" ls_clear_field="" attempts=0 secret_mode="" token_prompt=""
+  local existing_label="" existing_token_state=""
 
   token="$(lightspeed_trim "${LIGHTSPEED_API_TOKEN:-}")"
   url="$(lightspeed_trim "${LIGHTSPEED_API_URL:-}")"
@@ -920,6 +1214,29 @@ configure_lightspeed_token() {
       || oc -n "${ns}" get llmprovider openai >/dev/null 2>&1; then
       configured=true
     fi
+  fi
+
+  # Re-running the lab should not ask again when the key already works.
+  # Env overrides still go through the prompt path so a key can be replaced.
+  if [[ -z "${token}" && -z "${provider}" && "${url_from_env}" != true && "${model_from_env}" != true && "${deployment_from_env}" != true && "${api_version_from_env}" != true && "${configured}" == true ]]; then
+    if lightspeed_existing_token_works "${ns}"; then
+      echo "Lightspeed already has a working API token (${existing_label}). Skipping the provider prompt."
+      lightspeed_tty_say "Lightspeed already has a working API token (${existing_label}). Skipping the provider prompt."
+      LIGHTSPEED_TOKEN_SAVED=true
+      LIGHTSPEED_BANNER_DETAIL="Lightspeed API token already working (${existing_label})"
+      return 0
+    fi
+    case "${existing_token_state}" in
+      rejected)
+        echo "The saved Lightspeed API token was rejected."
+        lightspeed_tty_say "The saved Lightspeed API token was rejected. Choose a provider and paste a new key."
+        ;;
+      unreachable)
+        echo "Could not verify the saved Lightspeed API token."
+        lightspeed_tty_say "Could not reach the Lightspeed provider to check the saved API token."
+        lightspeed_tty_say "Choose a provider, or press Enter at the token prompt to leave the saved key unchanged."
+        ;;
+    esac
   fi
 
   if [[ -n "${provider}" ]]; then
@@ -1035,6 +1352,13 @@ configure_lightspeed_token() {
     lightspeed_tty_prompt token "${token_prompt}" true
   fi
   if [[ -z "${token}" ]]; then
+    if [[ "${existing_token_state}" == "rejected" || "${existing_token_state}" == "unreachable" ]]; then
+      echo "Leaving the saved Lightspeed token unchanged."
+      lightspeed_tty_say "Leaving the saved Lightspeed token unchanged."
+      LIGHTSPEED_TOKEN_SAVED=true
+      LIGHTSPEED_BANNER_DETAIL="Lightspeed API token left unchanged"
+      return 0
+    fi
     lightspeed_skip
     return 0
   fi

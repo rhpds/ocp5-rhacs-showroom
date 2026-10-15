@@ -13,7 +13,7 @@ This course offers hands-on experience with Kubernetes-native security on Red Ha
 * *Cluster setup and services are managed by GitOps* — RHACS, Quay, GitOps, Compliance Operator, and the vulnerable demo apps are already synced by Argo CD. Deleting resources by accident is no problem, as they will be recreated by GitOps.
 * *You can go through the catalog in order, or jump in. The modules are designed to not be influenced by each other.* — 101 → 201 → 301, then the product deep-dives (RHACS, Virtualization, Lightwell TSSC).
 
-IMPORTANT: Make sure to run the setup script below! It asks you to choose a Lightspeed LLM provider (OpenAI, Azure AI, Anthropic, Google Gemini, or another endpoint) and paste that provider's API key. Press Enter at the token prompt to skip. The script then saves your CLI credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
+IMPORTANT: Make sure to run the setup script below! It asks you to choose a Lightspeed LLM provider (OpenAI, Azure AI, Anthropic, Google Gemini, or another endpoint) and paste that provider's API key. Press Enter at the token prompt to skip. When a saved API key still authenticates, the script skips that prompt. The script then saves your CLI credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
 
 [[environment-setup]]
 == Environment setup
@@ -24,7 +24,7 @@ OpenShift Lightspeed uses an LLM API key. The choice is cluster-wide, meaning ev
 
 Choose OpenAI, Azure AI, Anthropic, Google Gemini, or Other, then paste that provider's API key. The script selects the model and the endpoint. Press Enter to accept a shown default, or type a value to replace it. Other asks for the endpoint and model name.
 
-When a provider is already saved, the script also offers *Keep the current provider*. That stores a new key and leaves the provider and model as they are.
+When a saved API key still authenticates, the script skips the provider prompt. To replace that key, export `LIGHTSPEED_PROVIDER` and `LIGHTSPEED_API_TOKEN` before running the script. When the saved key is missing or the provider rejects it, the script asks again and offers *Keep the current provider*. That choice stores a new key and leaves the provider and model as they are.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
