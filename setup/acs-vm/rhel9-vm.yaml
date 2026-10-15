@@ -12,6 +12,8 @@ spec:
       labels:
         kubevirt.io/domain: rhel9-vm
         kubevirt.io/size: small
+      annotations:
+        rhacs.demo/agent: lab-rhel-webserver-spec
     spec:
       domain:
         cpu:

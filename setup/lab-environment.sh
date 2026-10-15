@@ -4,7 +4,8 @@
 # by OpenShift GitOps. This script stores the Lightspeed provider and API key,
 # reads Quay and RHACS credentials into the shell, and installs TSSC CLIs.
 # Cluster-wide RHACS/Compliance/demo-app deploy is owned by OpenShift GitOps
-# (roadshow-prereqs + roadshow-demo-apps). This script also creates rhel9-vm.
+# (roadshow-prereqs + roadshow-demo-apps). This script also applies rhel9-vm,
+# the same guest the rhacs-virt chart syncs.
 #
 # Quiet by default (progress bar + current step). Use --verbose for full logs.
 #
@@ -2083,9 +2084,9 @@ acs_vm_status() {
   fi
 }
 
-# rhel9-vm uses the ACS module manifest: EFI q35, a worker nodeSelector, and
-# roxagent serve --host-path /. GitOps still applies the VSOCK gate and the
-# roxagent-bin Service. It does not create this guest.
+# Same guest the rhacs-virt chart syncs. Apply it here too so a bastion run
+# still brings the VM up when GitOps has not synced yet. Leave Argo CD
+# tracking annotations in place.
 do_acs_vm() {
   local ns=rhacs-virt
   local deadline phase status machine
@@ -2093,8 +2094,6 @@ do_acs_vm() {
     oc create ns "${ns}"
   fi
 
-  # Replace only a guest that is not already the lab spec. An unbounded
-  # `oc delete --wait` here stalls the setup bar while the old VM terminates.
   if oc -n "${ns}" get vm rhel9-vm >/dev/null 2>&1; then
     machine="$(oc -n "${ns}" get vm rhel9-vm -o jsonpath='{.spec.template.spec.domain.machine.type}' 2>/dev/null || true)"
     if [[ "${machine}" != "pc-q35-rhel9.6.0" || "$(oc -n "${ns}" get vm rhel9-vm -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || true)" != "" ]]; then
@@ -2118,11 +2117,6 @@ do_acs_vm() {
   acs_vm_status "Deploy ACS virtual machine (applying lab manifest)"
   oc apply -f "${SCRIPT_DIR}/acs-vm/rhel9-vm-cloudinit-secret.yaml"
   oc apply -f "${SCRIPT_DIR}/acs-vm/rhel9-vm.yaml"
-  # Drop Argo tracking so a later rhacs-virt sync does not prune this guest.
-  oc -n "${ns}" annotate secret/rhel9-vm-cloudinit vm/rhel9-vm \
-    argocd.argoproj.io/tracking-id- \
-    argocd.argoproj.io/instance- \
-    --overwrite >/dev/null 2>&1 || true
 
   deadline=$((SECONDS + 600))
   while true; do
@@ -2130,9 +2124,6 @@ do_acs_vm() {
     status="$(oc -n "${ns}" get vm rhel9-vm -o jsonpath='{.status.printableStatus}' 2>/dev/null || true)"
     if [[ "${phase}" == "Running" ]]; then
       echo "rhel9-vm is Running. Cloud-init still registers the guest and starts roxagent."
-      if ! oc -n "${ns}" get svc roxagent-bin >/dev/null 2>&1; then
-        echo "Warning: Service ${ns}/roxagent-bin is not present yet. The rhacs-virt Argo CD app provides it. Cloud-init retries the agent download."
-      fi
       return 0
     fi
     case "${status}" in

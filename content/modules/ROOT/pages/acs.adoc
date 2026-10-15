@@ -189,7 +189,7 @@ image::acs-vm-openshift-virtualmachines.png[OpenShift console VirtualMachines pa
 +
 On the `rhel9-vm` overview, use *Open web console* (or open the *Console* tab).
 +
-Log in with username `{vm_user}` and password `redhat`.
+Log in with username `{vm_user}` and password `roadshow`.
 +
 Run the remaining guest commands in this procedure from the VM console, not from the Showroom terminal.
 
