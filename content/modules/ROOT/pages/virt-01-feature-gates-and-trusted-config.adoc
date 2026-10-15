@@ -9,18 +9,25 @@
 **Duration:** ~25 minutes
 
 == Overview
-xref:virt-00-scope-and-hco.adoc[virt-00] found `HyperConverged/kubevirt-hyperconverged`. This module scores the *least functionality* controls on that object: non-root virt-launcher, persistent SCSI reservations, downward metrics into the guest, TLS-only registries for CDI imports, and the jsonpatch annotations that bypass HCO.
+xref:virt-00-scope-and-hco.adoc[virt-00] found `HyperConverged/kubevirt-hyperconverged`. This module scores the *least functionality* controls on that object: 
+* non-root virt-launcher
+* persistent SCSI reservations
+* downward metrics into the guest
+* TLS-only registries for CDI imports
+* and the jsonpatch annotations that bypass HCO.
 
 Most of these are already at the secure default. Your job is to prove it and know the patch you would apply if an audit ever fails.
 
 == Why it matters
-Feature gates and annotations are how a platform team quietly reintroduces privileged helpers (`qemu-pr-helper`), host metrics in the guest, or experimental patches that are not supported. Auditors will ask what is enabled on HCO, not whether the VM "looks fine."
+Feature gates and annotations are how a platform team quietly reintroduces over privileged helpers, host metrics in the guest, or experimental patches that are not supported. 
+
+*Auditors will ask what is enabled on HCO, not whether the VM "looks fine."*
 
 == What does it solve
 
-* Root virt-launcher on clusters older than 4.18
+* Enabling Root virt-launcher on clusters
 * Persistent reservations left on when no Windows Shared Cluster Filesystem exists
-* Host/VM performance data exposed to guests (`downwardMetrics`)
+* Host/VM performance data exposed to guests
 * CDI pulling disk images over HTTP from unknown registries
 * jsonpatch annotations that mutate KubeVirt, CDI, network add-ons, or SSP outside HCO
 
@@ -30,8 +37,6 @@ Audit five HCO controls. Leave the live object at the secure default. Use the re
 === Prerequisites
 
 * xref:virt-00-scope-and-hco.adoc[virt-00] complete (`HyperConverged` exists)
-* Cluster-admin to get and, if needed, patch HCO
-* `jq` on the bastion for annotation checks
 
 Click each step for the full solution.
 
@@ -53,11 +58,12 @@ The `nonRoot` feature gate makes virt-launcher run without root. From OpenShift 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 oc get hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv \
-  -o jsonpath='{.spec.featureGates.nonRoot}{"\n"}'
-oc get csv -n openshift-cnv -o jsonpath='{range .items[*]}{.spec.version}{"\n"}{end}'
+  -o jsonpath='nonRoot={.spec.featureGates.nonRoot}{"\n"}'
+oc get csv -n openshift-cnv -o custom-columns=NAME:.metadata.name,VERSION:.spec.version --no-headers \
+  | grep '^kubevirt-hyperconverged-operator'
 ----
 
-TIP: `true` is the pass on pre-4.18. On 4.18+ the field may be empty or ignored; CSV version 4.18 or later means the secure default is already enforced.
+TIP: `nonRoot=true` is the pass on pre-4.18. On 4.18+ `nonRoot=` may be empty. Operator version 4.18 or later means non-root is already enforced, so skip the patch. Ignore other CSVs in this namespace.
 ====
 
 .Remediation (pre-4.18 only)
@@ -226,15 +232,27 @@ TIP: All four values should be `false`. Missing annotations (`{}`) is a pass.
 .Remediation
 [%collapsible]
 ====
-Remove a specific annotation (example: CDI). Repeat for any `true` result above. The trailing `-` deletes the key.
+On this cluster `kubevirt` is `true`. The annotation adds the `VSOCK` feature gate to the KubeVirt operand on every reconcile. Read it, then delete the key. The trailing `-` removes the annotation.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
+oc get hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv \
+  -o jsonpath='{.metadata.annotations.kubevirt\.kubevirt\.io/jsonpatch}{"\n"}'
 oc annotate --overwrite -n openshift-cnv hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged \
-  'containerizeddataimporter.kubevirt.io/jsonpatch-'
+  'kubevirt.kubevirt.io/jsonpatch-'
 ----
 
-TIP: Re-run the four `has(...)` checks. They should be `false`.
+If another value above is `true`, delete that key the same way:
+
+[source,bash,subs="+macros,+attributes"]
+----
+oc annotate --overwrite -n openshift-cnv hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged \
+  'containerizeddataimporter.kubevirt.io/jsonpatch-' \
+  'networkaddonsconfigs.kubevirt.io/jsonpatch-' \
+  'ssp.kubevirt.io/jsonpatch-'
+----
+
+TIP: Re-run the four `has(...)` checks. They should be `false`. HCO stops reapplying `VSOCK`.
 ====
 
 == Debrief
@@ -252,7 +270,7 @@ NOTE: Next is xref:virt-02-devices-ksm-permissions.adoc[virt-02] -- host devices
 
 == Cleanup
 
-Progress only. HCO stays as you left it (hopefully still at the secure defaults).
+Progress only. HCO stays as you left it (with the secure defaults).
 
 :lab-cleanup-module: virt-01
 include::partial$lab-cleanup.adoc[]

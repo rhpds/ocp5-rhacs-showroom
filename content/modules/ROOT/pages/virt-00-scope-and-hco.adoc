@@ -84,7 +84,7 @@ kubevirt-hyperconverged   34h
 .Read the feature gates
 [%collapsible]
 ====
-The map above is `spec.featureGates` on this cluster. Two gates are on: `decentralizedLiveMigration` and `videoConfig`. The rest are off. xref:virt-01-feature-gates-and-trusted-config.adoc[virt-01] scores `persistentReservation` and `downwardMetrics`; both should stay `false`.
+The map above is `spec.featureGates` on this cluster. Two gates are on: `decentralizedLiveMigration` and `videoConfig`. The rest are off.
 
 `alignCPUs` (`false`)::
 When a VM pins the QEMU emulator thread to its own dedicated CPU, KubeVirt can request up to two extra dedicated CPUs so the total is even. With this off, KubeVirt leaves the CPU count as requested.
@@ -161,17 +161,15 @@ Keep these boundaries in mind for every later module:
 
 == Debrief
 
-HyperConverged/kubevirt-hyperconverged is the control plane for OpenShift Virtualization. The HyperConverged Cluster Operator owns the KubeVirt, CDI, and related operands and reconciles them to match this CR. Feature gates, insecure registries, and most of the cluster-wide virt posture live here, or get applied here as jsonpatch annotations that HCO forwards. Virt-01 starts on this object for that reason. If the change is not on HCO, it is not durable.
+HyperConverged/kubevirt-hyperconverged is the control plane for OpenShift Virtualization. The HyperConverged Cluster Operator owns the KubeVirt, CDI, and related operands and reconciles them to match this CR. Feature gates, insecure registries, and most of the cluster-wide virt posture live here, or get applied here as jsonpatch annotations that HCO forwards.
 
 VirtualMachine/rhel9-vm is the workload. It is the guest you can log into, plus the spec that asks for disks, networks, and devices. Hardening the pathway means both: the cluster object that decides what KubeVirt is allowed to do, and the VM object that decides what this guest is allowed to ask for.
 
-Skip that split and three things go wrong.
-Patching the KubeVirt CR (or CDI, or the rest of the operand set) instead of HCO looks like it worked. The field changes, the VM still starts, and then HCO reconciles and puts the old value back. The lab "passes" until the next operator loop. That is why Virt-01 is feature gates, insecure registries, and HCO jsonpatch annotations, not a direct edit of KubeVirt/kubevirt.
 Hardening only the guest leaves the interesting surface outside it. Device passthrough, live-migration RBAC, and KubeVirt feature gates are not RHEL settings. A locked-down rhel9-vm on a permissive HCO is still a hypervisor with extra hardware and a migration API.
 
 == Cleanup
 
-This pathway is cumulative. The cleanup script records progress only. It does not delete HCO or `rhel9-vm`.
+Run the cleanup script after every module. It does not delete HCO or `rhel9-vm`.
 
 :lab-cleanup-module: virt-00
 include::partial$lab-cleanup.adoc[]

@@ -4,7 +4,7 @@
 # by OpenShift GitOps. This script stores the Lightspeed provider and API key,
 # reads Quay and RHACS credentials into the shell, and installs TSSC CLIs.
 # Cluster-wide RHACS/Compliance/demo-app deploy is owned by OpenShift GitOps
-# (roadshow-prereqs + roadshow-demo-apps).
+# (roadshow-prereqs + roadshow-demo-apps). This script also creates rhel9-vm.
 #
 # Quiet by default (progress bar + current step). Use --verbose for full logs.
 #
@@ -300,7 +300,7 @@ load_roadshow_env
 
 # Count top-level lab steps.
 TOTAL=0
-TOTAL=$((TOTAL + 6)) # admin + lightspeed provider + quay env + tssc clis + CLI vars + verify API
+TOTAL=$((TOTAL + 7)) # admin + lightspeed provider + quay env + tssc clis + CLI vars + verify API + ACS VM
 [[ "${SKIP_RHACS_CONFIGURE}" != true ]] && TOTAL=$((TOTAL + 1))
 [[ "${SKIP_DEMO_APPS}" != true ]] && TOTAL=$((TOTAL + 1)) # clone
 [[ "${SKIP_DEMO_APPS}" != true && "${SKIP_DEMO_APPLY}" != true ]] && TOTAL=$((TOTAL + 1)) # apply
@@ -2073,7 +2073,52 @@ do_ensure_quay() {
   return 1
 }
 
+# rhel9-vm uses the ACS module manifest: EFI q35, a worker nodeSelector, and
+# roxagent serve --host-path /. GitOps keeps the VSOCK gate and roxagent-bin.
+do_acs_vm() {
+  local ns=rhacs-virt
+  local deadline phase
+  if ! oc get ns "${ns}" >/dev/null 2>&1; then
+    oc create ns "${ns}"
+  fi
+  echo "Waiting for Service ${ns}/roxagent-bin"
+  deadline=$((SECONDS + 300))
+  while ! oc -n "${ns}" get svc roxagent-bin >/dev/null 2>&1; do
+    if (( SECONDS >= deadline )); then
+      echo "Error: ${ns}/roxagent-bin did not appear within 300s." >&2
+      echo "Sync the rhacs-virt Argo CD Application, then rerun this script." >&2
+      return 1
+    fi
+    sleep 5
+  done
+  oc -n "${ns}" delete vm rhel9-vm --ignore-not-found --wait=true
+  oc -n "${ns}" delete secret rhel9-vm-cloudinit --ignore-not-found
+  oc apply -f "${SCRIPT_DIR}/acs-vm/rhel9-vm-cloudinit-secret.yaml"
+  oc apply -f "${SCRIPT_DIR}/acs-vm/rhel9-vm.yaml"
+  # The previous VM was an Argo CD resource. Drop tracking so prune leaves this one.
+  oc -n "${ns}" annotate secret/rhel9-vm-cloudinit vm/rhel9-vm \
+    argocd.argoproj.io/tracking-id- \
+    argocd.argoproj.io/instance- \
+    --overwrite >/dev/null 2>&1 || true
+  echo "Waiting for rhel9-vm to reach Running"
+  deadline=$((SECONDS + 300))
+  while true; do
+    phase="$(oc get vmi rhel9-vm -n "${ns}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    if [[ "${phase}" == "Running" ]]; then
+      echo "rhel9-vm is Running. Cloud-init still registers the guest and starts roxagent."
+      return 0
+    fi
+    if (( SECONDS >= deadline )); then
+      echo "Error: rhel9-vm did not reach Running within 300s (phase=${phase:-absent})." >&2
+      oc get vm,vmi -n "${ns}" >&2 || true
+      return 1
+    fi
+    sleep 5
+  done
+}
+
 progress_run "Verify OpenShift access" do_verify_admin
+progress_run "Deploy ACS virtual machine" do_acs_vm
 progress_run "Configure Lightspeed provider" configure_lightspeed_token
 progress_run "Read Quay credentials" load_quay_env
 progress_run "Install TSSC CLIs (cosign, oc-mirror, ec)" do_tssc_clis

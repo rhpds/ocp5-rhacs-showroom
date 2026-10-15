@@ -189,7 +189,7 @@ image::acs-vm-openshift-virtualmachines.png[OpenShift console VirtualMachines pa
 +
 On the `rhel9-vm` overview, use *Open web console* (or open the *Console* tab).
 +
-Log in with username `{vm_user}` and the VM password from the xref:index.adoc[Welcome] page.
+Log in with username `{vm_user}` and password `redhat`.
 +
 Run the remaining guest commands in this procedure from the VM console, not from the Showroom terminal.
 
@@ -198,11 +198,10 @@ Run the remaining guest commands in this procedure from the VM console, not from
 [source,sh,role="copypaste"]
 ----
 command -v roxagent
-sudo systemctl is-active roxagent-serve.service
-sudo journalctl -u roxagent-serve.service --no-pager -n 20
+sudo grep 'index report containing' /var/log/roxagent.log
 ----
 +
-`command -v` should print `/usr/local/bin/roxagent`. `roxagent-serve` must be `active` (this is pull mode: the agent listens on VSOCK port 818 so Sensor can request inventory). The journal should show the serve unit starting and an initial package scan. A warning about RPM epoch matching is expected and can be safely ignored.
+`command -v` should print `/usr/local/bin/roxagent`. A log line that includes `index report containing` and a package count means the guest finished a scan. The agent listens on VSOCK port 818 so Sensor can pull that inventory. Cloud-init can take several minutes after the VMI is `Running` before the log line appears.
 
 . In ACS Central, open *Vulnerability Management > Results > Virtual Machines*.
 +
