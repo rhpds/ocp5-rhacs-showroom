@@ -44,8 +44,19 @@ spec:
           type: pc-q35-rhel9.6.0
         memory:
           guest: 2Gi
-      nodeSelector:
-        node-role.kubernetes.io/worker: ""
+      # Control plane nodes on this cluster also have the worker label, so a
+      # worker nodeSelector still places virt-launcher there.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/worker
+                    operator: Exists
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+                  - key: node-role.kubernetes.io/master
+                    operator: DoesNotExist
       networks:
         - name: default
           pod: {}
