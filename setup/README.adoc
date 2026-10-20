@@ -1,4 +1,4 @@
-= ACME Incident Workshop — Cluster Setup
+= Cluster Setup
 
 Run these scripts as *cluster-admin* before delivering the OpenShift Security Roadshow ACS modules with end-of-module incident exercises.
 
@@ -79,7 +79,7 @@ Attendees use the Showroom attribute `{workshop_user_suffix}` matching their ass
 
 == Attendee lab environment (bastion)
 
-Attendees clone `ocp5-rhacs-showroom`, then run `setup/lab-environment.sh`. OpenShift GitOps already syncs RHACS, Quay (including the public MinIO image and the private workshop images), the Central Quay integration, Compliance Operator, collector networking, demo-apps, the MCP servers, and OpenShift Lightspeed. The bastion script asks for a Lightspeed provider (OpenAI, Azure AI, Anthropic, Google Gemini, or another endpoint) and that provider's API key, then selects the model and public endpoint. It reads Quay and RHACS credentials into `~/.bashrc`, and installs `cosign`, `oc-mirror`, and `ec`. Press Enter at the token prompt to skip. When a saved API key still authenticates, the script skips that prompt. The choice is cluster-wide.
+Attendees clone `ocp5-rhacs-showroom`, then run `setup/lab-environment.sh`. OpenShift GitOps already syncs RHACS, Quay (including the public MinIO image and the private workshop images), the Central Quay integration, Compliance Operator, collector networking, demo-apps, the MCP servers, and OpenShift Lightspeed. Lightspeed is preconfigured with the platform model. The bastion script reads Quay and RHACS credentials into `~/.bashrc`, and installs `cosign`, `oc-mirror`, and `ec`. When the provisioned API key still authenticates, the script skips the provider prompt. It asks for a provider and API key only when that key is missing or rejected.
 
 Patient-portal is not part of that init. ACS module 1 makes the Quay repositories public, then runs `--deploy-skupper-only`.
 
@@ -91,7 +91,7 @@ bash setup/lab-environment.sh
 source ~/.bashrc
 ----
 
-Unattended runs can export the provider before the script. When `LIGHTSPEED_API_TOKEN` is set and `LIGHTSPEED_PROVIDER` is unset, and Lightspeed is already configured, the script stores the key and leaves the provider and model alone. With those variables unset, a saved key that still authenticates skips the provider prompt. Export `LIGHTSPEED_PROVIDER` and `LIGHTSPEED_API_TOKEN` to replace a working key.
+Unattended runs skip the provider prompt when the provisioned key still authenticates. Export `LIGHTSPEED_PROVIDER` and `LIGHTSPEED_API_TOKEN` to replace a working key. When `LIGHTSPEED_API_TOKEN` is set and `LIGHTSPEED_PROVIDER` is unset, and Lightspeed is already configured, the script stores the key and leaves the provider and model alone.
 
 [source,bash]
 ----

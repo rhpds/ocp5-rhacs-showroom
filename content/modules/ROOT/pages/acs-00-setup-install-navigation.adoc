@@ -40,17 +40,13 @@ image::01-rhacs-console-dashboard.png[RHACS console,link=self, window=blank, wid
 
 == Lab environment setup
 
-The setup script below is the remaining *bastion* work: the Lightspeed LLM provider and API key, RHACS and Quay CLI variables, a local clone of `demo-apps`, and the TSSC CLIs. Quay, the workshop images, MCP, and OpenShift Lightspeed are already synced by OpenShift GitOps.
+The setup script below is the remaining *bastion* work: RHACS and Quay CLI variables, a local clone of `demo-apps`, and the TSSC CLIs. Quay, the workshop images, MCP, and OpenShift Lightspeed are already synced by OpenShift GitOps. Lightspeed is preconfigured with the platform model.
 
 IMPORTANT: This will run quickly if it has already been run as part of the initial setup.
 
 === Run the setup script
 
-The script asks you to choose the LLM provider for OpenShift Lightspeed, then paste that provider's API key. This is not your OpenShift, RHACS, or Quay password. The choice is cluster-wide. Press Enter at the token prompt to leave Lightspeed unchanged and continue.
-
-Choose OpenAI, Azure AI, Anthropic, Google Gemini, or Other, then paste that provider's API key. The script selects the model and the endpoint. Press Enter to accept a shown default, or type a value to replace it. Other asks for the endpoint and model name.
-
-When a saved API key still authenticates, the script skips the provider prompt. To replace that key, export `LIGHTSPEED_PROVIDER` and `LIGHTSPEED_API_TOKEN` before running the script. When the saved key is missing or the provider rejects it, choose *Keep the current provider* to store a new key and leave the provider and model as they are.
+OpenShift Lightspeed is already configured with the platform model. You do not need your own API key. When that key still authenticates, the script skips the provider prompt. It asks you to choose a provider and paste an API key only when the provisioned key is missing or rejected. To replace a working key, export `LIGHTSPEED_PROVIDER` and `LIGHTSPEED_API_TOKEN` before running the script.
 
 You can skip this step and run the verification step below if you've already run the script.
 
@@ -76,19 +72,7 @@ Lab environment setup
 Details: /home/lab-user/.acs-roadshow/lab-environment-YYYYMMDD-HHMMSS.log
 
 [########--------------------] 2/7  Configure Lightspeed provider
-
-OpenShift Lightspeed uses an LLM API key. This is not your OpenShift, RHACS, or Quay password.
-The choice is cluster-wide. Press Enter at the token prompt to leave Lightspeed unchanged.
-
-Select the LLM provider:
-  1) OpenAI
-  2) Azure AI
-  3) Anthropic
-  4) Google Gemini
-  5) Other
-Choice [1]: 1
-Using gpt-6.1-sol
-Paste the OpenAI API key (press Enter to skip):
+Lightspeed already has a working API token (Lightspeed / claude-sonnet-4-6). Skipping the provider prompt.
 
 [############################] 7/7  Lab environment setup complete
 
@@ -96,7 +80,7 @@ Paste the OpenAI API key (press Enter to skip):
   SUCCESS: Lab environment setup completed successfully
 ================================================================
 
-  ✓ Lightspeed configured (OpenAI / gpt-6.1-sol)
+  ✓ Lightspeed API token already working (Lightspeed / claude-sonnet-4-6)
   ✓ Quay credentials read from the cluster
   ✓ RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)
   ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)

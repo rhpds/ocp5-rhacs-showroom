@@ -35,7 +35,7 @@ Each of these features is covered in more detail in the following sections. Part
 | {acs_route}[ACS Central^]
 |===
 
-* In the OpenShift Console, open the OpenShift Lightspeed dialog (the icon at the bottom right of the interface). Ask Lightspeed to create a shortcut to the ACS console:
+* In the OpenShift Console, open the OpenShift Lightspeed dialog (the icon at the bottom right of the interface). Ask Lightspeed to create a shortcut to the ACS console. If the chat cannot answer, open ACS from the Showroom tab on the right.
 +
 [source,bash,role="copypaste"]
 ----
@@ -509,6 +509,8 @@ You should see an `acs-mcp` entry pointing at the in-cluster ACS MCP service URL
 [.step-title]
 Query ACS through OpenShift Lightspeed
 
+The `oc` checks above confirm the MCP server even if the chat cannot reach the model. An external Claude or Cursor client later in this exercise stays optional.
+
 . Open the OpenShift console and launch *OpenShift Lightspeed* (chat icon).
 +
 If prompted to approve MCP tools, approve the ACS MCP tools so the agent can call them.
@@ -638,6 +640,13 @@ create a new project for me called rhacs-init-container-test
 ----
 
 The MCP server requires approval, so approve when it asks you.
+
+If Lightspeed does not create the project, create it from the terminal:
+
+[source,bash,role="execute"]
+----
+oc new-project rhacs-init-container-test
+----
 
 On the left hand navigation, choose 'Projects' and then rhacs-init-container-test. All of the examples will be executed in this project to allow you to observe the results simply in
 the ACS console.

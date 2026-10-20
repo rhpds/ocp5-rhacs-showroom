@@ -12,7 +12,7 @@ The following components are pre-installed:
 * Red Hat Advanced Cluster Security (ACS)
 * Red Hat OpenShift GitOps (Argo CD)
 * Red Hat OpenShift Virtualization with a Red Hat Enterprise Linux 9 virtual machine
-* Red Hat OpenShift Lightspeed with MCP server integration
+* Red Hat OpenShift Lightspeed with MCP server integration, preconfigured with the platform model
 * Lightspeed Agentic Operator
 * Cluster Observability Operator with Perses dashboards
 * MCP Gateway (Red Hat Connectivity Link)

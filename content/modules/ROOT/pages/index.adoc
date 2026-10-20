@@ -13,18 +13,14 @@ This course offers hands-on experience with Kubernetes-native security on Red Ha
 * *Cluster setup and services are managed by GitOps* — RHACS, Quay, GitOps, Compliance Operator, and the vulnerable demo apps are already synced by Argo CD. Deleting resources by accident is no problem, as they will be recreated by GitOps.
 * *You can go through the catalog in order, or jump in. The modules are designed to not be influenced by each other.* — 101 → 201 → 301, then the product deep-dives (RHACS, Virtualization, Lightwell TSSC).
 
-IMPORTANT: Make sure to run the setup script below! It asks you to choose a Lightspeed LLM provider (OpenAI, Azure AI, Anthropic, Google Gemini, or another endpoint) and paste that provider's API key. Press Enter at the token prompt to skip. When a saved API key still authenticates, the script skips that prompt. The script then saves your CLI credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
+IMPORTANT: Make sure to run the setup script below! OpenShift Lightspeed is already configured with the platform model. You do not need your own API key. The script saves your CLI credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`). It asks for a Lightspeed API key only when the provisioned key is missing or rejected.
 
 [[environment-setup]]
 == Environment setup
 
-The following script asks you to choose the Lightspeed LLM provider and paste that provider's API key, reads Quay and RHACS credentials into your shell, and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
+The following script reads Quay and RHACS credentials into your shell and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`). OpenShift Lightspeed is already configured with the platform model.
 
-OpenShift Lightspeed uses an LLM API key. The choice is cluster-wide, meaning everyone on this cluster shares the provider you save. Press Enter at the token prompt to leave Lightspeed unchanged.
-
-Choose OpenAI, Azure AI, Anthropic, Google Gemini, or Other, then paste that provider's API key. The script selects the model and the endpoint. Press Enter to accept a shown default, or type a value to replace it. Other asks for the endpoint and model name.
-
-When a saved API key still authenticates, the script skips the provider prompt. To replace that key, export `LIGHTSPEED_PROVIDER` and `LIGHTSPEED_API_TOKEN` before running the script. When the saved key is missing or the provider rejects it, the script asks again and offers *Keep the current provider*. That choice stores a new key and leaves the provider and model as they are.
+When that key still authenticates, the script skips the provider prompt. It asks you to choose a provider and paste an API key only when the provisioned key is missing or rejected. To replace a working key, export `LIGHTSPEED_PROVIDER` and `LIGHTSPEED_API_TOKEN` before running the script.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
@@ -38,23 +34,14 @@ source ~/.bashrc
 [source,bash,subs="+macros,+attributes"]
 ----
 [########--------------------] 2/7  Configure Lightspeed provider
-OpenShift Lightspeed uses an LLM API key. This is not your OpenShift, RHACS, or Quay password.
-The choice is cluster-wide. Press Enter at the token prompt to leave Lightspeed unchanged.
-
-Select the LLM provider:
-  1) ChatGPT (OpenAI)
-  2) Azure OpenAI
-  3) Other OpenAI-compatible API
-  4) Keep the current provider
-Choice [4]: 4
-Paste the API key for the current Lightspeed provider (press Enter to skip): 
+Lightspeed already has a working API token (Lightspeed / claude-sonnet-4-6). Skipping the provider prompt.
 [############################] 7/7  Lab environment setup complete
 
 ================================================================
   SUCCESS: Lab environment setup completed successfully
 ================================================================
 
-  ✓ Lightspeed API token stored (current provider kept)
+  ✓ Lightspeed API token already working (Lightspeed / claude-sonnet-4-6)
   ✓ Quay credentials read from the cluster
   ✓ RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)
   ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)
