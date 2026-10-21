@@ -18,7 +18,7 @@ IMPORTANT: Make sure to run the setup script below! OpenShift Lightspeed is alre
 [[environment-setup]]
 == Environment setup
 
-The following script reads Quay and RHACS credentials into your shell and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`). OpenShift Lightspeed is already configured with the platform model.
+The following script installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`) and reads Quay and RHACS credentials into your shell. OpenShift Lightspeed is already configured with the platform model.
 
 When that key still authenticates, the script skips the provider prompt. It asks you to choose a provider and paste an API key only when the provisioned key is missing or rejected. To replace a working key, export `LIGHTSPEED_PROVIDER` and `LIGHTSPEED_API_TOKEN` before running the script.
 

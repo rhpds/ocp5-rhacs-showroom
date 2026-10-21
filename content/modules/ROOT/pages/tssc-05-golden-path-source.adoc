@@ -7,7 +7,7 @@
 
 Application source must live on in-cluster Gitea in organization `lw-student`. It must not live on GitHub. It must not stay under `workshop-templates`. The scored remote is `lw-student/spring-boot-lw-poc` (`student_repo_url`).
 
-The scored path is the seed script. That script also adds `renovate-bot`, which xref:tssc-07-live-renovate.adoc[3.3] requires. Red Hat Developer Hub (RHDH) `lightwell-java-service` is an optional golden path, not this Check.
+The cluster seed already created `lw-student` and the three repositories. This Check scores that remote. `renovate-bot` is added as a collaborator for xref:tssc-07-live-renovate.adoc[3.3]. Red Hat Developer Hub (RHDH) `lightwell-java-service` is an optional golden path, not this Check.
 
 Do not change `Dockerfile` `FROM` here. That is xref:tssc-06-bind-base-deps.adoc[3.2]. Do not merge a fake Renovate PR. That is xref:tssc-07-live-renovate.adoc[3.3].
 
@@ -69,21 +69,18 @@ git clone https://github.com/example/spring-boot-lw-poc.git
 # or: git clone <template_app_repo_url>   # workshop-templates, not lw-student
 ----
 
-== Your change: org, empty repos, seed script
+== Your change: confirm the seeded remotes
 
-. In Gitea: *+* → *New Organization*. Name exactly `lw-student`. Visibility *Public* → *Create Organization*.
+The cluster seed already created organization `lw-student` and these repositories, with the template tree on `main`:
 
-// VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/61
-image::gitea-new-org-lw-student.png[Gitea New Organization form with name lw-student,width=700,link=self,window=blank]
-
-. Under `lw-student`, create three *empty* repositories (do *not* initialize with a README):
-+
 * `spring-boot-lw-poc`
-* `gitops-spring-boot-lw-poc` (stage)
-* `gitops-prod-spring-boot-lw-poc` (prod)
+* `gitops-spring-boot-lw-poc` (stage, Application `lw-poc-staging`)
+* `gitops-prod-spring-boot-lw-poc` (prod, Application `lw-poc-prod`)
 
-. Seed from templates (adds `renovate-bot` as a write collaborator on the app repo)
-+
+Do not create a second organization or empty repositories with the same names. Later modules commit on these remotes.
+
+If the Check below is not HTTP `200`, repair from templates (this also adds `renovate-bot` as a write collaborator on the app repo):
+
 [source,bash,role=execute]
 ----
 export STUDENT_USER=student
