@@ -1225,6 +1225,56 @@ lightspeed_existing_token_works() {
   return 1
 }
 
+# Register the ACS MCP server on OLSConfig when the server and token exist.
+# The GitOps hook often runs before OLSConfig is created, and it must not
+# replace this entry with a guessed service name.
+lightspeed_ensure_acs_mcp() {
+  local ns="openshift-lightspeed"
+  local mcp_ns="rhacs-mcp"
+  local svc="rhacs-mcp-server-stackrox-mcp"
+  local url="https://${svc}.${mcp_ns}.svc:443/mcp"
+  if ! oc -n "${mcp_ns}" get svc "${svc}" >/dev/null 2>&1; then
+    echo "ACS MCP service ${svc} is not installed. Skipping Lightspeed registration."
+    return 0
+  fi
+  if ! oc -n "${ns}" get secret acs-mcp-api-token >/dev/null 2>&1; then
+    echo "Secret ${ns}/acs-mcp-api-token is missing. Skipping Lightspeed registration."
+    return 0
+  fi
+  if ! oc get olsconfig cluster >/dev/null 2>&1; then
+    echo "OLSConfig/cluster is missing. Skipping ACS MCP registration."
+    return 0
+  fi
+  oc get olsconfig cluster -o json | ACS_MCP_URL="${url}" python3 -c '
+import json, os, sys
+doc = json.load(sys.stdin)
+spec = doc.get("spec") or {}
+gates = list(spec.get("featureGates") or [])
+if "MCPServer" not in gates:
+    gates.append("MCPServer")
+servers = [s for s in (spec.get("mcpServers") or []) if not (isinstance(s, dict) and s.get("name") == "acs-mcp")]
+servers.append({
+    "name": "acs-mcp",
+    "url": os.environ["ACS_MCP_URL"],
+    "timeout": 120,
+    "headers": [{
+        "name": "Authorization",
+        "valueFrom": {
+            "type": "secret",
+            "secretRef": {"name": "acs-mcp-api-token"},
+        },
+    }],
+})
+json.dump({"spec": {"featureGates": gates, "mcpServers": servers}}, sys.stdout)
+' | oc patch olsconfig cluster --type=merge --patch-file=/dev/stdin >/dev/null
+  echo "Lightspeed OLSConfig includes acs-mcp (${url})"
+}
+
+configure_lightspeed_with_acs_mcp() {
+  configure_lightspeed_token
+  lightspeed_ensure_acs_mcp
+}
+
 # Ask for the Lightspeed provider and API key, then store them in the secrets
 # and CRs Argo already ignores. An empty token skips Lightspeed and continues.
 # A saved key that still authenticates skips the prompt.
@@ -2528,7 +2578,7 @@ do_acs_vm() {
 
 progress_run "Verify OpenShift access" do_verify_admin
 progress_run "Deploy rhel-webserver" do_acs_vm
-progress_run "Configure Lightspeed provider" configure_lightspeed_token
+progress_run "Configure Lightspeed provider" configure_lightspeed_with_acs_mcp
 progress_run "Read Quay credentials" load_quay_env
 progress_run "Install TSSC CLIs (cosign, oc-mirror, ec)" do_tssc_clis
 
