@@ -1,0 +1,52 @@
+# UBI keep-alive workload for the File Activity Monitoring exercise.
+# The namespace is privileged so the lab can run:
+#   oc debug -n acs-fam-demo deploy/fam-target --as-root -- touch /etc/passwd
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: acs-fam-demo
+  labels:
+    demo: roadshow
+    app.kubernetes.io/part-of: openshift-security-roadshow
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+    security.openshift.io/scc.podSecurityLabelSync: "false"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: default-scc-privileged
+  namespace: acs-fam-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: acs-fam-demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fam-target
+  namespace: acs-fam-demo
+  labels:
+    app: fam-target
+    demo: roadshow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fam-target
+  template:
+    metadata:
+      labels:
+        app: fam-target
+        demo: roadshow
+    spec:
+      containers:
+        - name: ubi
+          image: registry.access.redhat.com/ubi9/ubi:latest
+          command: ["sleep", "infinity"]

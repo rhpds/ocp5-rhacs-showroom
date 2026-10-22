@@ -359,7 +359,14 @@ Confirm:
 +
 TIP: The GitOps source for these policies is in the lab GitOps repository under `rhacs-operator/instance/templates/fim-deployment-policy.yaml` and `fim-node-policy.yaml`.
 
-. Confirm the FAM trigger workload from *Before You Begin* is running:
+. Deploy the FAM target. This is the workload the next steps write to. The script creates the `acs-fam-demo` namespace, allows a privileged debug shell, and starts `fam-target`:
++
+[source,sh,subs="attributes",role=execute]
+----
+bash setup/acs/deploy-fam-target.sh
+----
++
+. Confirm the workload is running:
 +
 [source,sh,subs="attributes",role=execute]
 ----
