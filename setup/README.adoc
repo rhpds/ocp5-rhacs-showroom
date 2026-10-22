@@ -97,12 +97,14 @@ Unattended runs skip the provider prompt when the provisioned key still authenti
 ----
 export LIGHTSPEED_API_TOKEN='...'
 export LIGHTSPEED_PROVIDER=openai          # openai, azure_openai, anthropic, gemini, other, or keep
-# Optional overrides. Defaults: OpenAI and Azure gpt-6.1-sol, Anthropic claude-sonnet-5-5,
-# Gemini gemini-3.8-flash. Endpoints default to the public OpenAI, Anthropic, and Gemini
-# URLs, and Azure to https://my-resource.openai.azure.com. Enter accepts a shown default.
-# export LIGHTSPEED_MODEL=gpt-6.1-sol
-# export LIGHTSPEED_API_URL=https://my-resource.openai.azure.com
-# export LIGHTSPEED_AZURE_DEPLOYMENT=gpt-6.1-sol
+# Optional overrides. Defaults: OpenAI gpt-6.1-sol, Anthropic claude-sonnet-5-5,
+# Gemini gemini-3.8-flash. Azure defaults to the roadshow gateway
+# https://ols-lightspeed-apim-pilot.azure-api.net/ols-test-openai and model gpt-5.4.
+# Enter accepts that gateway. Type a different URL to replace it. A custom Azure
+# OpenAI resource also needs LIGHTSPEED_AZURE_DEPLOYMENT. The script does not
+# suggest a placeholder endpoint or deployment name.
+# export LIGHTSPEED_MODEL=gpt-5.4
+# export LIGHTSPEED_API_URL=https://ols-lightspeed-apim-pilot.azure-api.net/ols-test-openai
 # Other needs LIGHTSPEED_API_URL and LIGHTSPEED_MODEL.
 ----
 

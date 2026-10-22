@@ -122,16 +122,24 @@ Environment:
   LIGHTSPEED_PROVIDER       openai, azure_openai, anthropic, gemini, other, or keep.
                             Set this with LIGHTSPEED_API_TOKEN to replace a
                             saved key that still works.
-  LIGHTSPEED_MODEL          Optional. Defaults: OpenAI and Azure gpt-6.1-sol,
-                            Anthropic claude-sonnet-5-5, Gemini gemini-3.8-flash.
-                            Required for other.
-  LIGHTSPEED_API_URL        Optional. OpenAI, Anthropic, Gemini, and Azure AI
-                            have defaults. Required for Other. Set this to
-                            override the default.
+  LIGHTSPEED_MODEL          Optional. Defaults: OpenAI gpt-6.1-sol, the roadshow
+                            Azure gateway gpt-5.4, Anthropic claude-sonnet-5-5,
+                            Gemini gemini-3.8-flash. Required for Other.
+                            A custom Azure resource URL needs this or
+                            LIGHTSPEED_AZURE_DEPLOYMENT. The script does not
+                            invent a deployment name.
+  LIGHTSPEED_API_URL        Optional. OpenAI, Anthropic, and Gemini use their
+                            public endpoints. Azure uses the roadshow gateway
+                            https://ols-lightspeed-apim-pilot.azure-api.net/ols-test-openai
+                            Press Enter at the prompt to keep that gateway.
+                            Type a URL to use a different endpoint. Required
+                            for Other.
   LIGHTSPEED_AZURE_DEPLOYMENT
-                            Optional. Defaults to the model name.
+                            Required only for a custom Azure OpenAI resource
+                            URL. The roadshow gateway does not use one.
   LIGHTSPEED_AZURE_API_VERSION
-                            Optional. Defaults to 2024-10-21.
+                            Optional for a custom Azure OpenAI resource.
+                            Defaults to 2024-10-21.
 EOF
 }
 
@@ -467,6 +475,16 @@ lightspeed_choose_provider() {
   done
 }
 
+# OpenAI-compatible Azure API Management gateway. A Bearer token for this
+# roadshow is accepted here. Do not replace it with a documentation sample.
+LIGHTSPEED_AZURE_GATEWAY_URL="https://ols-lightspeed-apim-pilot.azure-api.net/ols-test-openai"
+LIGHTSPEED_AZURE_GATEWAY_MODEL="gpt-5.4"
+
+lightspeed_url_is_azure_gateway() {
+  local base="${1%/}"
+  [[ "${base}" == "${LIGHTSPEED_AZURE_GATEWAY_URL}" ]]
+}
+
 # Public endpoints and a current mid-tier model for each known provider.
 # Callers can still override with LIGHTSPEED_MODEL or LIGHTSPEED_API_URL.
 lightspeed_apply_default_url() {
@@ -482,7 +500,7 @@ lightspeed_apply_default_url() {
       url="https://generativelanguage.googleapis.com/v1beta/openai/"
       ;;
     azure_openai)
-      url="https://my-resource.openai.azure.com"
+      url="${LIGHTSPEED_AZURE_GATEWAY_URL}"
       ;;
   esac
 }
@@ -505,16 +523,19 @@ lightspeed_apply_defaults() {
         model="gemini-3.8-flash"
         ;;
       azure_openai)
-        if [[ -n "${deployment}" ]]; then
+        if lightspeed_url_is_azure_gateway "${url}"; then
+          model="${LIGHTSPEED_AZURE_GATEWAY_MODEL}"
+        elif [[ -n "${deployment}" ]]; then
           model="${deployment}"
-        else
-          model="gpt-6.1-sol"
         fi
         ;;
     esac
-    announced_model=true
+    if [[ -n "${model}" ]]; then
+      announced_model=true
+    fi
   fi
-  if [[ "${provider}" == "azure_openai" && -z "${deployment}" && -n "${model}" ]]; then
+  if [[ "${provider}" == "azure_openai" && -z "${deployment}" && -n "${model}" ]] \
+    && ! lightspeed_url_is_azure_gateway "${url}"; then
     deployment="${model}"
   fi
   if [[ "${announced_model}" == true && -n "${model}" && "${interactive}" == true ]]; then
@@ -522,16 +543,37 @@ lightspeed_apply_defaults() {
   fi
 }
 
-# Known providers need only the API key. Azure shows its default endpoint;
-# Enter keeps it and a typed URL replaces it. Other needs an endpoint and a model name.
+# Known providers need only the API key. Azure offers the roadshow gateway.
+# Enter keeps that gateway. A typed URL replaces it and, for a custom Azure
+# OpenAI resource, the script then asks for the deployment name with no
+# suggested value. Other needs an endpoint and a model name.
 lightspeed_prompt_provider_fields() {
   local entered=""
   if [[ "${provider}" == "azure_openai" ]]; then
     if [[ "${interactive}" == true && "${url_from_env}" != true ]]; then
-      lightspeed_tty_prompt entered "Azure resource endpoint [${url}]: "
-      if [[ -n "${entered}" ]]; then
-        url="${entered}"
+      if [[ -n "${url}" ]]; then
+        if lightspeed_url_is_azure_gateway "${url}"; then
+          lightspeed_tty_say "Press Enter to use the roadshow Azure gateway, or type a different endpoint."
+        fi
+        lightspeed_tty_prompt entered "Azure endpoint [${url}]: "
+        if [[ -n "${entered}" ]]; then
+          url="${entered}"
+          if ! lightspeed_url_is_azure_gateway "${url}" && [[ "${model_from_env}" != true ]]; then
+            model=""
+            if [[ "${deployment_from_env}" != true ]]; then
+              deployment=""
+            fi
+          fi
+        fi
+      else
+        lightspeed_tty_prompt url "Azure endpoint: "
       fi
+    fi
+    if ! lightspeed_url_is_azure_gateway "${url}" \
+      && [[ -z "${deployment}" && -z "${model}" ]] \
+      && [[ "${interactive}" == true && "${deployment_from_env}" != true && "${model_from_env}" != true ]]; then
+      lightspeed_tty_prompt deployment "Azure deployment name: "
+      model="${deployment}"
     fi
     return 0
   fi
@@ -567,9 +609,9 @@ lightspeed_fields_ok() {
     ls_clear_field="url"
     return 1
   fi
-  if [[ "${provider}" == "azure_openai" ]]; then
+  if [[ "${provider}" == "azure_openai" ]] && ! lightspeed_url_is_azure_gateway "${url}"; then
     if [[ -z "${deployment}" ]]; then
-      ls_field_error="Azure AI needs a deployment name. Set LIGHTSPEED_AZURE_DEPLOYMENT."
+      ls_field_error="A custom Azure OpenAI resource needs a deployment name. Set LIGHTSPEED_AZURE_DEPLOYMENT."
       ls_clear_field="deployment"
       return 1
     fi
@@ -1377,6 +1419,12 @@ configure_lightspeed_token() {
     LIGHTSPEED_BANNER_DETAIL="Lightspeed API token stored (current provider kept)"
     echo "Lightspeed token stored; provider unchanged"
     return 0
+  fi
+
+  # The roadshow gateway speaks the OpenAI API. A classic Azure resource
+  # URL stays on the azure_openai provider.
+  if [[ "${provider}" == "azure_openai" ]] && lightspeed_url_is_azure_gateway "${url}"; then
+    provider="openai"
   fi
 
   case "${provider}" in
