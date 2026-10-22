@@ -129,9 +129,8 @@ for ns in juice-shop log4shell webgoat dvwa emojivoto acs-fam-demo rhacs-init-co
 done
 echo "  Deleted demo app namespaces"
 
-# Exercise 5: Delete demo SecurityPolicy CRs scoped to rhacs-init-container-test
-oc delete securitypolicy eap-init-test-fixable-important-cve eap-init-test-privileged-container -n rhacs-operator --ignore-not-found 2>/dev/null || true
-echo "  Deleted ACS init-container demo policies"
+# Init-container demo SecurityPolicies are applied by Argo CD in rhacs-operator.
+# Leave them in place so the next lab run does not have to recreate them.
 rm -rf ~/ea5-components 2>/dev/null || true
 echo "  Deleted ea5-components clone"
 

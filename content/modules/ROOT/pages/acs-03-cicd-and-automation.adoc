@@ -68,7 +68,7 @@ link:https://github.com/mfosterrox/skupper-security-demo/tree/main/PaC-custom-po
 . In the Template tab, select *Git Repository* and enter the URL of the GitHub repository containing the custom policies - URL: https://github.com/mfosterrox/skupper-security-demo.git:
 . Select "Main":
 . Select "PaC-custom-policies":
-. Enter the remote namespace of "stackrox":
+. Enter the remote namespace of "rhacs-operator":
 
 image::05-acm-05.png[link=self, window=blank, width=100%]
 

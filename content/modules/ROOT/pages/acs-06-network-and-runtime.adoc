@@ -155,7 +155,7 @@ oc get --all-namespaces networkpolicies -o json | jq '[.items[] | select((.metad
 ----
 [
  "medical",
- "stackrox",
+ "rhacs-operator",
  "vault"
 ]
 ----
@@ -336,7 +336,7 @@ backend/varnish[Deployment] => backend/api-server[Deployment] : TCP 9001
 [
  "backend",
  "medical",
- "stackrox",
+ "rhacs-operator",
  "vault"
 ]
 ----

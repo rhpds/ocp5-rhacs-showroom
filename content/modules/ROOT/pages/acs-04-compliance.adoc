@@ -65,7 +65,7 @@ Since RHACS was installed prior to the Compliance Operator, we’ll need to rest
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc delete pods -l app.kubernetes.io/component=sensor -n stackrox
+oc delete pods -l app.kubernetes.io/component=sensor -n rhacs-operator
 ----
 
 With the Sensor restarted, kick off a compliance scan in ACS to see the updated results.
@@ -308,7 +308,7 @@ oc get networkpolicies -A -o json | jq '[.items[] | select((.metadata.namespace 
   "janus-argocd",
   "medical",
   "sonataflow-infra",
-  "stackrox",
+  "rhacs-operator",
   "trusted-profile-analyzer",
   "vault"
 ]

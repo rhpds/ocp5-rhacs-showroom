@@ -98,11 +98,11 @@ Output should look like this:
 [source,bash]
 ----
 oc get route -n rhacs-mcp
-NAME                                          READY   STATUS      RESTARTS   AGE
-acs-mcp-server-stackrox-mcp-b79597899-lz64s   1/1     Running     0          3h5m
-copy-central-ca-8jrsn                         0/1     Completed   0          178m
-NAME                          HOST/PORT                                                                    PATH   SERVICES                      PORT    TERMINATION          WILDCARD
-acs-mcp-server-stackrox-mcp   acs-mcp-server-stackrox-mcp-rhacs-mcp.apps.ocp.2bfz7.sandbox5240.opentlc.com          acs-mcp-server-stackrox-mcp   https   reencrypt/Redirect   None
+NAME                                            READY   STATUS      RESTARTS   AGE
+rhacs-mcp-server-stackrox-mcp-b79597899-lz64s   1/1     Running     0          3h5m
+copy-central-ca-8jrsn                           0/1     Completed   0          178m
+NAME                            HOST/PORT                                                                      PATH   SERVICES                        PORT    TERMINATION          WILDCARD
+rhacs-mcp-server-stackrox-mcp   rhacs-mcp-server-stackrox-mcp-rhacs-mcp.apps.ocp.2bfz7.sandbox5240.opentlc.com          rhacs-mcp-server-stackrox-mcp   https   reencrypt/Redirect   None
 ----
 
 Awesome! You're ready to start the exercises.
@@ -709,12 +709,13 @@ In the terminal, run:
 cd ~/ea5-components
 ----
 
-We will now apply two additional policies specific to this namespace only; in the terminal, run:
+Argo CD already applies the two policies for this exercise in the `rhacs-operator` namespace. They are scoped to `rhacs-init-container-test`. Do not apply `fixable-important-cve.yaml` or `privileged-init-container.yaml` from `ea5-components`. Those copies still use namespace `acs` and scope `acs-init-container-test`, which do not match this cluster.
+
+Confirm the policies are present:
 
 [source,bash,role="execute"]
 ----
-oc create -f ~/ea5-components/fixable-important-cve.yaml
-oc create -f ~/ea5-components/privileged-init-container.yaml
+oc get securitypolicy -n rhacs-operator eap-init-test-fixable-important-cve eap-init-test-privileged-container
 ----
 
 While in the terminal, have a look at these two policy definitions. Specifically, for `privileged-init-container.yaml` note:
@@ -885,7 +886,7 @@ chmod +x ~/ea5-components/skip-init-container-evaluation.sh
 
 The script will list all eligible policies and prompt you for each one. Answer `yes` to add the skip filter, `no` to leave it unchanged, or `all` to update all remaining policies without further prompts.
 
-After running the script, navigate to the RHACS console and open *Platform Configuration > Policy Management*. Policies that were updated by the script will show a "Skips init" indicator next to them. Note that the declarative (CRD-managed) policies we applied earlier (`EAP-Init-Test: Privileged Container` and `EAP-Init-Test: Fixable Important+ CVE`) were explicitly skipped by the script — these must be managed separately by adding `skipContainerTypes: ["INIT"]` to the `evaluationFilter` in their CRD manifests.
+After running the script, navigate to the RHACS console and open *Platform Configuration > Policy Management*. Policies that were updated by the script will show a "Skips init" indicator next to them. The declarative policies Argo CD applies (`EAP-Init-Test: Privileged Container` and `EAP-Init-Test: Fixable Important+ CVE`) are skipped by the script. Change those in Git by adding `skipContainerTypes: ["INIT"]` to `evaluationFilter` on the SecurityPolicy manifests. A console edit is overwritten on the next sync.
 
 image::acs-skip-init-policy-management.png[Policy Management showing Skips init indicator on updated policies,link=_images/acs-skip-init-policy-management.png,window=ea-images]
 

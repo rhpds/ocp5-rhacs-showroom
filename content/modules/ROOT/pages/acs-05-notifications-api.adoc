@@ -102,7 +102,7 @@ IMPORTANT: Run the following command if you have not created the policy in xref:
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-cat <<EOF | oc apply -n stackrox -f -
+cat <<EOF | oc apply -n rhacs-operator -f -
 apiVersion: config.stackrox.io/v1alpha1
 kind: SecurityPolicy
 metadata:
@@ -174,7 +174,7 @@ The setup script already exported `ROX_API_TOKEN` and `ROX_CENTRAL_ADDRESS`. You
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-oc -n stackrox get route central -o jsonpath='{.spec.host}{"\n"}'
+oc -n rhacs-operator get route central -o jsonpath='{.spec.host}{"\n"}'
 echo "ROX_CENTRAL_ADDRESS=$ROX_CENTRAL_ADDRESS"
 test -n "$ROX_API_TOKEN" && echo "ROX_API_TOKEN is set" || echo "ROX_API_TOKEN is missing"
 ----
