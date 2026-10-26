@@ -12,7 +12,7 @@ PLAYBOOK           ?= site.yml
 SITE_URL           ?= http://localhost:$(PORT)/index.html
 CONTAINER_ENGINE   ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
 
-.PHONY: help build clean serve stop reset
+.PHONY: help build clean serve stop reset test
 
 help: ## Show this help
 	@echo "OpenShift Security Roadshow"
@@ -57,6 +57,9 @@ stop: ## Stop the serving container
 	@$(CONTAINER_ENGINE) stop $(CONTAINER_NAME) 2>/dev/null || \
 		echo "Container $(CONTAINER_NAME) not running or does not exist"
 	@echo "Stopped serve process."
+
+test: ## Run module tests (TRACK=acs MODULE=101-01 CONTENT_ONLY=1)
+	python3 tests/run.py $(if $(TRACK),--track $(TRACK),) $(if $(MODULE),--module $(MODULE),) $(if $(CONTENT_ONLY),--content-only,)
 
 reset: ## Clean, build, and serve (full reset)
 	$(MAKE) --no-print-directory stop

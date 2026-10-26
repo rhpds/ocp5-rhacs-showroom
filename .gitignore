@@ -11,6 +11,9 @@ node_modules/
 www/
 .cache/
 
+# Module test reports
+tests/reports/
+
 # Ignore IDE and editor files
 .vscode/
 .idea/
