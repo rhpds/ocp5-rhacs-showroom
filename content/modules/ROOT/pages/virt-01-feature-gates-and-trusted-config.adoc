@@ -35,6 +35,8 @@ Feature gates and annotations are how a platform team quietly reintroduces over 
 == Your Mission
 Audit five HCO controls. Leave the live object at the secure default. Use the remediation blocks only if an audit already fails.
 
+The `kubevirt` jsonpatch annotation is the one expected exception. The last control explains why it is set, and why you leave it.
+
 === Prerequisites
 
 * xref:virt-00-scope-and-hco.adoc[virt-00] complete (`HyperConverged` exists)
@@ -193,13 +195,21 @@ TIP: Re-run the audit. It should print nothing.
 
 === Control: Restrict HCO jsonpatch annotations
 
-HCO honors experimental jsonpatch annotations on itself: `kubevirt.kubevirt.io/jsonpatch`, `containerizeddataimporter.kubevirt.io/jsonpatch`, `networkaddonsconfigs.kubevirt.io/jsonpatch`, and `ssp.kubevirt.io/jsonpatch`. Those patches mutate child operands outside the supported HCO spec.
+HCO honors experimental jsonpatch annotations on itself: `kubevirt.kubevirt.io/jsonpatch`, `containerizeddataimporter.kubevirt.io/jsonpatch`, `networkaddonsconfigs.kubevirt.io/jsonpatch`, and `ssp.kubevirt.io/jsonpatch`. Those patches mutate child operands outside the supported HCO spec. HCO reapplies the patch on every reconcile, so an annotation can quietly undo a security field you set in `spec`.
 
-*Pros:* Administrators configure Virtualization through HCO fields, not unsupported patches that can disable security defaults.
+A hardened cluster has none of these keys. That is still the guide.
 
-*Cons / impact:* Experimental or preview settings that exist only as jsonpatch cannot be used. That is the point.
+This roadshow sets one key, `kubevirt.kubevirt.io/jsonpatch`, so RHACS can scan the guest. Sensor pulls the `roxagent` package report over VSOCK, through the KubeVirt API. That inventory has no path over the guest IP address. VSOCK is still a KubeVirt feature gate. OpenShift Virtualization 4.22 did not add it to `spec.featureGates` and did not turn the annotation on by itself. Job `enable-vsock` in the `rhacs-virt` GitOps app writes the annotation. The patch body is a single add of `VSOCK`.
+
+The gate makes the device available. A virtual machine receives it when `spec.domain.devices.autoattachVSOCK` is `true`. `rhel9-vm` sets that so ACS can scan it. Sensor still needs RBAC to `GET` `virtualmachineinstances/vsock`. The socket stays on the hypervisor. The CDI, network, and SSP annotations stay unset.
+
+*Pros:* Administrators configure Virtualization through HCO fields. An arbitrary jsonpatch can disable security defaults on every reconcile.
+
+*Cons / impact:* A setting that exists only as a jsonpatch is unsupported. VSOCK is the documented exception on this cluster, because RHACS VM scanning requires it.
 
 *Default:* None of the annotations are set. `jq has(...)` returns `false`.
+
+*This cluster:* `kubevirt` is `true`. Read the value and confirm it only adds `VSOCK`. Leave that annotation. `cdi`, `network`, and `ssp` stay `false`.
 
 .Audit jsonpatch annotations
 [%collapsible]
@@ -215,25 +225,19 @@ oc get hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n opensh
       ssp: has("ssp.kubevirt.io/jsonpatch")
     }
 '
+oc get hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv \
+  -o jsonpath='{.metadata.annotations.kubevirt\.kubevirt\.io/jsonpatch}{"\n"}'
 ----
 
-TIP: All four values should be `false`. Missing annotations (`{}`) is a pass.
+TIP: `cdi`, `network`, and `ssp` are `false`. `kubevirt` is `true`. The printed patch is the VSOCK add: `[{"op":"add","path":"/spec/configuration/developerConfiguration/featureGates/-","value":"VSOCK"}]`. Any other operation in that string is a finding.
 ====
 
 .Remediation
 [%collapsible]
 ====
-On this cluster `kubevirt` is `true`. The annotation adds the `VSOCK` feature gate to the KubeVirt operand on every reconcile. Read it, then delete the key. The trailing `-` removes the annotation.
+Leave the VSOCK annotation in place. It is what lets Sensor collect guest package inventory for the RHACS VM exercise. Removing it stops that collection. The next sync of `rhacs-virt` writes the same annotation again.
 
-[source,bash,subs="+macros,+attributes",role=execute]
-----
-oc get hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv \
-  -o jsonpath='{.metadata.annotations.kubevirt\.kubevirt\.io/jsonpatch}{"\n"}'
-oc annotate --overwrite -n openshift-cnv hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged \
-  'kubevirt.kubevirt.io/jsonpatch-'
-----
-
-If another value above is `true`, delete that key the same way:
+Remove a key only when it is unexpected. That means `cdi`, `network`, or `ssp` is `true`. The trailing `-` removes that annotation. This command leaves the VSOCK key alone:
 
 [source,bash,subs="+macros,+attributes"]
 ----
@@ -243,19 +247,30 @@ oc annotate --overwrite -n openshift-cnv hyperconvergeds.v1beta1.hco.kubevirt.io
   'ssp.kubevirt.io/jsonpatch-'
 ----
 
-TIP: Re-run the four `has(...)` checks. They should be `false`. HCO stops reapplying `VSOCK`.
+If the kubevirt value contains anything besides the VSOCK add, clear it and tell an instructor. `rhacs-virt` will restore the VSOCK add on the next sync:
+
+[source,bash,subs="+macros,+attributes"]
+----
+oc annotate --overwrite -n openshift-cnv hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged \
+  'kubevirt.kubevirt.io/jsonpatch-'
+----
+
+TIP: Re-run the audit. `kubevirt` stays `true` with the VSOCK add. The other three stay `false`.
 ====
 
 == Debrief
 
 HCO is the supported control plane for these five settings. Empty/false is the hardened baseline. Do not turn gates on just to demonstrate a patch.
 
+The kubevirt jsonpatch on this cluster is the VSOCK exception for RHACS. The guide still says that annotation should be absent. Here it is present so Sensor can pull `roxagent` reports, and the patch does nothing besides enable that gate. Leave it.
+
 What breaks without this:
 
 * `qemu-pr-helper` and clustered SCSI reservations you do not need
 * Guest-visible host metrics
 * HTTP registry imports of VM disks
-* jsonpatch that silently undoes HCO security fields on reconcile
+* A jsonpatch that changes HCO security fields on every reconcile
+* Removing the VSOCK annotation, which stops ACS from refreshing guest package inventory
 
 NOTE: Next is xref:virt-02-devices-ksm-permissions.adoc[virt-02] -- host devices, KSM, and virt-handler file permissions.
 
