@@ -56,7 +56,7 @@
 * xref:acs.adoc[ACS 5 Capabilities]
 * xref:index.adoc[Return to Welcome]
 
-.Secure Software Supply Chain with Red HatLightwell 
+.Secure Software Supply Chain with Red Hat Lightwell 
 * xref:tssc-INDEX.adoc[Lightwell TSSC overview]
 * xref:tssc-01-hummingbird-verify.adoc[1.1 Verify Hummingbird]
 * xref:tssc-02-hummingbird-mirror.adoc[1.2 Mirror into the trust boundary]
