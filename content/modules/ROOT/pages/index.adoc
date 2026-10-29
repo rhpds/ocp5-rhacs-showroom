@@ -13,14 +13,12 @@ This course offers hands-on experience with Kubernetes-native security on Red Ha
 * *Cluster setup and services are managed by GitOps* — RHACS, Quay, GitOps, Compliance Operator, and the vulnerable demo apps are already synced by Argo CD. Deleting resources by accident is no problem, as they will be recreated by GitOps.
 * *You can go through the catalog in order, or jump in. The modules are designed to not be influenced by each other.* — 101 → 201 → 301, then the product deep-dives (RHACS, Virtualization, Lightwell TSSC).
 
-IMPORTANT: Make sure to run the setup script below! OpenShift Lightspeed is already configured with the platform model. You do not need your own API key. The script saves your CLI credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`). It asks for a Lightspeed API key only when the provisioned key is missing or rejected.
+IMPORTANT: Make sure to run the setup script below! OpenShift Lightspeed is already configured with the platform model. The script saves your CLI credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
 
 [[environment-setup]]
 == Environment setup
 
 The following script installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`) and reads Quay and RHACS credentials into your shell. OpenShift Lightspeed is already configured with the platform model.
-
-When that key still authenticates, the script skips the provider prompt. It asks you to choose a provider and paste an API key only when the provisioned key is missing or rejected. To replace a working key, export `LIGHTSPEED_PROVIDER` and `LIGHTSPEED_API_TOKEN` before running the script.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
@@ -33,15 +31,13 @@ source ~/.bashrc
 [.console-output]
 [source,bash,subs="+macros,+attributes"]
 ----
-[########--------------------] 2/7  Configure Lightspeed provider
-Lightspeed already has a working API token (Lightspeed / claude-sonnet-4-6). Skipping the provider prompt.
-[############################] 7/7  Lab environment setup complete
+[#####################-------] 6/8  Configure RHACS CLI variables
+[############################] 8/8  Lab environment setup complete
 
 ================================================================
   SUCCESS: Lab environment setup completed successfully
 ================================================================
 
-  ✓ Lightspeed API token already working (Lightspeed / claude-sonnet-4-6)
   ✓ Quay credentials read from the cluster
   ✓ RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)
   ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)
@@ -158,7 +154,6 @@ Use the *Terminal* tab (or SSH) for CLI work (`oc`, `roxctl`, `podman`, `curl`, 
 * xref:basic-INDEX.adoc[101 Foundations] — OpenShift secure-by-default posture.
 * xref:intermediate-INDEX.adoc[201 Intermediate] — Hardening and shift-left.
 * xref:advanced-INDEX.adoc[301 Advanced] — Enterprise and zero trust.
-* xref:acs-INDEX.adoc[Advanced Cluster Security (RHACS)] — Setup, vulnerabilities, policy and risk, CI/CD gates, compliance, notifications and API, network and runtime, installation, and xref:acs.adoc[ACS 5 capabilities] (VM scanning, file activity monitoring, MCP, and init containers).
-* xref:virt-INDEX.adoc[OpenShift Virtualization Security] — HyperConverged feature gates, virt RBAC, VM and storage isolation, VM networking, and host firmware/kernel controls from the link:https://access.redhat.com/sites/default/files/attachments/rh-openshift-virtualization-hardening-guide-detail-202512-en.pdf[Red Hat OpenShift Virtualization hardening guide^].
-* xref:tssc-INDEX.adoc[Lightwell and Red Hat Trusted Software Supply Chain (TSSC)] — Hummingbird, Lightwell remediations, hermetic build, keyless signing, GitOps admission, and TPA/ACS compliance.
-
+* xref:acs-INDEX.adoc[Advanced Cluster Security (RHACS)] — Setup, vulnerabilities, policy and risk, CI/CD gates, compliance, notifications and API, network and runtime, installation, and xref:acs.adoc[ACS 5.0 capabilities] (VM scanning, file activity monitoring, MCP, and init containers).
+* xref:tssc-INDEX.adoc[Secure Software Supply Chain with Red HatLightwell ] — Hummingbird, Lightwell remediations, hermetic build, keyless signing, GitOps admission, and TPA/ACS compliance.
+* xref:virt-INDEX.adoc[OpenShift Virtualization Hardening Modules] — HyperConverged feature gates, virt RBAC, VM and storage isolation, VM networking, and host firmware/kernel controls from the link:https://access.redhat.com/sites/default/files/attachments/rh-openshift-virtualization-hardening-guide-detail-202512-en.pdf[Red Hat OpenShift Virtualization hardening guide^].

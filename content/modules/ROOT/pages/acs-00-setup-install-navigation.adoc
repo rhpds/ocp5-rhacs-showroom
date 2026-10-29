@@ -46,7 +46,7 @@ IMPORTANT: This will run quickly if it has already been run as part of the initi
 
 === Run the setup script
 
-OpenShift Lightspeed is already configured with the platform model. You do not need your own API key. When that key still authenticates, the script skips the provider prompt. It asks you to choose a provider and paste an API key only when the provisioned key is missing or rejected. To replace a working key, export `LIGHTSPEED_PROVIDER` and `LIGHTSPEED_API_TOKEN` before running the script.
+OpenShift Lightspeed is already configured with the platform model. The script reads Quay and RHACS credentials and installs the TSSC CLIs.
 
 You can skip this step and run the verification step below if you've already run the script.
 
@@ -71,16 +71,14 @@ bash setup/lab-environment.sh
 Lab environment setup
 Details: /home/lab-user/.acs-roadshow/lab-environment-YYYYMMDD-HHMMSS.log
 
-[########--------------------] 2/7  Configure Lightspeed provider
-Lightspeed already has a working API token (Lightspeed / claude-sonnet-4-6). Skipping the provider prompt.
+[#####################-------] 6/8  Configure RHACS CLI variables
 
-[############################] 7/7  Lab environment setup complete
+[############################] 8/8  Lab environment setup complete
 
 ================================================================
   SUCCESS: Lab environment setup completed successfully
 ================================================================
 
-  ✓ Lightspeed API token already working (Lightspeed / claude-sonnet-4-6)
   ✓ Quay credentials read from the cluster
   ✓ RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)
   ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)

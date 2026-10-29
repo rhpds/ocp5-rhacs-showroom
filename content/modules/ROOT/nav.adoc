@@ -1,6 +1,6 @@
 * xref:index.adoc[Welcome]
 
-.101 OpenShift Security Modules: Core Concepts & Foundations
+.101 - Core Concepts & Foundations
 * xref:basic-INDEX.adoc[101 Labs Overview]
 * xref:101-01-default-secure-behavior.adoc[101-01 - Default Secure Behavior & Why OpenShift Differs from Vanilla Kubernetes]
 * xref:101-02-projects-namespaces-boundaries.adoc[101-02 - Projects & Namespaces as Security Boundaries]
@@ -15,7 +15,7 @@
 * xref:101-11-rebuilding-images.adoc[101-11 - Rebuilding & Hardening Images]
 * xref:101-12-enforcing-tls-routes.adoc[101-12 - Enforcing TLS on Routes]
 
-.201 OpenShift Security Modules: Intermediate Hardening & Shift-Left
+.201 - Intermediate Hardening & Shift-Left
 * xref:intermediate-INDEX.adoc[201 Labs Overview]
 * xref:201-01-custom-rbac.adoc[201-01 - Custom RBAC & ClusterRoles]
 * xref:201-02-workload-hardening.adoc[201-02 - Custom SCC, Seccomp, SELinux & User Namespaces Basics]
@@ -29,7 +29,7 @@
 * xref:201-10-admission-governance.adoc[201-10 - RHACM Policy Governance (DoD / NIST baseline)]
 * xref:201-11-threat-modeling-control-mapping.adoc[201-11 - STRIDE Control Map (capstone)]
 
-.301 OpenShift Security Modules: Advanced Enterprise & Zero-Trust
+.301 - Advanced Enterprise & Zero-Trust
 * xref:advanced-INDEX.adoc[301 Labs Overview]
 * xref:301-01-platform-security-governance.adoc[301-01 - STRIDE PolicySet (RHACM)]
 * xref:301-02-gitops-policy-compliance.adoc[301-02 - GitOps UBI Python (Red Hat catalog)]
@@ -52,7 +52,7 @@
 * xref:acs-07-installation.adoc[Installation]
 * xref:acs.adoc[ACS 5 Capabilities]
 
-.Software Supply Chain Security (Lightwell)
+.Secure Software Supply Chain with Red HatLightwell 
 * xref:tssc-INDEX.adoc[Lightwell TSSC overview]
 * xref:tssc-01-hummingbird-verify.adoc[1.1 Verify Hummingbird]
 * xref:tssc-02-hummingbird-mirror.adoc[1.2 Mirror into the trust boundary]
@@ -82,7 +82,7 @@
 * xref:rhda-shift-left.adoc[RHDA shift-left (laptop)]
 * xref:appendix-osv-manifest-polling.adoc[OSV PULP_MANIFEST polling]
 
-.OpenShift Virtualization Security Modules
+.OpenShift Virtualization Hardening Modules
 * xref:virt-INDEX.adoc[Virtualization Labs Overview]
 * xref:virt-00-scope-and-hco.adoc[Scope and HyperConverged]
 * xref:virt-01-feature-gates-and-trusted-config.adoc[Feature Gates and Trusted Config]

@@ -79,7 +79,7 @@ Attendees use the Showroom attribute `{workshop_user_suffix}` matching their ass
 
 == Attendee lab environment (bastion)
 
-Attendees clone `ocp5-rhacs-showroom`, then run `setup/lab-environment.sh`. OpenShift GitOps already syncs RHACS, Quay (including the public MinIO image and the private workshop images), the Central Quay integration, Compliance Operator, collector networking, demo-apps, the MCP servers, and OpenShift Lightspeed. Lightspeed is preconfigured with the platform model. The bastion script reads Quay and RHACS credentials into `~/.bashrc`, and installs `cosign`, `oc-mirror`, and `ec`. When the provisioned API key still authenticates, the script skips the provider prompt. It asks for a provider and API key only when that key is missing or rejected.
+Attendees clone `ocp5-rhacs-showroom`, then run `setup/lab-environment.sh`. OpenShift GitOps already syncs RHACS, Quay (including the public MinIO image and the private workshop images), the Central Quay integration, Compliance Operator, collector networking, demo-apps, the MCP servers, and OpenShift Lightspeed. Lightspeed is preconfigured with the platform model. The bastion script reads Quay and RHACS credentials into `~/.bashrc`, and installs `cosign`, `oc-mirror`, and `ec`.
 
 Patient-portal is not part of that init. ACS module 1 makes the Quay repositories public, then runs `--deploy-skupper-only`.
 
@@ -89,23 +89,6 @@ git clone https://github.com/rhpds/ocp5-rhacs-showroom.git
 cd ocp5-rhacs-showroom
 bash setup/lab-environment.sh
 source ~/.bashrc
-----
-
-Unattended runs skip the provider prompt when the provisioned key still authenticates. Export `LIGHTSPEED_PROVIDER` and `LIGHTSPEED_API_TOKEN` to replace a working key. When `LIGHTSPEED_API_TOKEN` is set and `LIGHTSPEED_PROVIDER` is unset, and Lightspeed is already configured, the script stores the key and leaves the provider and model alone.
-
-[source,bash]
-----
-export LIGHTSPEED_API_TOKEN='...'
-export LIGHTSPEED_PROVIDER=openai          # openai, azure_openai, anthropic, gemini, other, or keep
-# Optional overrides. Defaults: OpenAI gpt-6.1-sol, Anthropic claude-sonnet-5-5,
-# Gemini gemini-3.8-flash. Azure defaults to the roadshow gateway
-# https://ols-lightspeed-apim-pilot.azure-api.net/ols-test-openai and model gpt-5.4.
-# Enter accepts that gateway. Type a different URL to replace it. A custom Azure
-# OpenAI resource also needs LIGHTSPEED_AZURE_DEPLOYMENT. The script does not
-# suggest a placeholder endpoint or deployment name.
-# export LIGHTSPEED_MODEL=gpt-5.4
-# export LIGHTSPEED_API_URL=https://ols-lightspeed-apim-pilot.azure-api.net/ols-test-openai
-# Other needs LIGHTSPEED_API_URL and LIGHTSPEED_MODEL.
 ----
 
 Use `--rhacs-configure` or `--apply-demo-apps` only on brownfield clusters that are not GitOps-managed.
