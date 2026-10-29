@@ -36,7 +36,7 @@ The CronJob retries about every 20 minutes.
 
 == Confirm the bot is on this cluster
 
-. The chart is *default-off*. If the CronJob is missing, this cluster did not enable `components.renovate`. Tell an instructor. Do not fake a PR.
+. Confirm CronJob `renovate` is present. If it is missing, this cluster did not enable Renovate. Tell an instructor. Do not fake a PR.
 +
 [source,bash,role=execute]
 ----
@@ -59,6 +59,64 @@ git commit --author='student <student@example.invalid>' \
 
 == Your change: merge the renovate-bot PR
 
+. GitOps leaves Secret `renovate/renovate-gitea-token` as `REPLACE_ME`. Create the `renovate-bot` user and token from the Gitea admin secret, then start one CronJob run. Re-running this is safe when the token is already set.
++
+[source,bash,role=execute]
+----
+GITEA_URL="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.gitea_url}')"
+ORG="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_gitea_org}')"
+REPO="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_repo_name}')"
+ADMIN_USER="$(oc -n gitea get secret gitea-admin -o jsonpath='{.data.username}' | base64 -d)"
+ADMIN_PASS="$(oc -n gitea get secret gitea-admin -o jsonpath='{.data.password}' | base64 -d)"
+API="${GITEA_URL%/}/api/v1"
+CURRENT="$(oc -n renovate get secret renovate-gitea-token -o jsonpath='{.data.token}' 2>/dev/null | base64 -d || true)"
+if [[ -z "${CURRENT}" || "${CURRENT}" == "REPLACE_ME" ]]; then
+  BOT_PASSWORD='workshop-renovate-bot-changeme'
+  CREATE_CODE="$(curl -sk -o /tmp/renovate-bot-create.json -w '%{http_code}' \
+    -u "${ADMIN_USER}:${ADMIN_PASS}" -H 'Content-Type: application/json' \
+    -d "{\"username\":\"renovate-bot\",\"email\":\"renovate-bot@workshop.local\",\"full_name\":\"Renovate Bot\",\"password\":\"${BOT_PASSWORD}\",\"must_change_password\":false,\"send_notify\":false}" \
+    -X POST "${API}/admin/users")"
+  echo "create user HTTP ${CREATE_CODE}"
+  LIST_CODE="$(curl -sk -o /tmp/renovate-tokens.json -w '%{http_code}' \
+    -u "renovate-bot:${BOT_PASSWORD}" "${API}/users/renovate-bot/tokens")"
+  if [[ "${LIST_CODE}" == "200" ]]; then
+    python3 -c 'import json
+tokens=json.load(open("/tmp/renovate-tokens.json"))
+open("/tmp/renovate-token-ids","w").write("\n".join(str(t["id"]) for t in tokens if t.get("name")=="renovate"))'
+    while IFS= read -r id; do
+      [[ -z "${id}" ]] && continue
+      curl -sk -o /dev/null -X DELETE -u "renovate-bot:${BOT_PASSWORD}" \
+        "${API}/users/renovate-bot/tokens/${id}"
+    done < /tmp/renovate-token-ids
+  fi
+  TOKEN_CODE="$(curl -sk -o /tmp/renovate-token.json -w '%{http_code}' \
+    -u "renovate-bot:${BOT_PASSWORD}" -H 'Content-Type: application/json' \
+    -d '{"name":"renovate","scopes":["write:repository","write:issue","read:user","write:notification"]}' \
+    -X POST "${API}/users/renovate-bot/tokens")"
+  if [[ "${TOKEN_CODE}" != "201" ]]; then
+    TOKEN_CODE="$(curl -sk -o /tmp/renovate-token.json -w '%{http_code}' \
+      -u "renovate-bot:${BOT_PASSWORD}" -H 'Content-Type: application/json' \
+      -d '{"name":"renovate","scopes":["all"]}' \
+      -X POST "${API}/users/renovate-bot/tokens")"
+  fi
+  echo "create token HTTP ${TOKEN_CODE}"
+  TOKEN="$(python3 -c 'import json; print(json.load(open("/tmp/renovate-token.json")).get("sha1") or "")')"
+  test -n "${TOKEN}"
+  oc -n renovate patch secret renovate-gitea-token --type merge \
+    -p "{\"stringData\":{\"token\":\"${TOKEN}\"}}"
+  rm -f /tmp/renovate-token.json
+  echo "Stored renovate-gitea-token"
+else
+  echo "renovate-gitea-token already set"
+fi
+curl -sk -o /dev/null -w "collaborator HTTP %{http_code}\n" -X PUT \
+  -u "${ADMIN_USER}:${ADMIN_PASS}" -H 'Content-Type: application/json' \
+  -d '{"permission":"write"}' \
+  "${API}/repos/${ORG}/${REPO}/collaborators/renovate-bot"
+oc -n renovate delete job renovate-now --ignore-not-found
+oc -n renovate create job renovate-now --from=cronjob/renovate
+----
+
 . In Gitea, open `lw-student/spring-boot-lw-poc` → *Pull Requests*.
 . The scored PR author is `renovate-bot`. Files must include `lightwell-pins.properties`. Both seed values (`rhlw-00000` and the all-zero digest) should move in that one PR.
 . Review, then merge on Gitea (do not `git commit` the same hunk as `student`).
@@ -66,7 +124,7 @@ git commit --author='student <student@example.invalid>' \
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/55
 image::gitea-renovate-bot-pr.png[Gitea pull request authored by renovate-bot on lightwell-pins.properties,width=700,link=self,window=blank]
 
-If no PR yet: wait for the next CronJob; check Job logs in namespace `renovate`. Maven bump should appear once Nexus remotes are up. Dest Docker bump needs 1.2. Retry. Do *not* push a student commit that edits the pins file.
+If no PR yet: follow Job `renovate-now` in namespace `renovate` (`oc logs -f job/renovate-now`). Maven bump should appear once Nexus remotes are up. Dest Docker bump needs 1.2. Retry the Job. Do *not* push a student commit that edits the pins file.
 
 . After merge, refresh the clone
 +

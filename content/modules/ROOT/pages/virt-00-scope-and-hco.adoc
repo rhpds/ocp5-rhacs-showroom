@@ -16,12 +16,12 @@ This module confirms *Container-Native Virtualization* (CNV) is installed, shows
 == Why it matters
 A VM traditionally looks like a pet server. On OpenShift it isn't. It is a handful of custom resources (VirtualMachine, DataVolume, NAD) plus privileged node components (virt-handler, virt-launcher) that actually run the guest.
 
-Harden only the guest and you miss device passthrough, live-migration RBAC, and KubeVirt feature gates. Harden only OpenShift and the hypervisor is still an attack surface. You have to treat both.
+Harden only the guest OS inside the VM and you miss device passthrough, live-migration RBAC, and KubeVirt feature gates. Harden only OpenShift and the hypervisor is still an attack surface. You have to treat both.
 
 == What are we trying to solve
 
-* Treating CNV as "just another operator" with no extra baseline
-* Performing only guest-only hardening.
+* Moving away from treating CNV as "just another operator" with no extra baseline
+* Performing only guest-only hardening and not treating the hypervisor as an attack surface.
 * Confusing Kata sandboxed pods (xref:201-09-sandboxed-containers-intro.adoc[201-09]) with full VMs on OpenShift Virtualization
 
 == Your Mission
@@ -140,23 +140,11 @@ TIP: `VirtualMachine` and `VirtualMachineInstance` exist. Status should be `Runn
 .Open VirtualMachines in the console
 [%collapsible]
 ====
-In the OpenShift console: *Virtualization* → *VirtualMachines*. Enable *Show only projects with VirtualMachines* and select project `rhacs-virt`. Overview should show one Running VM with guest agent reporting.
+In the OpenShift console tab on the right: *Virtualization* → *VirtualMachines*. Enable *Show only projects with VirtualMachines* and select project `rhacs-virt`. Overview should show one Running VM in the project with guest agent reporting.
 
 image::virt-00-virtualmachines.png[VirtualMachines overview for rhel9-vm,link=self,window=blank,width=100%]
 
 TIP: Zero alerts and one Running VM is a clean baseline before you start scoring controls.
-====
-
-.Know what this guide does not cover
-[%collapsible]
-====
-Keep these boundaries in mind for every later module:
-
-* *Guest OS separately.* RHEL, Windows, or other guests follow their own hardening guides.
-* *Level 1 vs Level 2.* Level 1 is the expected baseline. Level 2 (KSM, dedicated VLANs, MultiNetworkPolicy) is extra segmentation or anti-side-channel posture.
-* *Defaults are often already hardened.* Many audits should return empty or `false`. That is a pass, not a skipped lab.
-* *Kata containers vs CNV.* xref:201-09-sandboxed-containers-intro.adoc[201-09] isolates a *pod* with a second kernel. This pathway hardens *virtual machines* scheduled by KubeVirt.
-
 ====
 
 == Debrief

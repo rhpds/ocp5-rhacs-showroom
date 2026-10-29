@@ -120,7 +120,100 @@ oc -n lightwell-repo create configmap stub-18-blast-radius \
   --dry-run=client -o yaml | oc apply -f -
 ----
 
-. ACS: confirm Job `rhacs-ci-token-mint` in `stackrox` is Complete. That Job mints Secret `rhacs-ci-secrets` and copies it into your build namespace (`student_build_namespace`) so `acs-image-check` can mount it. Provision also registers the in-cluster registry with Central — do not add an image integration by hand. On the learner Pipeline, pass `fail-on-skipped: "true"` on `acs-image-check` (seeded default is soft-skip). Re-run if the last TaskRun was `skipped`. Expect `passed` or `failed` — both prove the control is *on*. Do not screenshot Central as this Check.
+. ACS: Central is already up. Mint a Continuous Integration token into Secret `rhacs-ci-secrets` in the namespace from `demo-userinfo-rhacs` (this roadshow uses `rhacs-operator`). Copy that secret into the build namespace so `acs-image-check` can mount it. Register the in-cluster registry only when that integration is missing. On the learner Pipeline, pass `fail-on-skipped: "true"` on `acs-image-check` (seeded default is soft-skip). Re-run if the last TaskRun was `skipped`. Expect `passed` or `failed` — both prove the control is *on*. Do not screenshot Central as this Check.
++
+[source,bash,role=execute]
+----
+RHACS_NS="$(oc get configmap -A --field-selector metadata.name=demo-userinfo-rhacs -o jsonpath='{.items[0].metadata.namespace}')"
+BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
+HOST="$(oc -n "${RHACS_NS}" get route central-reencrypt -o jsonpath='{.spec.host}' 2>/dev/null || true)"
+if [[ -z "${HOST}" ]]; then
+  HOST="$(oc -n "${RHACS_NS}" get route central -o jsonpath='{.spec.host}')"
+fi
+ENDPOINT="central.${RHACS_NS}.svc:443"
+ADMIN_PASS="$(oc -n "${RHACS_NS}" get secret central-admin-password -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)"
+if [[ -z "${ADMIN_PASS}" ]]; then
+  ADMIN_PASS="$(oc -n "${RHACS_NS}" get secret central-htpasswd -o jsonpath='{.data.password}' | base64 -d)"
+fi
+EXISTING="$(oc -n "${RHACS_NS}" get secret rhacs-ci-secrets -o jsonpath='{.data.rox-api-token}' 2>/dev/null | base64 -d || true)"
+if [[ -z "${EXISTING}" ]]; then
+  RESP="$(curl -sk -u "admin:${ADMIN_PASS}" \
+    "https://${HOST}/v1/apitokens/generate" \
+    -H 'Content-Type: application/json' \
+    -d '{"name":"lightwell-ci","roles":["Continuous Integration"]}')"
+  TOKEN="$(printf '%s' "${RESP}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("token") or "")')"
+  test -n "${TOKEN}"
+  oc -n "${RHACS_NS}" patch secret rhacs-ci-secrets --type merge \
+    -p "{\"stringData\":{\"rox-api-endpoint\":\"${ENDPOINT}\",\"rox-api-token\":\"${TOKEN}\"}}"
+  echo "Stored ${RHACS_NS}/rhacs-ci-secrets"
+else
+  echo "${RHACS_NS}/rhacs-ci-secrets already has a token"
+fi
+EP="$(oc -n "${RHACS_NS}" get secret rhacs-ci-secrets -o jsonpath='{.data.rox-api-endpoint}' | base64 -d)"
+TK="$(oc -n "${RHACS_NS}" get secret rhacs-ci-secrets -o jsonpath='{.data.rox-api-token}' | base64 -d)"
+oc -n "${BUILD_NS}" create secret generic rhacs-ci-secrets \
+  --from-literal=rox-api-endpoint="${EP}" \
+  --from-literal=rox-api-token="${TK}" \
+  --dry-run=client -o yaml | oc apply -f -
+oc -n "${RHACS_NS}" create serviceaccount rhacs-registry-puller --dry-run=client -o yaml | oc apply -f -
+oc -n "${BUILD_NS}" create rolebinding rhacs-registry-puller-image-puller \
+  --clusterrole=system:image-puller \
+  --serviceaccount="${RHACS_NS}:rhacs-registry-puller" \
+  --dry-run=client -o yaml | oc apply -f -
+oc -n "${RHACS_NS}" annotate serviceaccount rhacs-registry-puller argocd.argoproj.io/tracking-id- --overwrite || true
+oc -n "${RHACS_NS}" label serviceaccount rhacs-registry-puller app.kubernetes.io/instance- --overwrite || true
+oc -n "${BUILD_NS}" annotate rolebinding rhacs-registry-puller-image-puller argocd.argoproj.io/tracking-id- --overwrite || true
+oc -n "${BUILD_NS}" label rolebinding rhacs-registry-puller-image-puller app.kubernetes.io/instance- --overwrite || true
+export HOST ADMIN_PASS RHACS_NS
+python3 - <<'PY'
+import base64, json, os, ssl, subprocess, sys, urllib.error, urllib.request
+host = os.environ["HOST"]
+admin = os.environ["ADMIN_PASS"]
+ns = os.environ["RHACS_NS"]
+endpoint = "image-registry.openshift-image-registry.svc:5000"
+name = "openshift-internal-registry"
+ctx = ssl._create_unverified_context()
+basic = base64.b64encode(f"admin:{admin}".encode()).decode()
+
+def req(method, path, body=None):
+    data = None if body is None else json.dumps(body).encode()
+    request = urllib.request.Request(
+        f"https://{host}{path}", data=data, method=method,
+        headers={"Content-Type": "application/json", "Authorization": f"Basic {basic}"},
+    )
+    try:
+        with urllib.request.urlopen(request, context=ctx, timeout=60) as resp:
+            raw = resp.read().decode() or "{}"
+            return json.loads(raw)
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode() if exc.fp else ""
+        print(f"{method} {path} failed: {exc.code} {detail}", file=sys.stderr)
+        raise SystemExit(1) from exc
+
+listing = req("GET", "/v1/imageintegrations")
+items = listing.get("integrations") or listing.get("imageIntegrations") or []
+if any((item.get("name") == name) or ((item.get("docker") or {}).get("endpoint") == endpoint) for item in items):
+    print(f"image integration {name} already present")
+else:
+    token = subprocess.check_output(
+        ["oc", "create", "token", "rhacs-registry-puller", "-n", ns, "--duration=8760h"],
+        text=True,
+    ).strip()
+    req("POST", "/v1/imageintegrations", {
+        "name": name,
+        "type": "docker",
+        "categories": ["REGISTRY"],
+        "skipTestIntegration": True,
+        "docker": {
+            "endpoint": endpoint,
+            "username": "serviceaccount",
+            "password": token,
+            "insecure": True,
+        },
+    })
+    print(f"Created image integration {name}")
+PY
+----
 
 == Check: report tokens + ACS not skipped
 
@@ -133,7 +226,9 @@ grep -E 'REPLACE_ME' ~/track-7-2-blast-radius.txt && echo 'STILL HAS PLACEHOLDER
 grep -E 'LW-DEMO-0002|3.14.0.rhlw-00001|via-lightwell-pin' ~/track-7-2-blast-radius.txt
 oc -n lightwell-repo get configmap stub-18-blast-radius \
   -o jsonpath='{.data.blast-radius\.txt}' | grep -E 'LW-DEMO-0002|3.14.0.rhlw-00001|via-lightwell-pin'
-oc -n stackrox get job rhacs-ci-token-mint
+RHACS_NS="$(oc get configmap -A --field-selector metadata.name=demo-userinfo-rhacs -o jsonpath='{.items[0].metadata.namespace}')"
+oc -n "${RHACS_NS}" get secret rhacs-ci-secrets -o jsonpath='{.data.rox-api-token}' | grep -q .
+echo "token present in ${RHACS_NS}"
 oc -n "${BUILD_NS}" get secret rhacs-ci-secrets
 oc -n "${BUILD_NS}" get tr -l tekton.dev/pipelineTask=acs-image-check
 ----

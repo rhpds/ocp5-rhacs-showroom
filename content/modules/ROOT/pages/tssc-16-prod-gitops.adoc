@@ -45,6 +45,70 @@ replicas: 0
 
 == Your change: prod tag + prod commit
 
+. Create Application `lw-poc-prod` when it is absent. Point it at `student_prod_gitops_repo_url` before you replace the seed digest.
++
+[source,bash,role=execute]
+----
+PROD_APP="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_prod_argocd_app}')"
+PROD_APP="${PROD_APP:-lw-poc-prod}"
+PROD_GITOPS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_prod_gitops_repo_url}')"
+PROD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_prod_namespace}')"
+DOMAIN="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.cluster_domain}')"
+API_URL="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.cluster_api_url}')"
+if oc -n openshift-gitops get applications.argoproj.io "${PROD_APP}" >/dev/null 2>&1; then
+  echo "Application ${PROD_APP} already exists"
+else
+  oc apply -f - <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ${PROD_APP}
+  namespace: openshift-gitops
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: ${PROD_GITOPS}
+    targetRevision: main
+    path: .
+    helm:
+      values: |
+        springBootLwPoc:
+          enabled: true
+          namespace: ${PROD_NS}
+          name: spring-boot-lw-poc
+          createNamespace: false
+        labDocs:
+          enabled: false
+        userInfo:
+          enabled: false
+        deployer:
+          domain: ${DOMAIN}
+          apiUrl: ${API_URL}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ${PROD_NS}
+  ignoreDifferences:
+    - group: ""
+      kind: Namespace
+      jsonPointers:
+        - /metadata/labels
+        - /metadata/annotations
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - RespectIgnoreDifferences=true
+EOF
+  echo "Created Application ${PROD_APP}"
+fi
+oc -n openshift-gitops annotate applications.argoproj.io "${PROD_APP}" argocd.argoproj.io/tracking-id- --overwrite || true
+oc -n openshift-gitops label applications.argoproj.io "${PROD_APP}" app.kubernetes.io/instance- --overwrite || true
+----
+
 . Your change: prod tag + prod commit
 +
 [source,bash,role=execute]

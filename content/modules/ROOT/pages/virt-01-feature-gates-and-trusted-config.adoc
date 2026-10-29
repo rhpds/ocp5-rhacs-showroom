@@ -10,6 +10,7 @@
 
 == Overview
 xref:virt-00-scope-and-hco.adoc[virt-00] found `HyperConverged/kubevirt-hyperconverged`. This module scores the *least functionality* controls on that object: 
+
 * non-root virt-launcher
 * persistent SCSI reservations
 * downward metrics into the guest
@@ -41,8 +42,6 @@ Audit five HCO controls. Leave the live object at the secure default. Use the re
 Click each step for the full solution.
 
 === Control: Enable nonRoot (pre-4.18)
-
-**Level:** 1
 
 The `nonRoot` feature gate makes virt-launcher run without root. From OpenShift Virtualization 4.18 the field is ignored and non-root is always on.
 
@@ -83,8 +82,6 @@ TIP: Re-run the audit. Output should be `true`.
 
 === Control: Disable persistentReservation
 
-**Level:** 1
-
 Persistent SCSI reservations share a LUN among VMs. They exist for Windows Shared Cluster Filesystem and pull in `qemu-pr-helper` with extra privilege.
 
 *Pros:* Least functionality; no privileged helper unless that Windows clustered-disk use case is real.
@@ -121,8 +118,6 @@ TIP: Audit should return `false`.
 ====
 
 === Control: Disable downwardMetrics
-
-**Level:** 1
 
 `downwardMetrics` exposes extra host and VM performance data to the guest.
 
@@ -161,8 +156,6 @@ TIP: Audit should return `false`.
 
 === Control: Enforce trusted registries using TLS
 
-**Level:** 1
-
 `spec.storageImport.insecureRegistries` is the allow-list of registries CDI may contact *without* TLS. Empty means TLS-only trusted registries.
 
 *Pros:* Disk images and container sources are not imported over cleartext or from unknown HTTP endpoints.
@@ -199,8 +192,6 @@ TIP: Re-run the audit. It should print nothing.
 ====
 
 === Control: Restrict HCO jsonpatch annotations
-
-**Level:** 1
 
 HCO honors experimental jsonpatch annotations on itself: `kubevirt.kubevirt.io/jsonpatch`, `containerizeddataimporter.kubevirt.io/jsonpatch`, `networkaddonsconfigs.kubevirt.io/jsonpatch`, and `ssp.kubevirt.io/jsonpatch`. Those patches mutate child operands outside the supported HCO spec.
 

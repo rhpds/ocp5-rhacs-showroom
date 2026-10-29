@@ -63,6 +63,117 @@ spec:
 
 == Your change: tag, stage GitOps, TrustPolicy
 
+. Copy the RHTAS TUF Fulcio CA and Rekor public key into Secret `tssc-admission/rhtas-tuf-keys`. The admission CronJob reads those keys. Skip this when `fulcio_v1.crt.pem` is already present.
++
+[source,bash,role=execute]
+----
+if oc -n tssc-admission get secret rhtas-tuf-keys -o jsonpath='{.data.fulcio_v1\.crt\.pem}' 2>/dev/null | grep -q .; then
+  echo "rhtas-tuf-keys already has the Fulcio CA"
+else
+  TUF_HOST="$(oc -n trusted-artifact-signer get route -o jsonpath='{range .items[*]}{.spec.to.name}{"\t"}{.spec.host}{"\n"}{end}' \
+    | awk -F '\t' '$1=="tuf"{print $2; exit}')"
+  test -n "${TUF_HOST}"
+  mkdir -p /tmp/tuf-keys
+  fetch_by_suffix() {
+    local dest="$1" suffix="$2" href=""
+    href="$(curl -fsSk --max-time 20 "https://${TUF_HOST}/targets/" \
+      | grep -oE "href=\"[^\"]*${suffix}\"" | head -1 | sed 's/^href="//;s/"$//')" || true
+    [[ -n "${href}" ]] && curl -fsSk --max-time 20 -o "${dest}" "https://${TUF_HOST}/targets/${href}"
+  }
+  if ! fetch_by_suffix /tmp/tuf-keys/fulcio_v1.crt.pem fulcio_v1.crt.pem \
+    || ! fetch_by_suffix /tmp/tuf-keys/rekor.pub rekor.pub; then
+    python3 - <<'PY'
+import base64, json, os, subprocess
+names = subprocess.check_output(
+    ["oc", "-n", "trusted-artifact-signer", "get", "secret", "-o", "jsonpath={.items[*].metadata.name}"],
+    text=True,
+).split()
+fulcio = rekor = None
+for name in names:
+    raw = subprocess.check_output(
+        ["oc", "-n", "trusted-artifact-signer", "get", "secret", name, "-o", "json"],
+        text=True,
+    )
+    for value in (json.loads(raw).get("data") or {}).values():
+        text = base64.b64decode(value).decode("utf-8", "replace")
+        if "BEGIN CERTIFICATE" in text and fulcio is None:
+            fulcio = text
+        if ("BEGIN PUBLIC KEY" in text or "BEGIN REKOR" in text) and rekor is None and "BEGIN CERTIFICATE" not in text:
+            rekor = text
+if not fulcio or not rekor:
+    raise SystemExit("Could not find Fulcio CA and Rekor public key from the TUF route or Secrets")
+os.makedirs("/tmp/tuf-keys", exist_ok=True)
+open("/tmp/tuf-keys/fulcio_v1.crt.pem", "w").write(fulcio if fulcio.endswith("\n") else fulcio + "\n")
+open("/tmp/tuf-keys/rekor.pub", "w").write(rekor if rekor.endswith("\n") else rekor + "\n")
+print("Wrote PEMs from Secret scan")
+PY
+  fi
+  test -s /tmp/tuf-keys/fulcio_v1.crt.pem && test -s /tmp/tuf-keys/rekor.pub
+  oc -n tssc-admission create secret generic rhtas-tuf-keys \
+    --from-file=fulcio_v1.crt.pem=/tmp/tuf-keys/fulcio_v1.crt.pem \
+    --from-file=rekor.pub=/tmp/tuf-keys/rekor.pub \
+    --dry-run=client -o yaml | oc apply -f -
+  echo "Wrote tssc-admission/rhtas-tuf-keys"
+fi
+oc -n tssc-admission annotate secret rhtas-tuf-keys argocd.argoproj.io/tracking-id- --overwrite || true
+oc -n tssc-admission label secret rhtas-tuf-keys app.kubernetes.io/instance- --overwrite || true
+----
+
+. Create Application `lw-poc-staging` when it is absent. The source repo and destination namespace come from `demo-userinfo-gitea`.
++
+[source,bash,role=execute]
+----
+ARGO="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_argocd_app}')"
+STAGE_GITOPS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_gitops_repo_url}')"
+PROMOTE_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_promote_namespace}')"
+DOMAIN="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.cluster_domain}')"
+API_URL="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.cluster_api_url}')"
+if oc -n openshift-gitops get applications.argoproj.io "${ARGO}" >/dev/null 2>&1; then
+  echo "Application ${ARGO} already exists"
+else
+  oc apply -f - <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ${ARGO}
+  namespace: openshift-gitops
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: ${STAGE_GITOPS}
+    targetRevision: main
+    path: .
+    helm:
+      values: |
+        springBootLwPoc:
+          enabled: true
+          namespace: ${PROMOTE_NS}
+          name: spring-boot-lw-poc
+        labDocs:
+          enabled: false
+        userInfo:
+          enabled: false
+        deployer:
+          domain: ${DOMAIN}
+          apiUrl: ${API_URL}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ${PROMOTE_NS}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+EOF
+  echo "Created Application ${ARGO}"
+fi
+oc -n openshift-gitops annotate applications.argoproj.io "${ARGO}" argocd.argoproj.io/tracking-id- --overwrite || true
+oc -n openshift-gitops label applications.argoproj.io "${ARGO}" app.kubernetes.io/instance- --overwrite || true
+----
+
 . Tag the signed image into staging (not prod)
 +
 [source,bash,role=execute]
