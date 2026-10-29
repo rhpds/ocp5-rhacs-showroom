@@ -306,8 +306,19 @@ case "${MODULE}" in
     rm -f "/tmp/lab-${MODULE}.txt" /tmp/lab-scratch-* 2>/dev/null || true
     echo "Removed temporary lab files for module ${MODULE}."
     ;;
-  virt-00|virt-01|virt-02|virt-03|virt-04|virt-05|virt-06)
-    echo "Virtualization pathway is cumulative. No cluster objects deleted (HCO, rhel9-vm, NADs stay)."
+  virt-00|virt-01|virt-02|virt-03|virt-04|virt-05)
+    echo "Virtualization pathway is cumulative. No cluster objects deleted (HCO and rhel9-vm stay)."
+    ;;
+  virt-06)
+    if oc get crd multi-networkpolicies.k8s.cni.cncf.io >/dev/null 2>&1; then
+      oc delete multi-networkpolicy allow-same-vlan -n rhacs-virt --ignore-not-found=true
+    fi
+    oc delete network-attachment-definitions.k8s.cni.cncf.io vlan-100 -n rhacs-virt --ignore-not-found=true
+    if [[ "$(oc get network.operator.openshift.io cluster -o jsonpath='{.spec.useMultiNetworkPolicy}' 2>/dev/null || true)" == "true" ]]; then
+      oc patch network.operator.openshift.io cluster --type=merge --patch '{"spec":{"useMultiNetworkPolicy":false}}'
+      echo "Turned useMultiNetworkPolicy back off."
+    fi
+    echo "Removed the virt-06 VLAN example (rhacs-virt/vlan-100 and allow-same-vlan). rhel9-vm and the original networks stay."
     ;;
   virt-07)
     echo "Virtualization pathway complete. Cluster objects were left in place on purpose."

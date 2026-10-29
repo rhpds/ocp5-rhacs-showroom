@@ -14,18 +14,18 @@ xref:virt-02-devices-ksm-permissions.adoc[virt-02] locked devices and node files
 The link:https://access.redhat.com/sites/default/files/attachments/rh-openshift-virtualization-hardening-guide-detail-202512-en.pdf[Red Hat OpenShift Virtualization hardening guide^]'s position is least privilege. Namespace admins can often migrate today; the KubeVirt community is moving that to cluster admins. You will *see* who can, then remove only bindings you created or that are clearly extra.
 
 == Why it matters
-Live migration copies VM memory over the network and consumes CPU on two nodes. VNC is a console that is weaker than SSH or a bastion with MFA. Cluster instance types are copy-paste security: one insecure template becomes every new VM. CDI holds importer configuration for the whole cluster.
+Live migration copies VM memory over the network and consumes CPU on two nodes. Virtual Network Console (VNC) is a console that is weaker than SSH or a bastion with Multi-Factor Authentication (MFA). Cluster instance types are copy-paste security: one insecure template becomes every new VM. Containerized Data Importer (CDI) holds importer configuration for the whole cluster.
 
 == What does it solve
 
 * Project admins triggering migrations that starve neighbors
 * Extra `exec` on virt-launcher or virt-handler beyond cluster-admin
-* A RoleBinding that lets a whole group generate kubevirt subresource tokens (VNC)
+* A RoleBinding that lets a whole group generate kubevirt subresource tokens (Virtual Network Console)
 * Developers who can edit `VirtualMachineClusterInstanceType` for everyone
 * Workload owners who can update the CDI CR
 
 == Your Mission
-Run `oc adm policy who-can` (and one `jq` pass over RoleBindings) for five actions. Record who is expected (cluster-admin, kubevirt controllers) versus extra humans. Do not delete default controller bindings.
+Run `oc adm policy who-can` ,and one `jq` pass over RoleBindings, for five actions. Record who is expected (cluster-admin, kubevirt controllers) versus extra humans. Do not delete default controller bindings.
 
 === Prerequisites
 
@@ -34,11 +34,9 @@ Run `oc adm policy who-can` (and one `jq` pass over RoleBindings) for five actio
 
 Click each step for the full solution.
 
-=== Control: Restrict namespace administrator access to migration tools
+=== Control: Restrict namespace administrator access to migration tools (Level 1 Control)
 
-**Level:** 1
-
-`VirtualMachineInstanceMigration` (often `vmim`) and `MigrationPolicy` start and govern live migration.
+`VirtualMachineInstanceMigration` (VMIM) and `MigrationPolicy` start and govern live migration.
 
 *Pros:* Cluster admins own when memory moves between nodes. You cap concurrent migration blast radius and keep a clearer audit trail.
 
@@ -56,7 +54,7 @@ echo '---'
 oc adm policy who-can create migrationpolicy
 ----
 
-TIP: Expect `system:admin`, kubevirt controller service accounts, and possibly `system:serviceaccounts:openshift-cnv`. Extra *User* names are the finding.
+TIP: Expect `system:masters` and `system:cluster-admin`, kubevirt controller service accounts, and possibly `system:serviceaccounts:openshift-cnv`. Extra *User* names are the finding.
 ====
 
 .Remediation
@@ -78,9 +76,7 @@ Leave these commented unless you identified a binding you created. Deleting oper
 TIP: After a justified delete, `oc auth can-i ... --as <user>` should print `no`.
 ====
 
-=== Control: Restrict exec access to pods
-
-**Level:** 1
+=== Control: Restrict exec access to pods (Level 1 Control)
 
 `exec` into pods is not required for OpenShift Virtualization to run. It is how people get shells in virt-launcher.
 
@@ -109,9 +105,7 @@ Do not grant `pods/exec` to `system:authenticated`. Remove RoleBindings that add
 TIP: Guest access belongs in the guest (SSH, cloud-init users), not `oc exec` in virt-launcher.
 ====
 
-=== Control: Restrict VNC access to cluster workloads
-
-**Level:** 1
+=== Control: Restrict VNC access to cluster workloads (Level 1 Control)
 
 The kubevirt token subresource (`token.kubevirt.io:generate`) is how the UI and CLI mint VNC access. A RoleBinding that includes that role grants console to every VM in the namespace (or cluster, if ClusterRoleBinding).
 
@@ -149,9 +143,7 @@ Delete or subject-trim bindings that are not approved. Example:
 TIP: Re-run the `jq` filter. Only approved subjects should remain.
 ====
 
-=== Control: Restrict create and update of cluster instance types and preferences
-
-**Level:** 1
+=== Control: Restrict create and update of cluster instance types and preferences (Level 1 Control)
 
 `VirtualMachineClusterInstanceType` and cluster preferences are cluster-scoped starters for new VMs. A bad default (privileged devices, shareable disks) copies into every VM created from them.
 
@@ -182,9 +174,7 @@ Remove create/update from people who should only *consume* instance types (bind 
 TIP: `who-can` should shrink to admins plus controllers.
 ====
 
-=== Control: Restrict update access to the CDI CR
-
-**Level:** 1
+=== Control: Restrict update access to the CDI CR (Level 1 Control)
 
 The Containerized Data Importer object is cluster-scoped and holds sensitive importer settings (including the insecure registry list you audited in virt-01).
 

@@ -11,10 +11,10 @@
 == Overview
 xref:virt-02-devices-ksm-permissions.adoc[virt-02] locked the *cluster* allow-list (`permittedHostDevices`). This module looks at each VirtualMachine spec: `domain.devices.gpus`, `domain.devices.hostDevices`, and `domain.resources.overcommitGuestOverhead`.
 
-Audit every VM, then inspect `rhel9-vm` as the lab's production-like guest. Do not patch that VM. A finding on any other VM is a real exception to document or remove.
+Audit every VM, then inspect `rhel9-vm` as the lab's production-like guest. A finding on any other VM is a real exception to document or remove.
 
 == Why it matters
-HCO can forbid a device and a VM spec can still *request* one (it will not schedule). The inverse is worse: HCO allows a GPU and a forgotten VM still has it attached after the business need ended. Memory overcommit tells the scheduler the guest needs less RAM than the hypervisor actually uses. If the guest fills memory, kubelet OOM-kills the virt-launcher.
+HCO can forbid a device and a VM spec can still *request* one (it will not schedule). The inverse is worse: HCO allows a GPU and a forgotten VM still has it attached after the business need ended. Memory overcommit tells the scheduler the guest needs less RAM than the hypervisor actually uses. If the guest fills memory, kubelet OOM-kills the virt-launcher pod.
 
 == What does it solve
 
@@ -28,14 +28,11 @@ List VMs with GPUs, hostDevices, or overcommit. Confirm `rhel9-vm` is clean. Kno
 === Prerequisites
 
 * xref:virt-03-virtualization-rbac.adoc[virt-03] complete
-* `jq` on the bastion
 * Get access to VirtualMachines cluster-wide (or at least project `rhacs-virt`)
 
 Click each step for the full solution.
 
-=== Control: Restrict pass-through of GPUs and host devices to the VM
-
-**Level:** 1
+=== Control: Restrict pass-through of GPUs and host devices to the VM (Level 1 Control)
 
 Attaching a GPU, NVMe, or other host device maps that hardware into the guest. Performance goes up. So does the blast radius if the device firmware or driver is hostile.
 
@@ -94,9 +91,7 @@ GPUs use `/spec/template/spec/domain/devices/gpus/0`. Stop the VM if the API req
 TIP: Re-run the cluster-wide `jq`. That VM should disappear from the list.
 ====
 
-=== Control: Disable overcommitting guest memory
-
-**Level:** 1
+=== Control: Disable overcommitting guest memory (Level 1 Control)
 
 `overcommitGuestOverhead: true` asks the scheduler to ignore hypervisor overhead so more VMs fit on a node. If the guest actually uses its full RAM plus overhead, the virt-launcher pod is the process kubelet kills.
 
@@ -116,6 +111,10 @@ oc get vm -A -o json | jq -r '
   | select(.spec.template.spec.domain.resources.overcommitGuestOverhead == true)
   | .metadata.namespace + "/" + .metadata.name
 '
+----
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
 oc get vm rhel9-vm -n rhacs-virt -o jsonpath='{.spec.template.spec.domain.resources.overcommitGuestOverhead}{"\n"}'
 ----
 

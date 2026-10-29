@@ -42,12 +42,7 @@ Click each step for the full solution.
 oc get nodes -l node-role.kubernetes.io/worker -o wide
 ----
 
-TIP: Copy one `NAME`. The next steps use the first worker if you do not override `NODE`.
-====
-
-=== Control: Disable Intel Trusted Execution Technology (TXT)
-
-**Level:** 1
+=== Control: Disable Intel Trusted Execution Technology (TXT) (Level 1 Control)
 
 Intel TXT is a CPU/firmware feature. Red Hat OpenShift and OpenShift Virtualization do not use it. The guide says disable it.
 
@@ -69,7 +64,7 @@ echo "NODE=$NODE"
 oc debug node/"$NODE" --quiet -- chroot /host sh -c 'command -v fwupdmgr >/dev/null && fwupdmgr get-bios-settings | grep -i -A2 -E "txt|TxT" || echo "fwupdmgr not available; confirm TxT Disabled in the server BIOS"'
 ----
 
-TIP: Look for TxT / TXT *Disabled*. If the tool is missing, open the vendor iLO/iDRAC/BMC and record the setting there.
+TIP: Look for TxT / TXT *Disabled*. `fwupdmgr not available` means RHCOS has no firmware tool, so a bare-metal Intel node is confirmed in the BMC. This roadshow worker is AMD (`kvm_amd` in the next control). Intel TXT does not exist on AMD, so record this control as not applicable.
 ====
 
 .Remediation
@@ -80,9 +75,7 @@ Disable TXT in firmware on every virt worker, then reboot from the hardware work
 TIP: After a real change window, re-run the debug command or confirm in BMC.
 ====
 
-=== Control: Disable nested virtualization
-
-**Level:** 1
+=== Control: Disable nested virtualization (Level 1 Control)
 
 Nested virtualization lets a guest use hardware VMX/SVM to run another hypervisor. It is required for WSL2 in a Windows guest and for nested KVM labs. It is extra attack surface otherwise.
 
@@ -90,7 +83,7 @@ Nested virtualization lets a guest use hardware VMX/SVM to run another hyperviso
 
 *Cons / impact:* Windows guests cannot use WSL2. Nested KVM inside the VM fails. If that is a required product feature, this control is an exception, not a silent disable.
 
-*Default:* Red Hat OpenShift does not enable nested virtualization.
+*Default:* OpenShift does not set a nested-virt kernel argument. On current RHCOS, AMD still reports `1` because that is the kernel default. Intel often reports `0` until an argument turns it on.
 
 .Audit nested
 [%collapsible]
@@ -111,7 +104,7 @@ oc debug node/"$NODE" --quiet -- chroot /host sh -c '
 '
 ----
 
-TIP: Disabled (`0` or `N`) is the pass unless you have a written WSL2/nested-KVM exception.
+TIP: `0` or `N` is the hardened pass. `kvm_amd nested=1` on this roadshow is expected. The workers are virtual machines, which is why OpenShift Virtualization can run here, and the AMD kernel default leaves nested virtualization on. OpenShift Virtualization does not need `nested=1` to run `rhel9-vm`. That value lets a guest start its own hypervisor. Record it as the demo exception. Do not set `kvm_amd.nested=0` in this cluster.
 ====
 
 .Remediation
@@ -127,9 +120,7 @@ See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4
 TIP: After a real MCP update, re-run the `cat` on `/sys/module/kvm_*/parameters/nested`.
 ====
 
-=== Control: Enable vCPU metrics (schedstats)
-
-**Level:** 1
+=== Control: Enable vCPU metrics (schedstats) (Level 1 Control)
 
 OpenShift Virtualization vCPU Prometheus metrics need the kernel argument `schedstats=enable`.
 
@@ -159,9 +150,7 @@ Add `schedstats=enable` via MachineConfig on virt workers and reboot. Same docs 
 TIP: After reboot, `grep schedstats=enable /proc/cmdline` on the node should match.
 ====
 
-=== Control: Make sure all CPU vulnerabilities are mitigated
-
-**Level:** 1
+=== Control: Make sure all CPU vulnerabilities are mitigated (Level 1 Control)
 
 The kernel publishes per-issue state under `/sys/devices/system/cpu/vulnerabilities`. Values are `Not affected`, `Mitigation: ...`, or `Vulnerable`.
 

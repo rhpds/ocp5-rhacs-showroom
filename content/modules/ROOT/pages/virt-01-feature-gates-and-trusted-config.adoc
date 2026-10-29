@@ -43,7 +43,7 @@ The `kubevirt` jsonpatch annotation is the one expected exception. The last cont
 
 Click each step for the full solution.
 
-=== Control: Enable nonRoot (pre-4.18)
+=== Control: Enable nonRoot (pre-4.18) (Level 1 Control)
 
 The `nonRoot` feature gate makes virt-launcher run without root. From OpenShift Virtualization 4.18 the field is ignored and non-root is always on.
 
@@ -82,7 +82,7 @@ oc patch hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n open
 TIP: Re-run the audit. Output should be `true`.
 ====
 
-=== Control: Disable persistentReservation
+=== Control: Disable persistentReservation (Level 1 Control)
 
 Persistent SCSI reservations share a LUN among VMs. They exist for Windows Shared Cluster Filesystem and pull in `qemu-pr-helper` with extra privilege.
 
@@ -119,7 +119,7 @@ oc patch hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n open
 TIP: Audit should return `false`.
 ====
 
-=== Control: Disable downwardMetrics
+=== Control: Disable downwardMetrics (Level 1 Control)
 
 `downwardMetrics` exposes extra host and VM performance data to the guest.
 
@@ -156,7 +156,7 @@ oc patch hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n open
 TIP: Audit should return `false`.
 ====
 
-=== Control: Enforce trusted registries using TLS
+=== Control: Enforce trusted registries using TLS (Level 1 Control)
 
 `spec.storageImport.insecureRegistries` is the allow-list of registries CDI may contact *without* TLS. Empty means TLS-only trusted registries.
 
@@ -193,7 +193,7 @@ oc patch hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n open
 TIP: Re-run the audit. It should print nothing.
 ====
 
-=== Control: Restrict HCO jsonpatch annotations
+=== Control: Restrict HCO jsonpatch annotations (Level 1 Control)
 
 HCO honors experimental jsonpatch annotations on itself: `kubevirt.kubevirt.io/jsonpatch`, `containerizeddataimporter.kubevirt.io/jsonpatch`, `networkaddonsconfigs.kubevirt.io/jsonpatch`, and `ssp.kubevirt.io/jsonpatch`. Those patches mutate child operands outside the supported HCO spec. HCO reapplies the patch on every reconcile, so an annotation can quietly undo a security field you set in `spec`.
 
