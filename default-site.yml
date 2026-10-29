@@ -27,6 +27,7 @@ antora:
   extensions:
   - require: ./content/lib/dev-mode.js
     enabled: true
+    addToNavigation: false
 
 output:
   dir: ./www

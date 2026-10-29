@@ -897,3 +897,5 @@ image::acs-skip-init-policy-management.png[Policy Management showing Skips init 
 * File activity monitoring provides visibility into security-relevant file access patterns
 * The ACS MCP server enables AI agents to query secured clusters and CVE findings (deployments and nodes) programmatically
 * Init container scanning extends image and policy coverage to init containers
+
+This track is complete. Return to the xref:index.adoc[home page] to choose the next track.

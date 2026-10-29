@@ -119,3 +119,5 @@ Treat the poll as a *signal*, then reuse xref:tssc-04-remediated-pin.adoc[2.2]:
 * Toolkit README: `tools/osv-eval/README.md`
 * xref:tssc-04-remediated-pin.adoc[2.2 Remediated pin]
 * Canonical OSV remote: `{java-osv-url}`
+
+This track is complete. Return to the xref:index.adoc[home page] to choose the next track.

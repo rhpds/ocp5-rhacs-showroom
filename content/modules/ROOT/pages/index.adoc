@@ -11,7 +11,7 @@ This course offers hands-on experience with Kubernetes-native security on Red Ha
 * *Use consoles in Showroom, or open them in a new tab* — Keep this guide open. Prefer the console tabs on the right of the lab UI. To open a link in a new browser tab: on a Mac, *<cmd> click*; on Windows/Linux, *<ctrl> click* or right-click → "Open in new tab."
 * *Use the terminal tab for command line work* — Run `oc`, `roxctl`, and `podman` on the RHEL bastion.
 * *Cluster setup and services are managed by GitOps* — RHACS, Quay, GitOps, Compliance Operator, and the vulnerable demo apps are already synced by Argo CD. Deleting resources by accident is no problem, as they will be recreated by GitOps.
-* *You can go through the catalog in order, or jump in. The modules are designed to not be influenced by each other.* — 101 → 201 → 301, then the product deep-dives (RHACS, Virtualization, Lightwell TSSC).
+* *Start any track from this page.* The tracks are independent: 101, 201, 301, then RHACS, Lightwell TSSC, and Virtualization. When you finish a track, *Next* brings you back here.
 
 IMPORTANT: Make sure to run the setup script below! OpenShift Lightspeed is already configured with the platform model. The script saves your CLI credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
 

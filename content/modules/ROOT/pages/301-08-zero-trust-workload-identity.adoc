@@ -322,6 +322,8 @@ Controls that matter: SPIRE/ZTWIM issuance, mutual TLS on the data path, and ide
 
 Quick facts: this is one layer of a larger zero-trust stack—pair with NetworkPolicy and admission so stolen network access alone is not enough.
 
+This track is complete. Return to the xref:index.adoc[home page] to choose the next track.
+
 image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcjJmczc4MmswYmk1cnhvZ254ZXBiZ2M3bGJzbDV5eDQ3OGlqNWdwdyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/QSSA5Bd56W25ytLIwz/giphy.gif[link=self, window=blank, width=100%, class="center"]
 
 == Cleanup

@@ -1,5 +1,0 @@
-= This page is not in this workshop
-
-The Early Access Agentic Troubleshooting lab is not part of the OpenShift Security Roadshow.
-
-Continue from xref:index.adoc[Welcome], or open xref:acs.adoc[ACS 5 capabilities] in the RHACS track.

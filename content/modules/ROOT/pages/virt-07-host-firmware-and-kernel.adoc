@@ -196,7 +196,7 @@ What breaks without this:
 * No vCPU metrics when a guest misbehaves
 * Hypervisor nodes that still advertise `Vulnerable` for known CPU bugs
 
-The pathway is complete. Cluster objects were left in place on purpose so you can re-audit later.
+This track is complete. Cluster objects were left in place on purpose so you can re-audit later. Return to the xref:index.adoc[home page] to choose another track.
 
 == Cleanup
 

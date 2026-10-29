@@ -14,6 +14,7 @@
 * xref:101-10-security-compliance-addons.adoc[101-10 - CIS Audit Log Checks (Compliance Operator)]
 * xref:101-11-rebuilding-images.adoc[101-11 - Rebuilding & Hardening Images]
 * xref:101-12-enforcing-tls-routes.adoc[101-12 - Enforcing TLS on Routes]
+* xref:index.adoc[Return to Welcome]
 
 .201 - Intermediate Hardening & Shift-Left
 * xref:intermediate-INDEX.adoc[201 Labs Overview]
@@ -28,6 +29,7 @@
 * xref:201-09-sandboxed-containers-intro.adoc[201-09 - Sandboxed Containers & Workload Isolation Intro]
 * xref:201-10-admission-governance.adoc[201-10 - RHACM Policy Governance (DoD / NIST baseline)]
 * xref:201-11-threat-modeling-control-mapping.adoc[201-11 - STRIDE Control Map (capstone)]
+* xref:index.adoc[Return to Welcome]
 
 .301 - Advanced Enterprise & Zero-Trust
 * xref:advanced-INDEX.adoc[301 Labs Overview]
@@ -39,6 +41,7 @@
 * xref:301-06-supply-chain-integrity.adoc[301-06 - Catalog Image Provenance and Digest Admission]
 * xref:301-07-advanced-cryptography.adoc[301-07 - Encryption Inventory (etcd, TLS, Secrets)]
 * xref:301-08-zero-trust-workload-identity.adoc[301-08 - Zero-Trust Workload Identity, Federation & SPIFFE/SPIRE Concepts]
+* xref:index.adoc[Return to Welcome]
 
 .Advanced Cluster Security Modules
 * xref:acs-INDEX.adoc[RHACS Labs Overview]
@@ -51,6 +54,7 @@
 * xref:acs-06-network-and-runtime.adoc[Network and Runtime Security]
 * xref:acs-07-installation.adoc[Installation]
 * xref:acs.adoc[ACS 5 Capabilities]
+* xref:index.adoc[Return to Welcome]
 
 .Secure Software Supply Chain with Red HatLightwell 
 * xref:tssc-INDEX.adoc[Lightwell TSSC overview]
@@ -81,6 +85,7 @@
 * xref:appendix-acronyms.adoc[Acronym glossary]
 * xref:rhda-shift-left.adoc[RHDA shift-left (laptop)]
 * xref:appendix-osv-manifest-polling.adoc[OSV PULP_MANIFEST polling]
+* xref:index.adoc[Return to Welcome]
 
 .OpenShift Virtualization Hardening Modules
 * xref:virt-INDEX.adoc[Virtualization Labs Overview]
@@ -92,3 +97,4 @@
 * xref:virt-05-storage-isolation.adoc[DataVolume Cloning and Disk Isolation]
 * xref:virt-06-network-segmentation.adoc[VLAN, MAC Spoof, and MultiNetworkPolicy]
 * xref:virt-07-host-firmware-and-kernel.adoc[Host Firmware and Kernel]
+* xref:index.adoc[Return to Welcome]

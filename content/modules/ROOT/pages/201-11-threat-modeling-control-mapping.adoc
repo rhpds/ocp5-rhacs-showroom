@@ -160,7 +160,9 @@ What breaks without this:
 
 IMPORTANT: map registry, service-to-service, CI→cluster, SA tokens, syscalls, and privileged RBAC to scan/sign, NetworkPolicy/ANP, secrets/RBAC, admission, ACS enforce, and custom roles; revisit when architecture changes.
 
-NOTE: start at tier (app/platform) detail enough to prioritize; re-run when you add a trust boundary or on a fixed cadence. Continue with xref:advanced-INDEX.adoc[301].
+NOTE: start at tier (app/platform) detail enough to prioritize; re-run when you add a trust boundary or on a fixed cadence.
+
+This track is complete. Return to the xref:index.adoc[home page] to choose the next track. 301 is the next one in the table of contents.
 
 image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExa3R1YjV5eGt3MTQ2a2UxOGM0ZThzaTQwdXE3cHdmMGo3NXUzOHB0MiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/MrCYIN3x0SgdG/giphy.gif[link=self, window=blank, width=100%, class="center"]
 
