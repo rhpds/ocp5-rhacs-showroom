@@ -321,12 +321,12 @@ Red Hat Advanced Cluster Security for Kubernetes is a Kubernetes-native security
 . Log into the RHACS console at `{acs_route}`
 . Click the "Advanced" button in your browser
 
-image::../assets/images/01-rhacs-advanced.png[RHACS login not private] 
+image::../images/01-rhacs-advanced.png[RHACS login not private] 
 
 [start=3]
 . Click "Proceed to {acs_route}"
 
-image::../assets/images/01-rhacs-proceed.png[RHACS login proceed]
+image::../images/01-rhacs-proceed.png[RHACS login proceed]
 
 [start=4]
 . Enter the RHACS credentials 
@@ -337,9 +337,9 @@ image::../assets/images/01-rhacs-proceed.png[RHACS login proceed]
 *RHACS Console Password:* | {acs_portal_password} |
 |===
 
-image::../assets/images/01-rhacs-login.png[RHACS console]
+image::../images/01-rhacs-login.png[RHACS console]
 
-image::../assets/images/01-rhacs-console-dashboard.png[RHACS console]
+image::../images/01-rhacs-console-dashboard.png[RHACS console]
 
 
 
@@ -349,7 +349,7 @@ The next step is to use the ACS dashboard to locate the Log4shell vulnerability.
 
 NOTE: CVE-2021-44228 & CVE-2021-45046 can both be used to find the log4shell vulnerability in the dashboard. 
 
-image:../assets/images/misc-log-1.gif[]
+image:../images/misc-log-1.gif[]
 
 . Procedure
 
@@ -368,12 +368,12 @@ TIP: To find the policy quickly, type `Policy` followed by `Log4Shell` into the 
 
 . Select the policy by clicking the three dots to the right and select `Edit policy`.
 
-image::../assets/images/11_log4shell_05.png[]
+image::../images/11_log4shell_05.png[]
 
 . Use the `Policy Behavior` tab and enable runtime enforcement by clicking the `inform and enforce button` under `Response Method`
 . Scroll down to `Configure enforcement behavior` and switch both the `Enforce on Build` and `DEnforce on Deploy` selectors to on. 
 
-image::../assets/images/11_log4shell_06.png[]
+image::../images/11_log4shell_06.png[]
 
 . Click *Review Policy* on the left and *Save*.
 
