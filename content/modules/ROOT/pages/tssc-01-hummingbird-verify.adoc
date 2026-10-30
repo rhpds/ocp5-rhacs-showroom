@@ -41,9 +41,9 @@ A Hummingbird Python runtime uses the same verify story (`hi/python` or the pin 
 [source,bash,role=execute]
 ----
 command -v cosign
-command -v oc-mirror --v2
+command -v oc-mirror
 cosign version
-oc-mirror version
+oc-mirror version --v2
 ----
 +
 Expected output:

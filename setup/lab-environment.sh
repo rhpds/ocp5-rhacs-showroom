@@ -271,7 +271,7 @@ ensure_tssc_clis() {
   command -v ec
   command -v mvn
   cosign version || true
-  oc-mirror version || true
+  oc-mirror version --v2 || true
   ec version || ec --version || true
   echo "If command -v still prints nothing in this SSH session, run: source ~/.bashrc"
 }
