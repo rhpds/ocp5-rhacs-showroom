@@ -1,4 +1,4 @@
-= Appendix: Acronym glossary
+= Appendix: Acronym Glossary
 :toc:
 :toclevels: 1
 
@@ -149,4 +149,4 @@ Workshop modules expand each acronym *the first time it appears* in the learner 
 |Machine-readable remediation / exploitability status for scanners
 |===
 
-Related: xref:appendix-lightwell-concepts.adoc[Lightwell concepts (FAQ distill)] for product Q&A beyond acronym expansions.
+Related: xref:appendix-lightwell-concepts.adoc[Lightwell Concepts (FAQ Distill)] for product Q&A beyond acronym expansions.

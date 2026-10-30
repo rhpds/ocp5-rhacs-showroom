@@ -25,7 +25,7 @@ Clearinghouse Premier does not change the builder. Member GAVs appear in the sam
 
 == BuildConfig vs Buildah
 
-Konflux “build” on hosted Konflux is often Buildah. This cluster maps that control to Binary BuildConfig started from Tekton (`oc start-build --from-dir`). Do not add a Buildah task. The term map is in xref:appendix-konflux-mapping.adoc[Konflux mapping].
+Konflux “build” on hosted Konflux is often Buildah. This cluster maps that control to Binary BuildConfig started from Tekton (`oc start-build --from-dir`). Do not add a Buildah task. The term map is in xref:appendix-konflux-mapping.adoc[Konflux Mapping].
 
 == Worked example (not the Check)
 
@@ -55,6 +55,14 @@ echo "REPO_URL=${REPO_URL}"
 oc -n "${BUILD_NS}" apply -f /tmp/spring-boot-lw-poc/.tekton/rbac.yaml
 oc -n "${BUILD_NS}" apply -f /tmp/spring-boot-lw-poc/.tekton/pipeline.yaml
 ----
++
+Expected output:
++
+----
+BUILD_NS=lw-poc-build
+REPO_URL=http://gitea.gitea.svc:3000/lw-student/spring-boot-lw-poc.git
+pipeline.tekton.dev/spring-boot-lw-poc-build-sign configured
+----
 
 Edit `.tekton/pipelinerun.yaml`: replace `STUDENT_REPO_URL_PLACEHOLDER` with `student_repo_internal_url` (`http://gitea.gitea.svc:3000/…` — the HTTPS Route is blocked after 4.3), replace `<lab-namespace>` with `lw-poc-build`, and fill Fulcio/Rekor/TUF from `demo-userinfo-rhtas` **`fulcio_internal_url` / `rekor_internal_url` / `tuf_internal_url`** (in-cluster Services). Route hints (`fulcio_url_hint`) fail after 4.3. Leave syft `rhtpa-url` empty — Track 7 uploads from Showroom.
 
@@ -69,6 +77,15 @@ git diff --cached
 git commit -m "Fill PipelineRun in-cluster repo, namespace, and RHTAS URLs"
 git push origin HEAD
 ----
++
+Expected output:
++
+----
+[main d11d207] Fill PipelineRun in-cluster repo, namespace, and RHTAS URLs
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+----
+
+The commit hash differs on each run.
 
 . Then create the PipelineRun from the filled file
 +
@@ -78,6 +95,15 @@ BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.st
 oc -n "${BUILD_NS}" create -f /tmp/spring-boot-lw-poc/.tekton/pipelinerun.yaml
 oc -n "${BUILD_NS}" get pipelinerun -w
 ----
++
+Expected output:
++
+----
+pipelinerun.tekton.dev/spring-boot-lw-poc-build-sign-z4hhp created
+spring-boot-lw-poc-build-sign-z4hhp   True        Succeeded
+----
+
+The run name differs each time. `openshift-build` and `syft-sbom-rhtpa` both need `Succeeded`.
 
 Wait until `openshift-build` and `syft-sbom-rhtpa` succeed. ACS may fail or soft-skip; this Check is image + SBOM, not ACS (Track 7) and not cosign verify (Track 5).
 
@@ -96,6 +122,14 @@ oc -n "${BUILD_NS}" get pipelinerun
 # SBOM workspace / Task result — name may vary; confirm the syft task Succeeded
 oc -n "${BUILD_NS}" get tr -l tekton.dev/pipelineTask=syft-sbom-rhtpa
 ----
++
+Expected output:
++
+----
+spring-boot-lw-poc   image-registry.openshift-image-registry.svc:5000/lw-poc-build/spring-boot-lw-poc
+spring-boot-lw-poc-build-sign-z4hhp   True        Succeeded
+spring-boot-lw-poc-build-sign-z4hhp-syft-sbom-rhtpa   True        Succeeded
+----
 
 . Known-bad: patch the BuildConfig Dockerfile, start a binary build, then restore the good path. `oc start-build` has no `-DdockerfilePath`. The first `registry-1.docker.io` / `dial tcp …:443: i/o timeout` is the fail — press **Ctrl-C**. That only stops `--follow`; OpenShift keeps retrying the pull for many minutes and **queues** later Binary builds (5.2 / 7.2 PipelineRuns). Cancel the Build, then restore `dockerfilePath`.
 +
@@ -112,6 +146,15 @@ oc -n "${BUILD_NS}" cancel-build bc/spring-boot-lw-poc
 oc -n "${BUILD_NS}" patch bc spring-boot-lw-poc --type=json \
   -p '[{"op":"replace","path":"/spec/strategy/dockerStrategy/dockerfilePath","value":"Dockerfile"}]'
 ----
++
+Expected output:
++
+----
+pinging container registry registry-1.docker.io: Get "https://registry-1.docker.io/v2/": dial tcp 44.223.235.148:443: i/o timeout
+build.build.openshift.io/spring-boot-lw-poc-2 cancelled
+----
+
+Cancel the known-bad Build after that timeout, then point `dockerfilePath` back at `Dockerfile`. The registry address differs each run.
 
 It must fail (public `FROM` / `curl` after 4.1–4.3). Do not leave the BuildConfig pointed at the known-bad file, and do not leave a Running known-bad Build.
 

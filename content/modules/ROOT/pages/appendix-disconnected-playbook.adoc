@@ -1,4 +1,4 @@
-= Appendix: disconnected transfer
+= Appendix: Disconnected Transfer
 :toc:
 :toclevels: 1
 
@@ -95,6 +95,6 @@ That still talks to the in-cluster registry. It does *not* prove air-gap.
 
 == Related
 
-* xref:tssc-14-disconnected-verify.adoc[5.3 Disconnected verify] — scored `--key` sign + verify
-* xref:tssc-12-sign-keyless.adoc[5.1 Sign (keyless)] — connected Fulcio path
-* xref:appendix-consultant-delivery.adoc[Consultant delivery map]
+* xref:tssc-14-disconnected-verify.adoc[5.3 Disconnected Verify] — scored `--key` sign + verify
+* xref:tssc-12-sign-keyless.adoc[5.1 Sign (Keyless)] — connected Fulcio path
+* xref:appendix-consultant-delivery.adoc[Consultant Delivery Map]

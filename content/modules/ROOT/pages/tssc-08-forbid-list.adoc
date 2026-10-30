@@ -1,4 +1,4 @@
-= 4.1 Source forbid-list
+= 4.1 Source Forbid-List
 :source-highlighter: rouge
 :toc:
 :toclevels: 1
@@ -34,6 +34,16 @@ image::forbid-list-public-vs-internal.png[Public FROM and Maven Central versus i
 cd /tmp/spring-boot-lw-poc
 grep -nE 'FROM |curl |repo.maven.apache.org|registry.access.redhat.com|registry.redhat.io' Dockerfile settings.xml pom.xml || true
 ----
++
+Comments match the same pattern. The active lines are:
++
+Expected output:
++
+----
+FROM registry.access.redhat.com/ubi9/openjdk-21:1.21 AS build
+FROM registry-lightwell-repo.apps.cluster-wprcr.dyn.redhatworkshops.io/hi/openjdk:21-runtime@sha256:e7c41dc2cba28c49d551c491419e00b75c5aef6c13326cc08765d30e882630ba
+          <url>https://repo.maven.apache.org/maven2</url>
+----
 
 Expect at least: build-stage `FROM` UBI on `registry.access.redhat.com`, and `repo.maven.apache.org` in `settings.xml`.
 
@@ -60,11 +70,23 @@ DEST="$(oc -n lightwell-repo logs job/oc-mirror-learner -c copy-signatures | gre
 echo "DEST=${DEST}"
 oc -n "${BUILD_NS}" import-image hummingbird-openjdk \
   --from="${DEST}" --confirm --insecure=true
-oc -n "${BUILD_NS}" get istag hummingbird-openjdk:latest \
-  -o jsonpath='{.image.dockerImageReference}{"\n"}'
+for name in openjdk-21-builder hummingbird-openjdk; do
+  repo="$(oc -n "${BUILD_NS}" get imagestream "${name}" -o jsonpath='{.status.dockerImageRepository}')"
+  digest="$(oc -n "${BUILD_NS}" get istag "${name}:latest" -o jsonpath='{.image.metadata.name}')"
+  echo "${name}=${repo}@${digest}"
+done
+----
++
+`dockerImageReference` is the source registry. Use the internal ImageStream lines below. The Hummingbird digest is the platform manifest the ImageStream stored, not the 1.2 index digest.
++
+Expected output:
++
+----
+openjdk-21-builder=image-registry.openshift-image-registry.svc:5000/lw-poc-build/openjdk-21-builder@sha256:f5fb676772fb6ed5c12aa3f6494075e4f97ab1b73bc2186b195485d0ccf54b64
+hummingbird-openjdk=image-registry.openshift-image-registry.svc:5000/lw-poc-build/hummingbird-openjdk@sha256:dd3ce6562cc9bd752c5c1424b740397cbf8ca08c036d50311acfa19c756cdf37
 ----
 
-. Point the Dockerfile *build* `FROM` at ImageStream `openjdk-21-builder` (internal registry). Point *runtime* `FROM` at ImageStream `hummingbird-openjdk` using the dest digest from 1.2 / 3.2 (`image-registry.openshift-image-registry.svc:5000/${BUILD_NS}/hummingbird-openjdk@sha256:…`). Do not leave `dest_registry_host` (the Nexus Docker Route) on an active `FROM` line. No `registry.access.redhat.com` on active `FROM` lines.
+. Point the Dockerfile *build* `FROM` at the `openjdk-21-builder` line. Point *runtime* `FROM` at the `hummingbird-openjdk` line. Do not leave `dest_registry_host` (the Nexus Docker Route) on an active `FROM` line. No `registry.access.redhat.com` on active `FROM` lines.
 
 . In `settings.xml`, remove `repo.maven.apache.org` from the Lightwell profiles. Point remotes at the *in-cluster* Nexus service (`nexus_internal_url` from userinfo — `http://nexus.lightwell-repo.svc:8081`), not the HTTPS Route. Add a `<mirror>` with `mirrorOf` `*` (or `external:*`) whose URL is `${nexus_internal_url}/repository/maven-public/`. Seeded `maven-public` includes Validated + Remediated so `.rhlw-*` pins resolve. 4.3 will block the Nexus Route from `lw-poc-build`; the service URL keeps working.
 
@@ -76,6 +98,14 @@ cd /tmp/spring-boot-lw-poc
 git add Dockerfile settings.xml Dockerfile.known-bad
 git commit -m "Forbid-list: internal FROM and Nexus-only Maven remotes"
 git push origin HEAD
+----
++
+Expected output:
++
+----
+[main 3c13529] Forbid-list: internal FROM and Nexus-only Maven remotes
+ 2 files changed, 12 insertions(+), 28 deletions(-)
+   9d7d9f7..3c13529  HEAD -> main
 ----
 
 == Check: scan of active files
@@ -89,6 +119,15 @@ git show HEAD:Dockerfile | grep -E '^FROM '
 git show HEAD:settings.xml | grep -E 'repo.maven.apache.org|lightwell-repo' || true
 test -f Dockerfile.known-bad && echo 'known-bad fixture present'
 ----
++
+Expected output:
++
+----
+FROM image-registry.openshift-image-registry.svc:5000/lw-poc-build/openjdk-21-builder@sha256:f5fb676772fb6ed5c12aa3f6494075e4f97ab1b73bc2186b195485d0ccf54b64 AS build
+FROM image-registry.openshift-image-registry.svc:5000/lw-poc-build/hummingbird-openjdk@sha256:dd3ce6562cc9bd752c5c1424b740397cbf8ca08c036d50311acfa19c756cdf37
+      <url>http://nexus.lightwell-repo.svc:8081/repository/maven-public/</url>
+known-bad fixture present
+----
 
 Pass when active `Dockerfile` / `settings.xml` have no public `FROM`, no dest-registry Route, no Central, no `curl` installers — and `Dockerfile.known-bad` still exists. Both `FROM` lines use the internal registry.
 
@@ -101,12 +140,12 @@ On a pip app the same grep is `pypi.org` / public `index-url` in `requirements.t
 == Official documentation
 
 * link:{docs-lwn-java-url}[Lightwell Network Java repository^] (the remotes that must remain after Central is gone)
-* xref:appendix-konflux-mapping.adoc[Konflux mapping] (hermetic source policies → this Check)
+* xref:appendix-konflux-mapping.adoc[Konflux Mapping] (hermetic source policies → this Check)
 
 == Key takeaways
 
 * TSSC hermetic starts in source, before NP and prefetch.
-* Lightwell Network and Clearinghouse Premier GAVs stay on the internal Nexus service. Konflux hermetic source policies map to this Check. Product names are in xref:appendix-konflux-mapping.adoc[Konflux mapping].
+* Lightwell Network and Clearinghouse Premier GAVs stay on the internal Nexus service. Konflux hermetic source policies map to this Check. Product names are in xref:appendix-konflux-mapping.adoc[Konflux Mapping].
 
 :lab-cleanup-module: tssc-08
 include::partial$lab-cleanup.adoc[]

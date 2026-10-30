@@ -1,4 +1,4 @@
-= 2.2 Remediated pin
+= 2.2 Remediated Pin
 :source-highlighter: rouge
 :toc:
 :toclevels: 1
@@ -41,6 +41,14 @@ image::osv-fixed-to-rhlw-pin.png[OSV fixed event mapped to a Maven default .rhlw
 oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
   -o jsonpath='id={.data.scored_vex_id}{"\n"}gav={.data.scored_vex_gav}{"\n"}base={.data.scored_vex_base_version}{"\n"}'
 ----
++
+Expected output:
++
+----
+id=LW-DEMO-0002
+gav=org.apache.commons:commons-lang3:3.14.0.rhlw-00001
+base=3.14.0
+----
 
 . Scored OSV JSON — read `affected[].ranges[].events[].fixed`
 +
@@ -48,6 +56,15 @@ oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
 ----
 oc -n lightwell-repo get configmap lightwell-repo-seed \
   -o jsonpath='{.data.LW-DEMO-0002\.json}'
+----
++
+The command prints the full OSV document. The lines that name the pin are:
++
+Expected output:
++
+----
+"id": "LW-DEMO-0002",
+"fixed": "3.14.0.rhlw-00001"
 ----
 
 . Worked example OSV (different GAV — pasting its `fixed` into your pom still fails)
@@ -57,6 +74,15 @@ oc -n lightwell-repo get configmap lightwell-repo-seed \
 oc -n lightwell-repo get configmap lightwell-sample-osv \
   -o jsonpath='{.data.LW-DEMO-0001\.json}'
 ----
++
+The command prints the full worked-example OSV. The lines that show it is a different pin are:
++
+Expected output:
++
+----
+"id": "LW-DEMO-0001",
+"fixed": "5.3.18.rhlw-00003"
+----
 
 . Reuse 2.1 settings and a writable local repo
 +
@@ -64,6 +90,12 @@ oc -n lightwell-repo get configmap lightwell-sample-osv \
 ----
 export MVN_LOCAL='-Dmaven.repo.local=/tmp/m2'
 test -f ~/track-2-1-settings.xml && echo '2.1 settings present' || echo 'complete 2.1 first'
+----
++
+Expected output:
++
+----
+2.1 settings present
 ----
 
 == Worked example (not the Check)
@@ -90,6 +122,8 @@ mkdir -p ~/track-2-2
 oc -n lightwell-repo get configmap stub-04-remediated-pin \
   -o jsonpath='{.data.pom\.xml}' > ~/track-2-2/pom.xml
 ----
++
+Expected output: no output. The file is `~/track-2-2/pom.xml`.
 
 The seed looks like this (default `3.14.0` fails):
 
@@ -134,6 +168,14 @@ oc -n lightwell-repo create configmap stub-04-remediated-pin \
   --dry-run=client -o yaml | oc apply -f -
 grep commons.lang3.version ~/track-2-2/pom.xml
 ----
++
+Expected output:
++
+----
+configmap/stub-04-remediated-pin configured
+    <commons.lang3.version>3.14.0.rhlw-00001</commons.lang3.version>
+      <version>${commons.lang3.version}</version>
+----
 
 == Check: dependency tree shows `.rhlw-*` from Nexus
 
@@ -143,6 +185,16 @@ grep commons.lang3.version ~/track-2-2/pom.xml
 ----
 mvn -s ~/track-2-1-settings.xml ${MVN_LOCAL} -f ~/track-2-2/pom.xml \
   -Plightwell-remediated dependency:tree
+----
++
+Plugin downloads still come from Maven Central. The remediated GAV comes from Nexus.
++
+Expected output:
++
+----
+Downloaded from lightwell-java-remediated: https://nexus-lightwell-repo.apps.cluster-wprcr.dyn.redhatworkshops.io/repository/lightwell-java-remediated/org/apache/commons/commons-lang3/3.14.0.rhlw-00001/commons-lang3-3.14.0.rhlw-00001.pom
+[INFO] \- org.apache.commons:commons-lang3:jar:3.14.0.rhlw-00001:compile
+[INFO] BUILD SUCCESS
 ----
 
 You should see `org.apache.commons:commons-lang3:jar:3.14.0.rhlw-00001` and a download path on your Nexus host. A tree that still shows plain `3.14.0`, `3.18.0`, or `5.3.18.rhlw-00003`, fails.

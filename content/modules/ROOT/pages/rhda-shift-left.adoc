@@ -1,4 +1,4 @@
-= Optional: Red Hat Dependency Analytics (shift-left)
+= Optional: Red Hat Dependency Analytics (Shift-Left)
 :toc:
 :toclevels: 1
 

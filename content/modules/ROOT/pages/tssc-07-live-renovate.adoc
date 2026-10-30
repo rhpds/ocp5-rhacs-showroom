@@ -7,7 +7,7 @@
 
 Merge a real `renovate-bot` pull request that updates stale `lightwell-pins.properties` on `lw-student/spring-boot-lw-poc`. A hand-edited commit fails this Check. Copying the worked example fails too.
 
-MintMaker is the hosted Konflux name for this bot. This cluster does not install hosted Konflux. It uses an in-cluster CronJob. The term map is in xref:appendix-konflux-mapping.adoc[Konflux mapping].
+MintMaker is the hosted Konflux name for this bot. This cluster does not install hosted Konflux. It uses an in-cluster CronJob. The term map is in xref:appendix-konflux-mapping.adoc[Konflux Mapping].
 
 == Why it matters
 
@@ -44,6 +44,19 @@ oc -n renovate get cronjob
 oc -n renovate get configmap demo-userinfo-renovate -o yaml
 oc -n renovate get configmap renovate-docs \
   -o jsonpath='{.data.example-renovate-pr\.md}'
+----
++
+The userinfo ConfigMap YAML is long. The lines that show the bot is configured are below. The example PR is the worked example, not the Check.
++
+Expected output:
++
+----
+renovate   */20 * * * *   <none>     False     0        <age>   <age>
+bot=renovate-bot
+repo=lw-student/spring-boot-lw-poc
+pins=lightwell-pins.properties
+Author: student
+Files: pom.xml
 ----
 
 == Worked example (not the Check)
@@ -116,6 +129,16 @@ curl -sk -o /dev/null -w "collaborator HTTP %{http_code}\n" -X PUT \
 oc -n renovate delete job renovate-now --ignore-not-found
 oc -n renovate create job renovate-now --from=cronjob/renovate
 ----
++
+When the token is already stored, the script skips user creation.
++
+Expected output:
++
+----
+renovate-gitea-token already set
+collaborator HTTP 204
+job.batch/renovate-now created
+----
 
 . In Gitea, open `lw-student/spring-boot-lw-poc` → *Pull Requests*.
 . The scored PR author is `renovate-bot`. Files must include `lightwell-pins.properties`. Both seed values (`rhlw-00000` and the all-zero digest) should move in that one PR.
@@ -159,7 +182,7 @@ In many organizations, Renovate (or MintMaker) often reads Maven metadata from A
 == Official documentation
 
 * link:{docs-lwn-java-url}[Lightwell Network Java repository^] (the metadata Renovate reads through Nexus)
-* xref:appendix-konflux-mapping.adoc[Konflux mapping] (MintMaker → this CronJob)
+* xref:appendix-konflux-mapping.adoc[Konflux Mapping] (MintMaker → this CronJob)
 
 == Key takeaways
 

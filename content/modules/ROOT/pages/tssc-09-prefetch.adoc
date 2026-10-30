@@ -1,4 +1,4 @@
-= 4.2 Prefetch (Hermeto mapping)
+= 4.2 Prefetch (Hermeto Mapping)
 :source-highlighter: rouge
 :toc:
 :toclevels: 1
@@ -26,7 +26,7 @@ A Task that runs too late, or a `mvn` without `-o`, still hits the network. Afte
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/63
 image::hermeto-vs-prefetch-task.png[Konflux Hermeto versus workshop Task prefetch-dependencies,width=700,link=self,window=blank]
 
-Do not pull `quay.io/konflux-ci/hermeto`. Do not rename the cluster object `hermeto`. The term map is in xref:appendix-konflux-mapping.adoc[Konflux mapping].
+Do not pull `quay.io/konflux-ci/hermeto`. Do not rename the cluster object `hermeto`. The term map is in xref:appendix-konflux-mapping.adoc[Konflux Mapping].
 
 == Discover the Task
 
@@ -37,6 +37,14 @@ Do not pull `quay.io/konflux-ci/hermeto`. Do not rename the cluster object `herm
 oc -n lightwell-tasks get task prefetch-dependencies
 oc -n lightwell-tasks get configmap prefetch-dependencies-docs \
   -o jsonpath='{.data.example-pipeline-snippet\.yaml}'
+----
++
+Expected output:
++
+----
+prefetch-dependencies
+- name: hermeto
+  runAfter: [acs-image-check]
 ----
 
 == Worked example (not the Check)
@@ -79,6 +87,12 @@ cd /tmp/spring-boot-lw-poc
 oc -n "${BUILD_NS}" apply -f .tekton/rbac.yaml
 oc -n "${BUILD_NS}" apply -f .tekton/pipeline.yaml
 ----
++
+Expected output:
++
+----
+pipeline.tekton.dev/spring-boot-lw-poc-build-sign created
+----
 
 `oc apply` registers the Pipeline object so 4.4 can `create` a PipelineRun. It does *not* pull Task images — that happens on the first PipelineRun. The prefetch Task image is still UBI OpenJDK on `registry.access.redhat.com`; hermetic here is in-cluster Nexus + `mvn -o`, plus the xref:tssc-08-forbid-list.adoc[4.1] ImageStream `FROM` lines. Do not treat this apply as an image cache before xref:tssc-10-build-networkpolicy.adoc[4.3].
 
@@ -95,6 +109,17 @@ git show HEAD:settings.xml | grep repo.maven.apache.org && echo 'STILL HAS CENTR
 git show HEAD:Dockerfile | grep -E 'mvn.*-o'
 git show HEAD:Dockerfile | grep -E 'COPY .*m2-offline'
 ----
++
+Expected output:
++
+----
+  - name: prefetch-dependencies
+    runAfter:
+    - lightwell-dep-gate
+Central gone
+RUN mvn -B -o -s settings.xml -Dmaven.repo.local=.m2-offline -DskipTests package
+COPY .m2-offline ./.m2-offline
+----
 
 Pass when the live Pipeline includes `prefetch-dependencies` before `openshift-build`, settings have no Central, and the Dockerfile `COPY`s `.m2-offline` and uses `mvn -o`. Empty prefetch dir / undeclared deps fail later on `mvn -o`.
 
@@ -108,7 +133,7 @@ A PyPI app prefetches with `pip download` / `pip install --offline` against an i
 
 * link:{docs-pipelines-url}[About OpenShift Pipelines^] (Tasks, `runAfter`, Pipeline apply)
 * link:{docs-lwn-java-url}[Lightwell Network Java repository^] (what prefetch must hit)
-* xref:appendix-konflux-mapping.adoc[Konflux mapping] (Hermeto → `prefetch-dependencies`)
+* xref:appendix-konflux-mapping.adoc[Konflux Mapping] (Hermeto → `prefetch-dependencies`)
 
 == Key takeaways
 
@@ -117,3 +142,5 @@ A PyPI app prefetches with `pip download` / `pip install --offline` against an i
 
 :lab-cleanup-module: tssc-09
 include::partial$lab-cleanup.adoc[]
+
+

@@ -88,6 +88,16 @@ oc -n lw-poc-build get networkpolicy build-egress -o yaml
 # edit in place or oc apply a file you authored — not example-hermetic-egress.yaml
 oc -n lw-poc-staging get networkpolicy app-operate
 ----
++
+Expected output:
++
+----
+networkpolicy.networking.k8s.io/build-egress patched
+NAME          POD-SELECTOR   AGE
+app-operate   <none>         6h
+----
+
+The live allow-list uses this cluster's API ClusterIP `172.231.0.1/32` port `443` and endpoint `10.10.10.10/32` port `6443`. Those addresses differ on every cluster.
 
 == Check: NP spec
 

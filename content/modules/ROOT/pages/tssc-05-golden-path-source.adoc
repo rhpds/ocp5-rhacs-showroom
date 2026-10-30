@@ -1,4 +1,4 @@
-= 3.1 Golden-path source
+= 3.1 Golden-Path Source
 :source-highlighter: rouge
 :toc:
 :toclevels: 1
@@ -39,6 +39,18 @@ image::gitea-templates-vs-learner-org.png[workshop-templates versus your lw-stud
 oc -n gitea get configmap demo-userinfo-gitea \
   -o jsonpath='gitea_url={.data.gitea_url}{"\n"}user={.data.student_username}{"\n"}org={.data.student_gitea_org}{"\n"}app={.data.student_repo_url}{"\n"}templates={.data.template_app_repo_url}{"\n"}password={.data.student_password}{"\n"}'
 ----
++
+The password line prints the ConfigMap value. Do not copy it into Git or this page.
++
+Expected output:
++
+----
+gitea_url=https://gitea.apps.cluster-wprcr.dyn.redhatworkshops.io
+user=student
+org=lw-student
+app=https://gitea.apps.cluster-wprcr.dyn.redhatworkshops.io/lw-student/spring-boot-lw-poc.git
+templates=https://gitea.apps.cluster-wprcr.dyn.redhatworkshops.io/workshop-templates/spring-boot-lw-poc.git
+----
 
 Expect user `student` and org `lw-student`. The Gitea password is the *value* of ConfigMap key `student_password` (not the key name). Do not put that value in Git or a screenshot.
 
@@ -54,6 +66,16 @@ oc -n gitea get configmap gitea-student-repo-seed \
   -o jsonpath='{.data.learner-ensure-gitea-user\.sh}' > /tmp/learner-ensure-gitea-user.sh
 chmod +x /tmp/learner-ensure-gitea-user.sh
 /tmp/learner-ensure-gitea-user.sh
+----
++
+Expected output:
++
+----
+Gitea URL:     https://gitea.apps.cluster-wprcr.dyn.redhatworkshops.io
+Student user:  student
+OK: student can already sign in.
+Open: https://gitea.apps.cluster-wprcr.dyn.redhatworkshops.io
+Sign in as: student  (password: value of demo-userinfo-gitea key student_password)
 ----
 
 Open `gitea_url` and sign in as `student` with the password value from that ConfigMap.
@@ -103,6 +125,14 @@ oc -n gitea get configmap demo-userinfo-gitea \
   -o jsonpath='{.data.student_repo_url}{"\n"}{.data.template_app_repo_url}{"\n"}'
 curl -sk -o /dev/null -w "%{http_code}\n" \
   "$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_repo_url}')"
+----
++
+Expected output:
++
+----
+https://gitea.apps.cluster-wprcr.dyn.redhatworkshops.io/lw-student/spring-boot-lw-poc.git
+https://gitea.apps.cluster-wprcr.dyn.redhatworkshops.io/workshop-templates/spring-boot-lw-poc.git
+200
 ----
 
 Expect HTTP `200` on `student_repo_url`. Open `lw-student/spring-boot-lw-poc` and confirm `pom.xml` is at the repository *root*. Default `<commons.lang3.version>` is still the affected upstream `3.14.0` (not `3.18.0`, not yet `3.14.0.rhlw-00001`). `workshop-templates` is not the scored remote.

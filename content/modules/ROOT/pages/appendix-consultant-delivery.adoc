@@ -1,4 +1,4 @@
-= Appendix: consultant delivery map
+= Appendix: Consultant Delivery Map
 :toc:
 :toclevels: 1
 
@@ -22,7 +22,7 @@ image::seven-track-tssc-flow.png[Seven-track TSSC flow this map hangs on,width=7
 |One sentence on a scored page. No extra Check.
 
 |*Mapping*
-|Product name used in a client engagement → cluster object. Konflux terms: xref:appendix-konflux-mapping.adoc[Konflux mapping] (not this page).
+|Product name used in a client engagement → cluster object. Konflux terms: xref:appendix-konflux-mapping.adoc[Konflux Mapping] (not this page).
 
 |*Playbook*
 |Procedure / talking points. Not executed on this connected RHDP claim.
@@ -88,7 +88,7 @@ You did *not* click every engagement activity. Use the *Playbook* / *Not on this
 
 |Hermetic Konflux / Hermeto
 |Scored + mapping
-|xref:tssc-09-prefetch.adoc[4.2] Task `prefetch-dependencies`. Not Konflux. Term map: xref:appendix-konflux-mapping.adoc[Konflux mapping].
+|xref:tssc-09-prefetch.adoc[4.2] Task `prefetch-dependencies`. Not Konflux. Term map: xref:appendix-konflux-mapping.adoc[Konflux Mapping].
 
 |Conforma reject unapproved transitives
 |Scored
@@ -115,7 +115,7 @@ You did *not* click every engagement activity. Use the *Playbook* / *Not on this
 
 |Tekton Konflux pipelines
 |Mapping
-|OpenShift Pipelines under real names. xref:appendix-konflux-mapping.adoc[Konflux mapping]. Do not install Konflux.
+|OpenShift Pipelines under real names. xref:appendix-konflux-mapping.adoc[Konflux Mapping]. Do not install Konflux.
 
 |Buildah rootless OCI builds
 |Mapping
@@ -131,11 +131,11 @@ You did *not* click every engagement activity. Use the *Playbook* / *Not on this
 
 |SLSA L3 / Tekton Chains
 |Callout + Conforma
-|5.2 scores tightened Conforma; `skip-att-sig-check` stays true (`ec` 0.7 has no skip flag — ignore only the attestation builtin, do not use `--ignore-rekor`). Chains is mapping (xref:appendix-konflux-mapping.adoc[Konflux mapping]), not SLSA L3 on this claim.
+|5.2 scores tightened Conforma; `skip-att-sig-check` stays true (`ec` 0.7 has no skip flag — ignore only the attestation builtin, do not use `--ignore-rekor`). Chains is mapping (xref:appendix-konflux-mapping.adoc[Konflux Mapping]), not SLSA L3 on this claim.
 
 |Key-based / disconnected verify
 |Scored
-|xref:tssc-14-disconnected-verify.adoc[5.3] second signature (`sign --key` / `verify --key`) on the 5.1 digest. Cluster stays networked. Media list: xref:appendix-disconnected-playbook.adoc[disconnected transfer].
+|xref:tssc-14-disconnected-verify.adoc[5.3] second signature (`sign --key` / `verify --key`) on the 5.1 digest. Cluster stays networked. Media list: xref:appendix-disconnected-playbook.adoc[Disconnected Transfer].
 
 |Author Conforma policies
 |Scored
@@ -259,8 +259,8 @@ Remind the room: no Hummingbird factory, no hosted Konflux, no physical air-gap,
 
 == Related appendices
 
-* xref:appendix-lightwell-concepts.adoc[Lightwell concepts]
-* xref:appendix-konflux-mapping.adoc[Konflux mapping] — names used in client engagements → cluster objects
-* xref:appendix-disconnected-playbook.adoc[Disconnected transfer] — simulated media drop (not a diode)
-* xref:appendix-instructor-runbook.adoc[Instructor two-day grouping] — envelope, not a timer
-* xref:appendix-enablement-checklist.adoc[Internal enablement checklist] — scored after the workshop, not a live PoV
+* xref:appendix-lightwell-concepts.adoc[Lightwell Concepts]
+* xref:appendix-konflux-mapping.adoc[Konflux Mapping] — names used in client engagements → cluster objects
+* xref:appendix-disconnected-playbook.adoc[Disconnected Transfer] — simulated media drop (not a diode)
+* xref:appendix-instructor-runbook.adoc[Instructor Two-Day Grouping] — envelope, not a timer
+* xref:appendix-enablement-checklist.adoc[Internal Enablement Checklist] — scored after the workshop, not a live PoV

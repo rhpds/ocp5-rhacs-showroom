@@ -1,4 +1,4 @@
-= Appendix: internal enablement checklist
+= Appendix: Internal Enablement Checklist
 :toc:
 :toclevels: 1
 
@@ -6,7 +6,7 @@ This page is the *enablement metric* (Q20). It is scored *after* the workshop. I
 
 Lab *Checks* on tracks 1–7 prove the consultant can operate *this* claim. Passing this rubric is a separate sitting: same seven-track outcomes, plus they can point at a playbook for every engagement activity they did *not* click.
 
-Nothing to pass *during* the two days. Instructors: xref:appendix-instructor-runbook.adoc[two-day grouping] still runs the event; this page is what you score afterward.
+Nothing to pass *during* the two days. Instructors: xref:appendix-instructor-runbook.adoc[Two-Day Grouping] still runs the event; this page is what you score afterward.
 
 == How to score
 
@@ -69,7 +69,7 @@ Lab pedagogy (fresh-claim negatives, worked-example fail, report keys) stays on 
 
 |Playbook for what they did not click
 |For every engagement activity they did *not* run on this claim, they can name the treatment and the page (scored / callout / mapping / playbook / not on this claim). They do not over-claim hosted Konflux, a data diode, Artifactory-on-the-claim, or an unassisted customer PoV.
-|Walk xref:appendix-consultant-delivery.adoc[Consultant delivery map] and xref:appendix-konflux-mapping.adoc[Konflux mapping]. Fail if they rename cluster Tasks to Konflux product names or treat 5.3 as a physical air-gap.
+|Walk xref:appendix-consultant-delivery.adoc[Consultant Delivery Map] and xref:appendix-konflux-mapping.adoc[Konflux Mapping]. Fail if they rename cluster Tasks to Konflux product names or treat 5.3 as a physical air-gap.
 |===
 
 Python `pip` / `+rhlw.*` and Artifactory remote/virtual/include are *callouts* on the Java pages. Reciting those sentences is not a ninth track. Installing Artifactory or scaffolding FastAPI fails this rubric (those are later work, not v2 enablement).
@@ -131,6 +131,6 @@ Do not leave Notes blank on a Pass row if they used the wrong product name, skip
 == Related
 
 * xref:tssc-INDEX.adoc[Workshop home] — learner map; this checklist is after, not a Day-1 exam
-* xref:appendix-instructor-runbook.adoc[Instructor two-day grouping] — when the event runs
-* xref:appendix-consultant-delivery.adoc[Consultant delivery map] — SoW row
-* xref:appendix-konflux-mapping.adoc[Konflux mapping] — names they must not install
+* xref:appendix-instructor-runbook.adoc[Instructor Two-Day Grouping] — when the event runs
+* xref:appendix-consultant-delivery.adoc[Consultant Delivery Map] — SoW row
+* xref:appendix-konflux-mapping.adoc[Konflux Mapping] — names they must not install

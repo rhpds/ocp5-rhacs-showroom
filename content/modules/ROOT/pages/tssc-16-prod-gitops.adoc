@@ -1,4 +1,4 @@
-= 6.2 Promote to prod repo
+= 6.2 Promote to Prod Repo
 :source-highlighter: rouge
 :toc:
 :toclevels: 1
@@ -28,7 +28,7 @@ Lightwell Network and Clearinghouse Premier do not change the promote remote. Th
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/52
 image::gitops-stage-vs-prod-remotes.png[Stage versus prod Gitea remotes — promotion is a commit to the second remote,width=700,link=self,window=blank]
 
-Konflux *Release Service* maps to this commit (xref:appendix-konflux-mapping.adoc[Konflux mapping]). Do not “fix” a broken prod app by pointing Argo at stage.
+Konflux *Release Service* maps to this commit (xref:appendix-konflux-mapping.adoc[Konflux Mapping]). Do not “fix” a broken prod app by pointing Argo at stage.
 
 == Worked example (not the Check)
 
@@ -108,8 +108,16 @@ fi
 oc -n openshift-gitops annotate applications.argoproj.io "${PROD_APP}" argocd.argoproj.io/tracking-id- --overwrite || true
 oc -n openshift-gitops label applications.argoproj.io "${PROD_APP}" app.kubernetes.io/instance- --overwrite || true
 ----
++
+Expected output:
++
+----
+application.argoproj.io/lw-poc-prod created
+Created Application lw-poc-prod
+application.argoproj.io/lw-poc-prod annotated
+----
 
-. Your change: prod tag + prod commit
+. Tag the signed image into prod. `oc tag` copies the image, not `.sig` tags. The bastion cannot reach the internal registry, so `cosign copy` and `cosign sign` run in a short-lived pod in `default`, the same way as xref:tssc-15-gitops-admission.adoc[6.1]. Grant the prod `builder` service account `system:image-puller` on the build namespace. Sign the dest repo with the 5.3 key. `-f` overwrites an existing signature tag so you can run the step again.
 +
 [source,bash,role=execute]
 ----
@@ -118,21 +126,95 @@ PROD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.stu
 PROD_GITOPS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_prod_gitops_repo_url}')"
 echo "PROD_NS=${PROD_NS}"
 echo "PROD_GITOPS=${PROD_GITOPS}"
+oc policy add-role-to-user system:image-puller \
+  "system:serviceaccount:${PROD_NS}:builder" -n "${BUILD_NS}"
 oc tag "${BUILD_NS}/spring-boot-lw-poc:latest" "${PROD_NS}/spring-boot-lw-poc:latest"
-oc -n "${PROD_NS}" get istag spring-boot-lw-poc:latest \
-  -o jsonpath='{.image.metadata.name}{"\n"}'
 DIGEST="$(oc -n "${PROD_NS}" get istag spring-boot-lw-poc:latest \
   -o jsonpath='{.image.metadata.name}')"
+echo "${DIGEST}"
 SRC="image-registry.openshift-image-registry.svc:5000/${BUILD_NS}/spring-boot-lw-poc@${DIGEST}"
 DST="image-registry.openshift-image-registry.svc:5000/${PROD_NS}/spring-boot-lw-poc@${DIGEST}"
-export HOME=/tmp/lab-home
-mkdir -p "${HOME}"
-cosign login -u unused -p "$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
-  image-registry.openshift-image-registry.svc:5000
-cosign copy --allow-http-registry --allow-insecure-registry "${SRC}" "${DST}"
-COSIGN_PASSWORD="" cosign sign --key /home/lab-user/lab-trust/cosign.key \
-  --tlog-upload=false --allow-http-registry --allow-insecure-registry \
-  "${DST}"
+TOKEN="$(oc -n "${PROD_NS}" create token builder --duration=10m)"
+oc -n default delete secret lab-cosign-key --ignore-not-found
+oc -n default create secret generic lab-cosign-key \
+  --from-file=cosign.key=/home/lab-user/lab-trust/cosign.key \
+  --from-file=cosign.pub=/home/lab-user/lab-trust/cosign.pub
+oc -n default delete pod cosign-copy --ignore-not-found --wait=true
+export TOKEN SRC DST
+python3 - <<'PY' | oc apply -f -
+import json, os
+pod = {
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {"name": "cosign-copy", "namespace": "default"},
+  "spec": {
+    "restartPolicy": "Never",
+    "initContainers": [{
+      "name": "login",
+      "image": "registry.redhat.io/rhtas/cosign-rhel9:1.3.0",
+      "env": [
+        {"name": "HOME", "value": "/work"},
+        {"name": "TOKEN", "value": os.environ["TOKEN"]},
+      ],
+      "command": ["bash", "-ec"],
+      "args": [
+        'cosign login -u unused -p "${TOKEN}" image-registry.openshift-image-registry.svc:5000\n'
+        'chmod -R a+rwX /work\n'
+      ],
+      "volumeMounts": [{"name": "work", "mountPath": "/work"}],
+    }],
+    "containers": [{
+      "name": "copy",
+      "image": "registry.redhat.io/rhtas/cosign-rhel9:1.3.0",
+      "env": [
+        {"name": "HOME", "value": "/work"},
+        {"name": "SRC", "value": os.environ["SRC"]},
+        {"name": "DST", "value": os.environ["DST"]},
+        {"name": "COSIGN_PASSWORD", "value": ""},
+      ],
+      "command": ["bash", "-ec"],
+      "args": [
+        'cosign copy -f --allow-http-registry --allow-insecure-registry "${SRC}" "${DST}"\n'
+        'echo COPY_OK\n'
+        'cosign sign --key /keys/cosign.key --yes --tlog-upload=false --allow-http-registry --allow-insecure-registry "${DST}"\n'
+        'echo SIGN_OK\n'
+      ],
+      "volumeMounts": [
+        {"name": "work", "mountPath": "/work"},
+        {"name": "keys", "mountPath": "/keys", "readOnly": True},
+      ],
+    }],
+    "volumes": [
+      {"name": "work", "emptyDir": {}},
+      {"name": "keys", "secret": {"secretName": "lab-cosign-key"}},
+    ],
+  },
+}
+json.dump(pod, open("/dev/stdout", "w"))
+PY
+unset TOKEN
+oc -n default wait --for=jsonpath='{.status.phase}'=Succeeded pod/cosign-copy --timeout=180s
+oc -n default logs pod/cosign-copy
+oc -n default delete pod cosign-copy --wait=false
+oc -n default delete secret lab-cosign-key
+----
++
+Expected output:
++
+----
+PROD_NS=lw-poc-prod
+PROD_GITOPS=https://gitea.apps.cluster-wprcr.dyn.redhatworkshops.io/lw-student/gitops-prod-spring-boot-lw-poc.git
+clusterrole.rbac.authorization.k8s.io/system:image-puller added: "system:serviceaccount:lw-poc-prod:builder"
+Tag lw-poc-prod/spring-boot-lw-poc:latest set to lw-poc-build/spring-boot-lw-poc@sha256:55d2219fb675de8099432cf4985c57275b8028b8a8901bd5aca6e91427695d86.
+sha256:55d2219fb675de8099432cf4985c57275b8028b8a8901bd5aca6e91427695d86
+secret/lab-cosign-key created
+pod/cosign-copy created
+pod/cosign-copy condition met
+COPY_OK
+Pushing signature to: image-registry.openshift-image-registry.svc:5000/lw-poc-prod/spring-boot-lw-poc
+SIGN_OK
+pod "cosign-copy" deleted from default namespace
+secret "lab-cosign-key" deleted from default namespace
 ----
 
 . Clone `student_prod_gitops_repo_url` (password is the *value* of ConfigMap key `student_password` — do not commit it). Set repo-local `git config user.name` / `user.email` (same as 6.1 — a fresh clone does not inherit the app-repo author). Replace `sha256:REPLACE_ME_PROD_DIGEST` with that digest; set `replicas: 1`. Commit and push *this* remote only. Do not copy `values.yaml` or `PROMOTE.md` from the stage clone.
@@ -149,6 +231,12 @@ cd /tmp/gitops-prod
 git config user.name student
 git config user.email student@workshop.local
 ----
++
+Expected output:
++
+----
+Cloning into '/tmp/gitops-prod'...
+----
 
 == Check: prod Application sources prod
 
@@ -160,6 +248,8 @@ PROD_GITOPS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data
 # Same as 6.1: push alone may not sync. Hard-refresh after replicas: 1 is on the prod remote.
 oc -n openshift-gitops annotate applications.argoproj.io lw-poc-prod \
   argocd.argoproj.io/refresh=hard --overwrite
+oc -n lw-poc-prod wait deploy/spring-boot-lw-poc \
+  --for=jsonpath='{.status.readyReplicas}'=1 --timeout=180s
 oc -n openshift-gitops get applications.argoproj.io lw-poc-prod \
   -o jsonpath='repo={.spec.source.repoURL}{"\n"}sync={.status.sync.status}{"\n"}health={.status.health.status}{"\n"}'
 oc -n openshift-gitops get applications.argoproj.io lw-poc-prod \
@@ -168,6 +258,25 @@ oc -n openshift-gitops get applications.argoproj.io lw-poc-prod \
 echo "expected prefix ${PROD_GITOPS}"
 oc -n lw-poc-prod get deploy,pods,route,imagepolicy
 ----
++
+Expected output:
++
+----
+application.argoproj.io/lw-poc-prod annotated
+deployment.apps/spring-boot-lw-poc condition met
+repo=https://gitea.apps.cluster-wprcr.dyn.redhatworkshops.io/lw-student/gitops-prod-spring-boot-lw-poc.git
+sync=Synced
+health=Healthy
+https://gitea.apps.cluster-wprcr.dyn.redhatworkshops.io/lw-student/gitops-prod-spring-boot-lw-poc.git
+prod remote OK
+expected prefix https://gitea.apps.cluster-wprcr.dyn.redhatworkshops.io/lw-student/gitops-prod-spring-boot-lw-poc.git
+deployment.apps/spring-boot-lw-poc   1/1     1            1
+pod/spring-boot-lw-poc-6b4dc58576-dbn2s   1/1     Running
+route.route.openshift.io/spring-boot-lw-poc   spring-boot-lw-poc-lw-poc-prod.apps.cluster-wprcr.dyn.redhatworkshops.io          spring-boot-lw-poc   http   edge/Redirect   None
+imagepolicy.config.openshift.io/tssc-prod-admission
+----
+
+The pod name differs each run.
 
 Pass when:
 
@@ -183,7 +292,7 @@ Continue to Track 7 when you are ready.
 == Official documentation
 
 * link:{docs-gitops-url}[About Red Hat OpenShift GitOps^]
-* xref:appendix-konflux-mapping.adoc[Konflux mapping] (Release Service → this prod commit)
+* xref:appendix-konflux-mapping.adoc[Konflux Mapping] (Release Service → this prod commit)
 
 == Key takeaways
 

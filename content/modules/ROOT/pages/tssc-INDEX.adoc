@@ -71,7 +71,7 @@ An *embargo* is a coordinated-disclosure window. The vulnerability and its patch
 
 See link:{docs-lwn-lifecycle-url}[Patch delivery lifecycle^].
 
-For more background visit the xref:appendix-lightwell-concepts.adoc[Lightwell concepts] appendix.
+For more background visit the xref:appendix-lightwell-concepts.adoc[Lightwell Concepts] appendix.
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/109
 image::tssc-lwn-clearinghouse-overview.png[TSSC controls wrapping Lightwell Network catalog consumption and Clearinghouse Premier member remediations,width=700,link=self,window=blank]
@@ -88,25 +88,6 @@ On each numbered page, *Your change* is the edit you make. *Check* is the comman
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/48
 image::seven-track-tssc-flow.png[Seven-track TSSC flow from Hummingbird through continuous compliance,width=700,link=self,window=blank]
 
-. xref:tssc-01-hummingbird-verify.adoc[1.1 Verify Hummingbird]
-. xref:tssc-02-hummingbird-mirror.adoc[1.2 Mirror into the trust boundary]
-. xref:tssc-03-enterprise-proxy.adoc[2.1 Enterprise proxy]
-. xref:tssc-04-remediated-pin.adoc[2.2 Remediated pin]
-. xref:tssc-05-golden-path-source.adoc[3.1 Golden-path source]
-. xref:tssc-06-bind-base-deps.adoc[3.2 Bind base and deps]
-. xref:tssc-07-live-renovate.adoc[3.3 Live Renovate]
-. xref:tssc-08-forbid-list.adoc[4.1 Source forbid-list]
-. xref:tssc-09-prefetch.adoc[4.2 Prefetch (Hermeto mapping)]
-. xref:tssc-10-build-networkpolicy.adoc[4.3 Build NetworkPolicy]
-. xref:tssc-11-build-sbom.adoc[4.4 Build and SBOM]
-. xref:tssc-12-sign-keyless.adoc[5.1 Sign (keyless)]
-. xref:tssc-13-attest-conforma.adoc[5.2 Attest + Conforma]
-. xref:tssc-14-disconnected-verify.adoc[5.3 Disconnected verify]
-. xref:tssc-15-gitops-admission.adoc[6.1 GitOps + admission]
-. xref:tssc-16-prod-gitops.adoc[6.2 Promote to prod repo]
-. xref:tssc-17-sbom-sor.adoc[7.1 SBOM system of record]
-. xref:tssc-18-vex-acs.adoc[7.2 VEX blast radius + ACS]
-
 == Labs index
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/111
@@ -121,23 +102,23 @@ image::tssc-artifact-trust-chain.png[Trust chain from Hummingbird digest and Lig
 |Runtime bases that were never signature-checked
 
 |xref:tssc-02-hummingbird-mirror.adoc[1.2]
-|Mirror into the trust boundary
+|Mirror into the Trust Boundary
 |Catalog images that never entered your registry
 
 |xref:tssc-03-enterprise-proxy.adoc[2.1]
-|Enterprise proxy
+|Enterprise Proxy
 |Builds that pull libraries from Maven Central
 
 |xref:tssc-04-remediated-pin.adoc[2.2]
-|Remediated pin
+|Remediated Pin
 |“Upgrade to latest” when you must stay on a certified version
 
 |xref:tssc-05-golden-path-source.adoc[3.1]
-|Golden-path source
+|Golden-Path Source
 |Application source that is not yours to pin and promote
 
 |xref:tssc-06-bind-base-deps.adoc[3.2]
-|Bind base and deps
+|Bind Base and Deps
 |Dockerfiles and Maven pins that still float
 
 |xref:tssc-07-live-renovate.adoc[3.3]
@@ -145,11 +126,11 @@ image::tssc-artifact-trust-chain.png[Trust chain from Hummingbird digest and Lig
 |Manual pin edits that drift from the remediation catalog
 
 |xref:tssc-08-forbid-list.adoc[4.1]
-|Source forbid-list
+|Source Forbid-List
 |Public `FROM`, Maven Central, or `curl` still in active files
 
 |xref:tssc-09-prefetch.adoc[4.2]
-|Prefetch (Hermeto mapping)
+|Prefetch (Hermeto Mapping)
 |Dependencies fetched from the internet at build time
 
 |xref:tssc-10-build-networkpolicy.adoc[4.3]
@@ -161,7 +142,7 @@ image::tssc-artifact-trust-chain.png[Trust chain from Hummingbird digest and Lig
 |Production images with no SBOM
 
 |xref:tssc-12-sign-keyless.adoc[5.1]
-|Sign (keyless)
+|Sign (Keyless)
 |Application images with no signature
 
 |xref:tssc-13-attest-conforma.adoc[5.2]
@@ -169,23 +150,23 @@ image::tssc-artifact-trust-chain.png[Trust chain from Hummingbird digest and Lig
 |Policy that never fails, so unsigned work still ships
 
 |xref:tssc-14-disconnected-verify.adoc[5.3]
-|Disconnected verify
+|Disconnected Verify
 |No way to verify a signature when public key servers are out of reach
 
 |xref:tssc-15-gitops-admission.adoc[6.1]
-|GitOps + admission
+|GitOps + Admission
 |Unsigned images that still deploy to the cluster
 
 |xref:tssc-16-prod-gitops.adoc[6.2]
-|Promote to prod repo
+|Promote to Prod Repo
 |Production that is not a separate, digest-pinned promote
 
 |xref:tssc-17-sbom-sor.adoc[7.1]
-|SBOM system of record
+|SBOM System of Record
 |No durable record of what the promoted digest contains
 
 |xref:tssc-18-vex-acs.adoc[7.2]
-|VEX blast radius + ACS
+|VEX Blast Radius + ACS
 |Scanner noise with no GAV-bound VEX, and ACS left out of the story
 |===
 
@@ -194,12 +175,11 @@ image::tssc-artifact-trust-chain.png[Trust chain from Hummingbird digest and Lig
 
 You walk one Java (Maven) supply chain on this OpenShift cluster.
 
-* *Konflux.* Builds are OpenShift Pipelines. Name mapping is in xref:appendix-konflux-mapping.adoc[Konflux mapping].
-* *A physical air-gap.* xref:tssc-14-disconnected-verify.adoc[5.3] and xref:appendix-disconnected-playbook.adoc[Disconnected transfer] stay on this network.
+* *Konflux.* Builds are OpenShift Pipelines. Name mapping is in xref:appendix-konflux-mapping.adoc[Konflux Mapping].
+* *A physical air-gap.* xref:tssc-14-disconnected-verify.adoc[5.3] and xref:appendix-disconnected-playbook.adoc[Disconnected Transfer] stay on this network.
 * *Building Hummingbird images.* You verify published Red Hat Hardened Images.
 * *FIPS evidence.* You consume an image that already carries that claim.
-* *Artifactory or a Python app.* You configure Nexus for the Java lab.
-* *A live Clearinghouse Premier membership.* You practice the post-disclosure pin. See the xref:appendix-lightwell-concepts.adoc[Lightwell concepts] appendix.
+* *A live Clearinghouse Premier membership.* You practice the post-disclosure pin. See the xref:appendix-lightwell-concepts.adoc[Lightwell Concepts] appendix.
 
 == How the lab checks work
 

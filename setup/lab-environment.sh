@@ -4,7 +4,8 @@
 # by OpenShift GitOps. Lightspeed already uses the platform model.
 # This script registers the ACS MCP server with Lightspeed when that
 # server is present, reads Quay and RHACS credentials into the shell,
-# and installs TSSC CLIs.
+# creates a Quay account token (QUAY_TOKEN), and installs TSSC CLIs
+# (cosign, oc-mirror, ec, and mvn).
 # Cluster-wide RHACS/Compliance/demo-app deploy is owned by OpenShift GitOps
 # (roadshow-prereqs + roadshow-demo-apps). This script also applies
 # rhel-webserver in rhacs-virt-webserver. GitOps keeps rhel9-vm in rhacs-virt.
@@ -15,6 +16,7 @@
 #   bash setup/lab-environment.sh
 #
 # Quay admin credentials are read from the quay-admin-password secret.
+# Setup also creates a Quay account token and saves it as QUAY_TOKEN.
 # Optional --quay-user / --quay-password are ignored; GitOps owns that account.
 #
 # After making the frontend repository public in Quay UI:
@@ -103,7 +105,8 @@ Options:
   --quay-user USER          Ignored. Quay admin comes from the GitOps secret
   --quay-password PASS      Ignored. Quay admin comes from the GitOps secret
   --deploy-skupper-only     Deploy patient-portal after frontend repo is public in Quay
-  --install-tssc-clis-only  Install cosign, oc-mirror, and ec into ~/.local/bin, then exit
+  --install-tssc-clis-only  Install cosign, oc-mirror, and ec into ~/.local/bin,
+                            install the maven RPM, then exit
   --skip-demo-apps          Skip cloning the demo-apps repository
   --apply-demo-apps         oc apply demo-apps manifests (GitOps deploys these by default)
   --skip-images             Skip golden image and frontend build/push
@@ -261,10 +264,12 @@ ensure_tssc_clis() {
   install_cli_from_rh_image cosign "${COSIGN_IMAGE}" || return 1
   install_cli_from_rh_image oc-mirror "${OC_MIRROR_IMAGE}" || return 1
   install_cli_from_rh_image ec "${EC_IMAGE}" || return 1
+  ensure_maven || return 1
   echo "TSSC CLIs on PATH:"
   command -v cosign
   command -v oc-mirror
   command -v ec
+  command -v mvn
   cosign version || true
   oc-mirror version || true
   ec version || ec --version || true
@@ -363,6 +368,106 @@ load_quay_env() {
   persist_var QUAY_PASSWORD "${QUAY_PASSWORD}"
   persist_var QUAY_URL "${QUAY_URL}"
   echo "Using Quay at ${QUAY_URL}"
+  ensure_quay_account_token
+}
+
+# Session cookie plus X-CSRF-Token. Quay rejects POST /api/v1 without both.
+quay_csrf_token() {
+  local jar=$1
+  curl -sk -c "${jar}" -b "${jar}" "https://${QUAY_URL}/csrf_token" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf_token"])'
+}
+
+quay_account_token_works() {
+  local home
+  [[ -n "${QUAY_TOKEN:-}" && -n "${QUAY_USER:-}" && -n "${QUAY_URL:-}" ]] || return 1
+  # First setup run creates the token before cosign is installed. A later run
+  # checks the saved token with cosign login against the Quay route.
+  command -v cosign >/dev/null 2>&1 || return 0
+  home="$(mktemp -d)"
+  if HOME="${home}" cosign login -u "${QUAY_USER}" -p "${QUAY_TOKEN}" "${QUAY_URL}" >/dev/null 2>&1; then
+    rm -rf "${home}"
+    return 0
+  fi
+  rm -rf "${home}"
+  return 1
+}
+
+# Long-lived account token for podman/cosign login and the Quay API.
+# Reuse QUAY_TOKEN when it still authenticates. The secret is only returned
+# at creation time, so a failed reuse creates a new lab-environment token.
+ensure_quay_account_token() {
+  local jar csrf code token
+  if quay_account_token_works; then
+    echo "Quay account token already set"
+    persist_var QUAY_TOKEN "${QUAY_TOKEN}"
+    return 0
+  fi
+  jar="$(mktemp)"
+  csrf="$(quay_csrf_token "${jar}")" || {
+    rm -f "${jar}"
+    echo "Error: could not read a Quay CSRF token from https://${QUAY_URL}/csrf_token." >&2
+    return 1
+  }
+  code="$(curl -sk -c "${jar}" -b "${jar}" -o /tmp/quay-signin.json -w '%{http_code}' \
+    -X POST "https://${QUAY_URL}/api/v1/signin" \
+    -H 'Content-Type: application/json' \
+    -H "X-CSRF-Token: ${csrf}" \
+    -d "$(QUAY_USER="${QUAY_USER}" QUAY_PASSWORD="${QUAY_PASSWORD}" python3 -c 'import json,os; print(json.dumps({"username":os.environ["QUAY_USER"],"password":os.environ["QUAY_PASSWORD"]}))')")" || true
+  if [[ "${code}" != "200" ]]; then
+    rm -f "${jar}"
+    echo "Error: Quay sign-in returned HTTP ${code:-000}; cannot create an account token." >&2
+    return 1
+  fi
+  csrf="$(quay_csrf_token "${jar}")"
+  # Drop earlier lab-environment tokens. Their secrets cannot be read back.
+  curl -sk -c "${jar}" -b "${jar}" -o /tmp/quay-apptokens.json \
+    -H "X-CSRF-Token: ${csrf}" \
+    "https://${QUAY_URL}/api/v1/user/apptoken" >/dev/null || true
+  python3 - <<'PY' > /tmp/quay-apptoken-uuids
+import json
+try:
+    items = json.load(open("/tmp/quay-apptokens.json")).get("tokens") or []
+except Exception:
+    items = []
+for item in items:
+    if item.get("title", "").startswith("lab-environment") and item.get("uuid"):
+        print(item["uuid"])
+PY
+  while read -r uuid; do
+    [[ -n "${uuid}" ]] || continue
+    csrf="$(quay_csrf_token "${jar}")"
+    curl -sk -c "${jar}" -b "${jar}" -o /dev/null \
+      -X DELETE "https://${QUAY_URL}/api/v1/user/apptoken/${uuid}" \
+      -H "X-CSRF-Token: ${csrf}" || true
+  done < /tmp/quay-apptoken-uuids
+  csrf="$(quay_csrf_token "${jar}")"
+  code="$(curl -sk -c "${jar}" -b "${jar}" -o /tmp/quay-apptoken.json -w '%{http_code}' \
+    -X POST "https://${QUAY_URL}/api/v1/user/apptoken" \
+    -H 'Content-Type: application/json' \
+    -H "X-CSRF-Token: ${csrf}" \
+    -d '{"title":"lab-environment"}')" || true
+  rm -f "${jar}" /tmp/quay-signin.json /tmp/quay-apptokens.json /tmp/quay-apptoken-uuids
+  if [[ "${code}" != "200" && "${code}" != "201" ]]; then
+    rm -f /tmp/quay-apptoken.json
+    echo "Error: Quay account token request returned HTTP ${code:-000}." >&2
+    return 1
+  fi
+  token="$(python3 -c '
+import json
+value = json.load(open("/tmp/quay-apptoken.json")).get("token")
+if isinstance(value, dict):
+    value = value.get("token_code") or value.get("token") or ""
+print(value or "")
+')"
+  rm -f /tmp/quay-apptoken.json
+  if [[ -z "${token}" ]]; then
+    echo "Error: Quay did not return an account token." >&2
+    return 1
+  fi
+  persist_var QUAY_TOKEN "${token}"
+  unset token
+  echo "Quay account token saved"
 }
 
 do_verify_admin() {
@@ -560,6 +665,28 @@ detect_quay_url() {
   return 1
 }
 
+# Track 2 runs mvn on the bastion. The launcher is a shell script plus a Maven
+# home, so it cannot be copied out of an image as a single ELF binary.
+ensure_maven() {
+  if command -v mvn >/dev/null 2>&1; then
+    echo "mvn already on PATH ($(command -v mvn))"
+    mvn -version || true
+    return 0
+  fi
+  echo "mvn not found; attempting install..."
+  if command -v dnf >/dev/null 2>&1; then
+    sudo dnf install -y maven
+  elif command -v yum >/dev/null 2>&1; then
+    sudo yum install -y maven
+  else
+    echo "Error: mvn is required but could not be installed (no dnf/yum)." >&2
+    return 1
+  fi
+  hash -r 2>/dev/null || true
+  command -v mvn >/dev/null 2>&1
+  mvn -version
+}
+
 # Labs expect podman; install it when missing (common on minimal bastions).
 ensure_podman() {
   if command -v podman >/dev/null 2>&1; then
@@ -679,12 +806,14 @@ do_quay_login() {
   initialize_quay_admin "${QUAY_URL}" "${QUAY_USER}" "${QUAY_PASSWORD}"
   if podman_login_quay "${QUAY_URL}" "${QUAY_USER}" "${QUAY_PASSWORD}"; then
     persist_var QUAY_PASSWORD "${QUAY_PASSWORD}"
+    ensure_quay_account_token
     return 0
   fi
   echo "Login with the supplied password failed. The admin account already exists with a different password."
   reset_quay_admin_password "${QUAY_USER}" "${QUAY_PASSWORD}" || return 1
   if podman_login_quay "${QUAY_URL}" "${QUAY_USER}" "${QUAY_PASSWORD}"; then
     persist_var QUAY_PASSWORD "${QUAY_PASSWORD}"
+    ensure_quay_account_token
     return 0
   fi
   echo "Error: podman login to ${QUAY_URL} failed for user '${QUAY_USER}' after resetting the password." >&2
@@ -1433,8 +1562,8 @@ do_acs_vm() {
 progress_run "Verify OpenShift access" do_verify_admin
 progress_run "Deploy rhel-webserver" do_acs_vm
 progress_run "Register ACS MCP with Lightspeed" lightspeed_ensure_acs_mcp
-progress_run "Read Quay credentials" load_quay_env
-progress_run "Install TSSC CLIs (cosign, oc-mirror, ec)" do_tssc_clis
+progress_run "Read Quay credentials and account token" load_quay_env
+progress_run "Install TSSC CLIs (cosign, oc-mirror, ec, mvn)" do_tssc_clis
 
 # Kick off RHACS configure in the background so demo apps / Quay work can overlap.
 configure_pid=""
@@ -1497,6 +1626,6 @@ load_roadshow_env
 progress_success_banner "Lab environment setup completed successfully" \
   "Quay credentials read from the cluster" \
   "RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)" \
-  "TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)" \
+  "TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin; mvn from the Maven RPM)" \
   "Env file: ${ROADSHOW_ENV_FILE}" \
   "Detailed log: ${LOG_FILE}"

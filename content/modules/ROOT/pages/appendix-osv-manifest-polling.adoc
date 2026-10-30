@@ -1,4 +1,4 @@
-= Optional appendix: OSV `PULP_MANIFEST` polling (advanced)
+= Optional Appendix: OSV `PULP_MANIFEST` Polling (Advanced)
 :source-highlighter: rouge
 :toc:
 :toclevels: 1
@@ -23,7 +23,7 @@ Generic automation story (map to your local ticketing / Git workflow):
 . On change, *create a ticket* and/or *open a merge request* / *trigger a rebuild pipeline*
 . A human or bot runs xref:tssc-04-remediated-pin.adoc[2.2] steps: read `fixed`, pin, rebuild
 
-image::appendix-osv-pulp-manifest-poll.png["OSV PULP_MANIFEST polling automation",width=700]
+image::appendix-osv-pulp-manifest-poll.png["OSV PULP_MANIFEST Polling Automation",width=700]
 
 == Canonical endpoints
 
@@ -117,7 +117,7 @@ Treat the poll as a *signal*, then reuse xref:tssc-04-remediated-pin.adoc[2.2]:
 == Related
 
 * Toolkit README: `tools/osv-eval/README.md`
-* xref:tssc-04-remediated-pin.adoc[2.2 Remediated pin]
+* xref:tssc-04-remediated-pin.adoc[2.2 Remediated Pin]
 * Canonical OSV remote: `{java-osv-url}`
 
 This track is complete. Return to the xref:index.adoc[home page] to choose the next track.

@@ -1,4 +1,4 @@
-= 5.1 Sign (keyless)
+= 5.1 Sign (Keyless)
 :source-highlighter: rouge
 :toc:
 :toclevels: 1
@@ -43,6 +43,22 @@ oc -n trusted-artifact-signer get configmap demo-userinfo-rhtas \
   -o jsonpath='{.data.signing_model}{"\n"}{.data.fulcio_internal_url}{"\n"}{.data.rekor_internal_url}{"\n"}{.data.tuf_internal_url}{"\n"}{.data.fulcio_url_hint}{"\n"}{.data.rekor_url_hint}{"\n"}{.data.tuf_url_hint}{"\n"}'
 oc -n trusted-artifact-signer get routes
 ----
++
+Expected output:
++
+----
+/home/lab-user/.local/bin/cosign
+keyless
+http://fulcio-server.trusted-artifact-signer.svc
+http://rekor-server.trusted-artifact-signer.svc
+http://tuf.trusted-artifact-signer.svc
+https://fulcio-server-trusted-artifact-signer.apps.cluster-wprcr.dyn.redhatworkshops.io
+https://rekor-server-trusted-artifact-signer.apps.cluster-wprcr.dyn.redhatworkshops.io
+https://tuf-trusted-artifact-signer.apps.cluster-wprcr.dyn.redhatworkshops.io
+fulcio-server-2c7h9
+rekor-server-hp66n
+tuf-gmkkb
+----
 
 Confirm the hints against live Routes. Do not leave `apps.<domain>` in the PipelineRun.
 
@@ -71,6 +87,12 @@ git show origin/main:.tekton/pipelinerun.yaml | grep -E 'STUDENT_REPO_URL_PLACEH
   && echo 'STILL HAS PLACEHOLDERS — commit the filled file from 4.4' \
   || echo 'Gitea pipelinerun is filled'
 ----
++
+Expected output:
++
+----
+Gitea pipelinerun is filled
+----
 
 . Otherwise edit `.tekton/pipelinerun.yaml` on `lw-student/spring-boot-lw-poc`: replace Fulcio / Rekor / TUF with `fulcio_internal_url` / `rekor_internal_url` / `tuf_internal_url` (not the HTTPS Route hints), `STUDENT_REPO_URL_PLACEHOLDER` with `student_repo_internal_url` (in-cluster Gitea, not the HTTPS Route), and `<lab-namespace>` with `lw-poc-build`. Commit and push that file (same as xref:tssc-11-build-sbom.adoc[4.4]), then create a new run
 +
@@ -92,7 +114,7 @@ Do *not* `oc tag` into staging here (Track 6). Do *not* generate a Showroom key 
 
 == Check: `cosign verify` on the app digest
 
-. Identity is the *pipeline* SA in the build namespace (claim-proven), *not* a Hummingbird signer and *not* `REPLACE_ME_*`. Issuer is the Kubernetes API. If verify fails, capture the SAN from Rekor / `cosign verify` error text — do not invent an alternate issuer.
+. Identity is the *pipeline* SA in the build namespace (claim-proven), *not* a Hummingbird signer and *not* `REPLACE_ME_*`. Issuer is the Kubernetes API. The lab bastion cannot reach `image-registry.openshift-image-registry.svc`, and it has no ServiceAccount token file. Verify in a short-lived pod in the `default` namespace: that pod can resolve the internal registry and can reach the TUF and Rekor Routes, which `lw-poc-build` cannot reach after 4.3. If verify fails, capture the SAN from Rekor / `cosign verify` error text — do not invent an alternate issuer.
 +
 [source,bash,role=execute]
 ----
@@ -100,20 +122,43 @@ BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.st
 TUF="$(oc -n trusted-artifact-signer get configmap demo-userinfo-rhtas -o jsonpath='{.data.tuf_url_hint}')"
 REKOR="$(oc -n trusted-artifact-signer get configmap demo-userinfo-rhtas -o jsonpath='{.data.rekor_url_hint}')"
 IMAGE="image-registry.openshift-image-registry.svc:5000/${BUILD_NS}/spring-boot-lw-poc:latest"
-mkdir -p /tmp/lab-home
-export HOME=/tmp/lab-home
-cosign initialize --mirror="${TUF}" --root="${TUF}/root.json"
-cosign login -u unused -p "$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
-  image-registry.openshift-image-registry.svc:5000
+TOKEN="$(oc -n "${BUILD_NS}" create token pipeline --duration=10m)"
+oc -n default delete pod cosign-verify --ignore-not-found --wait=true
+oc -n default run cosign-verify --restart=Never \
+  --image=registry.redhat.io/rhtas/cosign-rhel9:1.3.0 \
+  --env="HOME=/tmp" \
+  --env="TOKEN=${TOKEN}" \
+  --env="TUF=${TUF}" \
+  --env="REKOR=${REKOR}" \
+  --env="IMAGE=${IMAGE}" \
+  --env="BUILD_NS=${BUILD_NS}" \
+  --command -- bash -ec 'cosign initialize --mirror="${TUF}" --root="${TUF}/root.json"
+cosign login -u unused -p "${TOKEN}" image-registry.openshift-image-registry.svc:5000
 cosign verify \
   --rekor-url="${REKOR}" \
   --certificate-identity-regexp="^https://kubernetes.io/namespaces/${BUILD_NS}/serviceaccounts/pipeline$" \
   --certificate-oidc-issuer="https://kubernetes.default.svc" \
   --allow-http-registry --allow-insecure-registry \
-  "${IMAGE}"
+  "${IMAGE}"'
+oc -n default wait --for=jsonpath='{.status.phase}'=Succeeded pod/cosign-verify --timeout=180s
+oc -n default logs pod/cosign-verify
+oc -n default delete pod cosign-verify --wait=false
+oc -n "${BUILD_NS}" get istag spring-boot-lw-poc:latest -o jsonpath='{.image.dockerImageReference}{"\n"}'
+----
++
+Expected output:
++
+----
+pod/cosign-verify created
+Verification for image-registry.openshift-image-registry.svc:5000/lw-poc-build/spring-boot-lw-poc:latest --
+The following checks were performed on each of these signatures:
+  - The cosign claims were validated
+  - Existence of the claims in the transparency log was verified offline
+  - The code-signing certificate was verified using trusted certificate authority certificates
+image-registry.openshift-image-registry.svc:5000/lw-poc-build/spring-boot-lw-poc@sha256:55d2219fb675de8099432cf4985c57275b8028b8a8901bd5aca6e91427695d86
 ----
 
-Pass when that command exits 0 on *your* app digest. Record the digest (`oc -n "${BUILD_NS}" get istag spring-boot-lw-poc:latest -o jsonpath='{.image.dockerImageReference}'`) — Track 6 promotes it.
+Pass when that command exits 0 on *your* app digest. The digest above is the one Track 6 promotes on this cluster. Delete the pod so the short-lived token is not left in the pod spec.
 
 Continue to xref:tssc-13-attest-conforma.adoc[5.2] when you are ready.
 

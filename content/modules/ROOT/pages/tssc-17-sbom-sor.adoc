@@ -1,4 +1,4 @@
-= 7.1 SBOM system of record
+= 7.1 SBOM System of Record
 :source-highlighter: rouge
 :toc:
 :toclevels: 1
@@ -38,7 +38,21 @@ oc -n trusted-profile-analyzer get configmap rhtpa-ingestion-info \
 oc -n trusted-profile-analyzer get configmap demo-userinfo-rhtpa \
   -o jsonpath='url={.data.rhtpa_url}{"\n"}format={.data.sbom_format}{"\n"}'
 oc -n sso get configmap demo-userinfo-keycloak \
-  -o jsonpath='issuer={.data.oidc_issuer}{"\n"}user={.data.workshop_username}{"\n"}password={.data.workshop_password}{"\n"}'
+  -o jsonpath='issuer={.data.oidc_issuer}{"\n"}user={.data.workshop_username}{"\n"}'
+oc -n sso get configmap demo-userinfo-keycloak -o jsonpath='{.data.workshop_password}' \
+  | grep -q . && echo 'password=set'
+----
++
+Expected output:
++
+----
+tpa_ui=https://server-trusted-profile-analyzer.apps.cluster-wprcr.dyn.redhatworkshops.io
+csaf_gate=false
+url=https://server-trusted-profile-analyzer.apps.cluster-wprcr.dyn.redhatworkshops.io
+format=CycloneDX
+issuer=https://sso-tpa.apps.cluster-wprcr.dyn.redhatworkshops.io/realms/tpa
+user=tpa-user
+password=set
 ----
 
 The TPA password is the *value* of ConfigMap key `workshop_password` in `demo-userinfo-keycloak` (not the key name). CLI client secret is Secret `tpa-realm-cli-clients`. Do not commit either. Sign in from the *TPA UI* Route (realm `tpa`), not `https://sso…/admin/`.
@@ -66,6 +80,18 @@ oc -n "${BUILD_NS}" get tr -l tekton.dev/pipelineTask=syft-sbom-rhtpa
 oc -n "${BUILD_NS}" extract configmap/lab-sbom-cyclonedx --to="${HOME}" --confirm
 test -f ~/sbom.cyclonedx.json && jq '{bomFormat, specVersion, components:(.components|length)}' ~/sbom.cyclonedx.json || echo 'EXTRACT ConfigMap lab-sbom-cyclonedx FIRST'
 ----
++
+Expected output:
++
+----
+spring-boot-lw-poc-build-sign-z4hhp-syft-sbom-rhtpa   True        Succeeded
+/home/lab-user/sbom.cyclonedx.json
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "components": 98
+}
+----
 
 . Ingest *this* file (bound to the 6.2 digest) even if the pipeline already uploaded — you must be able to find the document. UI file picker or REST
 +
@@ -87,6 +113,15 @@ curl -sk -X POST \
   -w '\nHTTP %{http_code}\n' \
   "${RHTPA_URL%/}/api/v3/sbom"
 ----
++
+Expected output:
++
+----
+{"id":"urn:uuid:01a18d05-a01d-7ed3-8251-a5a08868e9c9","document_id":"urn:uuid:274bc4c1-901c-4e04-838a-f750f4b5c1aa/1"}
+HTTP 201
+----
+
+A second ingest returns a new id. HTTP 201 is the pass.
 
 Expect HTTP 201 (or another success). Open `server_url`, sign in, find the promoted digest / component.
 

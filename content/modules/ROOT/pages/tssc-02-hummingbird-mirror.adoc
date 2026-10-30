@@ -1,4 +1,4 @@
-= 1.2 Mirror into the trust boundary
+= 1.2 Mirror into the Trust Boundary
 :source-highlighter: rouge
 :toc:
 :toclevels: 1
@@ -35,6 +35,15 @@ image::hummingbird-published-vs-dest.png[Published Hummingbird digest versus int
 oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
   -o jsonpath='dest={.data.dest_registry_host}{"\n"}repo={.data.dest_registry_repo}{"\n"}docker={.data.dest_registry_docker}{"\n"}pre_mirror={.data.oc_mirror_pre_stage_scored_image}{"\n"}'
 ----
++
+Expected output:
++
+----
+dest=registry-lightwell-repo.apps.cluster-wprcr.dyn.redhatworkshops.io
+repo=hummingbird-mirror
+docker=docker://registry-lightwell-repo.apps.cluster-wprcr.dyn.redhatworkshops.io
+pre_mirror=false
+----
 
 . Seed ImageSet (scored ConfigMap — still has the placeholder)
 +
@@ -43,6 +52,20 @@ oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
 oc -n lightwell-repo get configmap imageset-configuration \
   -o jsonpath='{.data.imageset-config\.yaml}'
 ----
++
+Expected output:
++
+----
+# Incomplete ImageSet (V2-11). Scored file -- not the Showroom worked example.
+# Replace additionalImages[0].name with the V2-1 digest pin from
+# ConfigMap demo-userinfo-lightwell-repo key hummingbird_source_pullspec.
+# Copying example-imageset.yaml from oc-mirror-tooling still fails the Check.
+kind: ImageSetConfiguration
+apiVersion: mirror.openshift.io/v2alpha1
+mirror:
+  additionalImages:
+    - name: REPLACE_ME_HUMMINGBIRD_PULLSPEC
+----
 
 . Cluster copy of the worked example (do not paste into the scored ConfigMap)
 +
@@ -50,6 +73,18 @@ oc -n lightwell-repo get configmap imageset-configuration \
 ----
 oc -n lightwell-repo get configmap oc-mirror-tooling \
   -o jsonpath='{.data.example-imageset\.yaml}'
+----
++
+Expected output:
++
+----
+# Worked example ONLY -- different image from the scored ConfigMap.
+# Pasting this into imageset-configuration still fails the Check.
+kind: ImageSetConfiguration
+apiVersion: mirror.openshift.io/v2alpha1
+mirror:
+  additionalImages:
+    - name: registry.access.redhat.com/ubi9/ubi-minimal:latest
 ----
 
 == Your task: ImageSet
@@ -60,6 +95,12 @@ oc -n lightwell-repo get configmap oc-mirror-tooling \
 ----
 oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
   -o jsonpath='{.data.hummingbird_source_pullspec}{"\n"}'
+----
++
+Expected output:
++
+----
+registry.access.redhat.com/hi/openjdk:21-runtime@sha256:e7c41dc2cba28c49d551c491419e00b75c5aef6c13326cc08765d30e882630ba
 ----
 
 . Edit ConfigMap `imageset-configuration` in namespace `lightwell-repo` so `mirror.additionalImages[0].name` is that pull spec (digest, not `:latest`). 
@@ -80,6 +121,12 @@ oc -n lightwell-repo get configmap imageset-configuration \
   -o jsonpath='{.data.imageset-config\.yaml}' | grep -E 'REPLACE_ME' \
   && echo 'STILL HAS PLACEHOLDERS' || echo 'placeholders gone'
 ----
++
+Expected output:
++
+----
+placeholders gone
+----
 
 == Run oc-mirror
 
@@ -93,12 +140,26 @@ oc -n lightwell-repo delete job oc-mirror-learner --ignore-not-found
 oc -n lightwell-repo get configmap oc-mirror-tooling \
   -o jsonpath='{.data.job\.yaml}' | oc create -f -
 ----
++
+Expected output:
++
+----
+job.batch/oc-mirror-learner created
+----
+
+A repeat prints `job.batch "oc-mirror-learner" deleted` before `created`.
 
 . Wait for completion (mirror + signatures can take several minutes)
 +
 [source,bash,role=execute]
 ----
 oc -n lightwell-repo wait --for=condition=complete job/oc-mirror-learner --timeout=20m
+----
++
+Expected output:
++
+----
+job.batch/oc-mirror-learner condition met
 ----
 
 . Read oc-mirror logs for the dest image, then the signature-copy container
@@ -107,6 +168,20 @@ oc -n lightwell-repo wait --for=condition=complete job/oc-mirror-learner --timeo
 ----
 oc -n lightwell-repo logs job/oc-mirror-learner -c oc-mirror
 oc -n lightwell-repo logs job/oc-mirror-learner -c copy-signatures
+----
++
+The oc-mirror log is long. The lines that show the mirror worked are:
++
+Expected output:
++
+----
+Success copying registry.access.redhat.com/hi/openjdk:21-runtime@sha256:e7c41dc2cba28c49d551c491419e00b75c5aef6c13326cc08765d30e882630ba
+1 / 1 additional images mirrored successfully
+Copying signatures:
+  source: registry.access.redhat.com/hi/openjdk:21-runtime@sha256:e7c41dc2cba28c49d551c491419e00b75c5aef6c13326cc08765d30e882630ba
+  dest:   registry-lightwell-repo.apps.cluster-wprcr.dyn.redhatworkshops.io/hi/openjdk:21-runtime@sha256:e7c41dc2cba28c49d551c491419e00b75c5aef6c13326cc08765d30e882630ba
+DEST_PULLSPEC=registry-lightwell-repo.apps.cluster-wprcr.dyn.redhatworkshops.io/hi/openjdk:21-runtime@sha256:e7c41dc2cba28c49d551c491419e00b75c5aef6c13326cc08765d30e882630ba
+Signature copy complete.
 ----
 
 . Record the *dest* digest from those logs (or dest registry metadata).
@@ -132,6 +207,17 @@ cosign verify \
   --key https://security.access.redhat.com/data/63405576.txt \
   --insecure-ignore-tlog \
   "${DEST_PULLSPEC}"
+----
++
+Replace `REPLACE_ME_DEST_PULLSPEC` with the `DEST_PULLSPEC=` line from the signature-copy log. `cosign` prints a JSON signature array. The lines that show success are:
++
+Expected output:
++
+----
+Verification for registry-lightwell-repo.apps.cluster-wprcr.dyn.redhatworkshops.io/hi/openjdk@sha256:e7c41dc2cba28c49d551c491419e00b75c5aef6c13326cc08765d30e882630ba --
+The following checks were performed on each of these signatures:
+  - The cosign claims were validated
+  - The signatures were verified against the specified public key
 ----
 
 Honor system: you can open Track 2 without a UI lock. The Check is still: ImageSet has no `REPLACE_ME`, Job `oc-mirror-learner` completed, and `cosign verify` used the *internal* digest.

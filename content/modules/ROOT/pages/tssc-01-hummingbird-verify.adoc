@@ -32,7 +32,7 @@ A Hummingbird Python runtime uses the same verify story (`hi/python` or the pin 
 
 == Prerequisites
 
-* Bastion or Showroom terminal after xref:index.adoc#environment-setup[Environment setup] on the Welcome page (`setup/lab-environment.sh`). That script installs `cosign`, `oc-mirror`, and `ec` into `~/.local/bin` from Red Hat images. Do *not* curl `github.com` for CLIs.
+* Bastion or Showroom terminal after xref:index.adoc#environment-setup[Environment setup] on the Welcome page (`setup/lab-environment.sh`). That script installs `cosign`, `oc-mirror`, and `ec` into `~/.local/bin` from Red Hat images, and installs `mvn` from the Maven RPM. Do *not* curl `github.com` for CLIs.
 * ConfigMap `demo-userinfo-lightwell-repo` in namespace `lightwell-repo`.
 * If `command -v cosign` prints nothing, re-run the Welcome xref:index.adoc#environment-setup[Environment setup] block.
 
@@ -45,6 +45,15 @@ command -v oc-mirror --v2
 cosign version
 oc-mirror version
 ----
++
+Expected output:
++
+----
+/home/lab-user/.local/bin/cosign
+/home/lab-user/.local/bin/oc-mirror
+GitVersion:    227f0ec0
+Client Version: version.Info{GitVersion:"4.20.0-202610240619.p2.g9786cf2.assembly.stream.el9-9786cf2", ...}
+----
 
 == Discover the published pin
 
@@ -56,6 +65,13 @@ Do *not* paste a digest from chat, a slide, or this page’s narrative. The live
 ----
 oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
   -o jsonpath='{.data.hummingbird_source_pullspec}{"\n"}{.data.dest_registry_host}{"\n"}'
+----
++
+Expected output:
++
+----
+registry.access.redhat.com/hi/openjdk:21-runtime@sha256:e7c41dc2cba28c49d551c491419e00b75c5aef6c13326cc08765d30e882630ba
+registry-lightwell-repo.apps.cluster-wprcr.dyn.redhatworkshops.io
 ----
 
 Keep the pull spec. The `@sha256:…` on that line is the *index*.
@@ -88,10 +104,11 @@ oc -n lightwell-repo get configmap stub-01-hummingbird-verify \
   -o jsonpath='{.data.published-verify\.sh}' > ~/track-1-1-published-verify.sh
 cat ~/track-1-1-published-verify.sh
 ----
-
-. You should see both `REPLACE_ME_*` strings. The seed looks like this
 +
-[source,bash]
+You should see both `REPLACE_ME_*` strings.
+
+Expected output:
++
 ----
 #!/usr/bin/env bash
 set -euo pipefail
@@ -121,6 +138,16 @@ ENDSCRIPT
 chmod +x ~/track-1-1-published-verify.sh
 cat ~/track-1-1-published-verify.sh
 ----
++
+Expected output:
++
+----
+PIN=registry.access.redhat.com/hi/openjdk:21-runtime@sha256:e7c41dc2cba28c49d551c491419e00b75c5aef6c13326cc08765d30e882630ba
+#!/usr/bin/env bash
+set -euo pipefail
+export HUMMINGBIRD_PUBLISHED='registry.access.redhat.com/hi/openjdk:21-runtime@sha256:e7c41dc2cba28c49d551c491419e00b75c5aef6c13326cc08765d30e882630ba'
+cosign verify --key https://security.access.redhat.com/data/63405576.txt --insecure-ignore-tlog "${HUMMINGBIRD_PUBLISHED}"
+----
 
 The `PIN=` line must be a `registry.access.redhat.com/hi/openjdk` pull spec with `@sha256:`. The script body must show that pull spec and the `63405576.txt` key URL, with no `REPLACE_ME`.
 
@@ -136,6 +163,14 @@ oc -n lightwell-repo create configmap stub-01-hummingbird-verify \
   --from-file=published-verify.sh=$HOME/track-1-1-published-verify.sh \
   --dry-run=client -o yaml | oc apply -f -
 ----
++
+Expected output:
++
+----
+configmap/stub-01-hummingbird-verify configured
+----
+
+A second run prints `unchanged`.
 
 . Confirm the *cluster* object is filled (this is what the Check reads)
 +
@@ -148,6 +183,17 @@ oc -n lightwell-repo get configmap stub-01-hummingbird-verify \
   -o jsonpath='{.data.published-verify\.sh}' | grep -E 'REPLACE_ME' \
   && echo 'STILL HAS PLACEHOLDERS' || echo 'placeholders gone'
 ----
++
+Expected output:
++
+----
+#!/usr/bin/env bash
+set -euo pipefail
+export HUMMINGBIRD_PUBLISHED='registry.access.redhat.com/hi/openjdk:21-runtime@sha256:e7c41dc2cba28c49d551c491419e00b75c5aef6c13326cc08765d30e882630ba'
+cosign verify --key https://security.access.redhat.com/data/63405576.txt --insecure-ignore-tlog "${HUMMINGBIRD_PUBLISHED}"
+
+placeholders gone
+----
 
 == Check: published `cosign verify`
 
@@ -156,6 +202,17 @@ oc -n lightwell-repo get configmap stub-01-hummingbird-verify \
 [source,bash,role=execute]
 ----
 bash "$HOME/track-1-1-published-verify.sh"
+----
++
+`cosign` also prints a JSON array of signatures. The lines that show success are:
++
+Expected output:
++
+----
+Verification for registry.access.redhat.com/hi/openjdk@sha256:e7c41dc2cba28c49d551c491419e00b75c5aef6c13326cc08765d30e882630ba --
+The following checks were performed on each of these signatures:
+  - The cosign claims were validated
+  - The signatures were verified against the specified public key
 ----
 
 The image name inside that pull spec is `hi/openjdk`. The command to run is the `bash` line above.

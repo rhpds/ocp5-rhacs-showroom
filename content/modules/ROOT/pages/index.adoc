@@ -13,12 +13,12 @@ This course offers hands-on experience with Kubernetes-native security on Red Ha
 * *Cluster setup and services are managed by GitOps* — RHACS, Quay, GitOps, Compliance Operator, and the vulnerable demo apps are already synced by Argo CD. Deleting resources by accident is no problem, as they will be recreated by GitOps.
 * *Start any track from this page.* The tracks are independent: 101, 201, 301, then RHACS, Lightwell TSSC, and Virtualization. When you finish a track, *Next* brings you back here.
 
-IMPORTANT: Make sure to run the setup script below! OpenShift Lightspeed is already configured with the platform model. The script saves your CLI credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`).
+IMPORTANT: Make sure to run the setup script below! OpenShift Lightspeed is already configured with the platform model. The script saves your CLI credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`, and `mvn`).
 
 [[environment-setup]]
 == Environment setup
 
-The following script installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`) and reads Quay and RHACS credentials into your shell. OpenShift Lightspeed is already configured with the platform model.
+The following script installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`, and `mvn`) and reads Quay and RHACS credentials into your shell. OpenShift Lightspeed is already configured with the platform model.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
@@ -40,7 +40,7 @@ source ~/.bashrc
 
   ✓ Quay credentials read from the cluster
   ✓ RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)
-  ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)
+  ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin; mvn from the Maven RPM)
   ✓ Env file: /home/lab-user/.acs-roadshow/env
   ✓ Detailed log: /home/lab-user/.acs-roadshow/lab-environment-20261014-174611.log
 

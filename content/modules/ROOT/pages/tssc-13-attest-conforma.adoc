@@ -7,7 +7,7 @@
 
 You copy the too-permissive Conforma seed and tighten *your* copy. Unsigned builder images must fail. The signed app digest from 5.1 must pass. You run that gate as Task `conforma-policy` in namespace `lightwell-tasks`. The Task is *not* in the seeded pipeline.
 
-This is not SLSA L3. There is no Tekton Chains on this cluster and no `cosign attest` step. Leave `skip-att-sig-check=true` on the ConfigMap. Showroom `ec` is 0.7 (`ec-rhel9:0.7`). It has no `--skip-att-sig-check`, and `--ignore-rekor` breaks Fulcio timestamps on the pass path. The listing and Task ignore only `builtin.attestation.signature_check` in the report. Konflux Conforma maps to this Task. Chains and in-toto are a callout. Full table is xref:appendix-konflux-mapping.adoc[Konflux mapping].
+This is not SLSA L3. There is no Tekton Chains on this cluster and no `cosign attest` step. Leave `skip-att-sig-check=true` on the ConfigMap. Showroom `ec` is 0.7 (`ec-rhel9:0.7`). It has no `--skip-att-sig-check`, and `--ignore-rekor` breaks Fulcio timestamps on the pass path. The listing and Task ignore only `builtin.attestation.signature_check` in the report. Konflux Conforma maps to this Task. Chains and in-toto are a callout. Full table is xref:appendix-konflux-mapping.adoc[Konflux Mapping].
 
 The seeded ConfigMap skips signature checks, uses identity `.*`, and sets CVE 999. Argo reverts edits to that object. Copy it to `lw-poc-build` and tighten the copy.
 
@@ -45,6 +45,16 @@ oc -n lightwell-tasks get configmap conforma-policy \
 oc -n lightwell-tasks get configmap conforma-policy-docs \
   -o jsonpath='{.data.example-pipeline-snippet\.yaml}'
 ----
++
+Expected output:
++
+----
+conforma-policy
+true
+.*
+- name: verify-enterprise-contract
+  runAfter: [clone]
+----
 
 == Worked example (not the Check)
 
@@ -74,6 +84,14 @@ oc -n lightwell-tasks get configmap conforma-policy -o yaml \
         -e "s/namespace: lightwell-tasks/namespace: ${BUILD_NS}/" \
   | oc apply -f -
 ----
++
+Expected output:
++
+----
+configmap/conforma-policy created
+----
+
+The seed in `lightwell-tasks` stays `skip-image-sig-check=true`. Tighten the copy in `lw-poc-build`.
 
 . On the copy in `lw-poc-build`, set `skip-image-sig-check` to `false`. Leave `skip-att-sig-check` `true` (no Chains / no `cosign attest` on this claim). Set `certificate-identity-regexp` to the same pipeline SA regexp you used in 5.1 (not a wildcard identity, not a Hummingbird placeholder). Set the OIDC issuer regexp to `https://kubernetes.default.svc`. In `policy.yaml` / `data.yaml`, drop the catch-all exclude (the list that is a single asterisk). Do not add an `exclude` for `attestation_signature_check` — `ec` 0.7 builtins ignore that list. Lower `restrict_max_cve_score` below 999, and pin `allowed_registry_prefixes` to the internal registry (`image-registry.openshift-image-registry.svc`).
 
@@ -83,25 +101,62 @@ oc -n lightwell-tasks get configmap conforma-policy -o yaml \
 
 Fail path is the in-cluster ImageStream `openjdk-21-builder` you imported in xref:tssc-08-forbid-list.adoc[4.1] — it is *not* signed with the RHTAS pipeline SA. It can pull (internal registry is allowed). Pass path is the 5.1 app digest. Do not use `docker.io/library/java:latest` (worked example; hermetic egress also blocks it from the build namespace).
 
-. `ec` is on Showroom `PATH` (do not curl `github.com`). Initialize TUF and log in to the internal registry the same way as xref:tssc-12-sign-keyless.adoc[5.1]. Do *not* pass `--ignore-rekor` (Fulcio certs need Rekor timestamps) and do *not* pass `--skip-att-sig-check` (unknown on `ec` 0.7). `--strict=false` writes a report even when the attestation builtin fails; judge the files, not the exit code.
+. `ec` is installed on the bastion by Welcome xref:index.adoc#environment-setup[Environment setup]. The bastion cannot reach the internal registry, so initialize TUF, log in, and run `ec` in a short-lived pod in the `default` namespace, the same way as xref:tssc-12-sign-keyless.adoc[5.1]. Do *not* pass `--ignore-rekor` (Fulcio certs need Rekor timestamps) and do *not* pass `--skip-att-sig-check` (unknown on `ec` 0.7). `--strict=false` writes a report even when the attestation builtin fails; judge the files, not the exit code.
 +
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
 TUF="$(oc -n trusted-artifact-signer get configmap demo-userinfo-rhtas -o jsonpath='{.data.tuf_url_hint}')"
 REKOR="$(oc -n trusted-artifact-signer get configmap demo-userinfo-rhtas -o jsonpath='{.data.rekor_url_hint}')"
-mkdir -p /tmp/ec /tmp/lab-home
-export HOME=/tmp/lab-home
-export SSL_CERT_FILE=/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
-cosign initialize --mirror="${TUF}" --root="${TUF}/root.json"
-cosign login -u unused -p "$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
-  image-registry.openshift-image-registry.svc:5000
+TOKEN="$(oc -n "${BUILD_NS}" create token pipeline --duration=10m)"
+rm -rf /tmp/ec
+mkdir -p /tmp/ec
 oc -n "${BUILD_NS}" extract configmap/conforma-policy --to=/tmp/ec --confirm
+oc -n default delete configmap ec-policy --ignore-not-found
+oc -n default create configmap ec-policy --from-file=/tmp/ec
+oc -n default delete pod ec-validate --ignore-not-found --wait=true
+export TUF REKOR TOKEN BUILD_NS
+python3 - <<'PY' | oc apply -f -
+import json, os
+pod = {
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {"name": "ec-validate", "namespace": "default"},
+  "spec": {
+    "restartPolicy": "Never",
+    "initContainers": [{
+      "name": "tuf",
+      "image": "registry.redhat.io/rhtas/cosign-rhel9:1.3.0",
+      "env": [
+        {"name": "HOME", "value": "/work"},
+        {"name": "TOKEN", "value": os.environ["TOKEN"]},
+        {"name": "TUF", "value": os.environ["TUF"]},
+      ],
+      "command": ["bash", "-ec"],
+      "args": [
+        'cosign initialize --mirror="${TUF}" --root="${TUF}/root.json"\n'
+        'cosign login -u unused -p "${TOKEN}" image-registry.openshift-image-registry.svc:5000\n'
+        'chmod -R a+rwX /work\n'
+      ],
+      "volumeMounts": [{"name": "work", "mountPath": "/work"}],
+    }],
+    "containers": [{
+      "name": "ec",
+      "image": "registry.redhat.io/rhtas/ec-rhel9:0.7",
+      "env": [
+        {"name": "HOME", "value": "/work"},
+        {"name": "REKOR", "value": os.environ["REKOR"]},
+        {"name": "BUILD_NS", "value": os.environ["BUILD_NS"]},
+        {"name": "SSL_CERT_FILE", "value": "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"},
+      ],
+      "command": ["bash", "-ec"],
+      "args": [r'''
+mkdir -p /tmp/ec
+cp /policy/* /tmp/ec/
 FAIL_IMG="image-registry.openshift-image-registry.svc:5000/${BUILD_NS}/openjdk-21-builder:latest"
 PASS_IMG="image-registry.openshift-image-registry.svc:5000/${BUILD_NS}/spring-boot-lw-poc:latest"
 IDENTITY="$(tr -d '[:space:]' < /tmp/ec/certificate-identity-regexp)"
 ISSUER="$(tr -d '[:space:]' < /tmp/ec/certificate-oidc-issuer-regexp)"
-# Fail path: unsigned builder must report builtin.image.signature_check
 ec validate image --image="${FAIL_IMG}" --policy=/tmp/ec/policy.yaml --strict=false \
   --show-successes --info --output=text=/tmp/ec-fail.txt \
   --certificate-identity-regexp="${IDENTITY}" \
@@ -109,7 +164,7 @@ ec validate image --image="${FAIL_IMG}" --policy=/tmp/ec/policy.yaml --strict=fa
   --rekor-url="${REKOR}" || true
 grep '\[Violation\]' /tmp/ec-fail.txt | grep -q 'builtin.image.signature_check' \
   || { echo 'FAIL PATH UNEXPECTEDLY PASSED'; cat /tmp/ec-fail.txt; exit 1; }
-# Pass path: ignore only the attestation builtin (no cosign attest on this claim)
+echo FAIL_PATH_OK
 ec validate image --image="${PASS_IMG}" --policy=/tmp/ec/policy.yaml --strict=false \
   --show-successes --info --output=text=/tmp/ec-pass.txt \
   --certificate-identity-regexp="${IDENTITY}" \
@@ -119,8 +174,42 @@ grep '\[Violation\]' /tmp/ec-pass.txt | grep -q 'builtin.image.signature_check' 
   && { echo 'PASS PATH: image signature still failing'; cat /tmp/ec-pass.txt; exit 1; }
 leftover="$(grep '\[Violation\]' /tmp/ec-pass.txt | grep -v 'builtin.attestation.signature_check' || true)"
 [[ -z "${leftover}" ]] || { echo "PASS PATH leftover: ${leftover}"; cat /tmp/ec-pass.txt; exit 1; }
+echo PASS_PATH_OK
+grep '\[Violation\]' /tmp/ec-pass.txt || true
+'''],
+      "volumeMounts": [
+        {"name": "work", "mountPath": "/work"},
+        {"name": "policy", "mountPath": "/policy", "readOnly": True},
+      ],
+    }],
+    "volumes": [
+      {"name": "work", "emptyDir": {}},
+      {"name": "policy", "configMap": {"name": "ec-policy"}},
+    ],
+  },
+}
+json.dump(pod, open("/dev/stdout", "w"))
+PY
+unset TOKEN
+oc -n default wait --for=jsonpath='{.status.phase}'=Succeeded pod/ec-validate --timeout=180s
+oc -n default logs pod/ec-validate
+oc -n default delete pod ec-validate --wait=false
+oc -n default delete configmap ec-policy
 oc -n "${BUILD_NS}" get pipeline spring-boot-lw-poc-build-sign -o yaml \
-  | grep -A30 'name: conforma-policy' | head -40
+  | grep -A20 'name: conforma-policy' | head -25
+----
++
+Expected output:
++
+----
+FAIL_PATH_OK
+PASS_PATH_OK
+[Violation] builtin.attestation.signature_check
+- name: conforma-policy
+    - name: policy-namespace
+      value: lw-poc-build
+    runAfter:
+    - cosign-sign-keyless
 ----
 
 Pass when the builder report has `builtin.image.signature_check` as a `[Violation]`, the signed app leftover `[Violation]` lines are empty after dropping `builtin.attestation.signature_check`, the live Pipeline includes `conforma-policy` after `cosign-sign-keyless` with in-cluster `tuf-url` / `rekor-url`, and `policy-namespace` is `lw-poc-build`.
@@ -133,11 +222,11 @@ Continue to xref:tssc-14-disconnected-verify.adoc[5.3] when you are ready. Track
 == Official documentation
 
 * link:{docs-rhtas-url}[Trusted Artifact Signer deployment guide^] (Conforma / `ec` against RHTAS signatures)
-* xref:appendix-konflux-mapping.adoc[Konflux mapping] (Conforma → Task `conforma-policy`)
+* xref:appendix-konflux-mapping.adoc[Konflux Mapping] (Conforma → Task `conforma-policy`)
 
 == Callout
 
-SLSA L3 / Tekton Chains is a mapping sentence, not this Check. Full table is xref:appendix-konflux-mapping.adoc[Konflux mapping].
+SLSA L3 / Tekton Chains is a mapping sentence, not this Check. Full table is xref:appendix-konflux-mapping.adoc[Konflux Mapping].
 
 == Key takeaways
 

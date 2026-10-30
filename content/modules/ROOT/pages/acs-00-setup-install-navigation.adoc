@@ -40,13 +40,13 @@ image::01-rhacs-console-dashboard.png[RHACS console,link=self, window=blank, wid
 
 == Lab environment setup
 
-The setup script below is the remaining *bastion* work: RHACS and Quay CLI variables, a local clone of `demo-apps`, and the TSSC CLIs. Quay, the workshop images, MCP, and OpenShift Lightspeed are already synced by OpenShift GitOps. Lightspeed is preconfigured with the platform model.
+The setup script below is the remaining *bastion* work: RHACS and Quay CLI variables, a local clone of `demo-apps`, and the TSSC CLIs (`cosign`, `oc-mirror`, `ec`, and `mvn`). Quay, the workshop images, MCP, and OpenShift Lightspeed are already synced by OpenShift GitOps. Lightspeed is preconfigured with the platform model.
 
 IMPORTANT: This will run quickly if it has already been run as part of the initial setup.
 
 === Run the setup script
 
-OpenShift Lightspeed is already configured with the platform model. The script reads Quay and RHACS credentials and installs the TSSC CLIs.
+OpenShift Lightspeed is already configured with the platform model. The script reads Quay and RHACS credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`, and `mvn`).
 
 You can skip this step and run the verification step below if you've already run the script.
 
@@ -81,7 +81,7 @@ Details: /home/lab-user/.acs-roadshow/lab-environment-YYYYMMDD-HHMMSS.log
 
   ✓ Quay credentials read from the cluster
   ✓ RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)
-  ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin)
+  ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin; mvn from the Maven RPM)
   ✓ Env file: /home/lab-user/.acs-roadshow/env
   ✓ Detailed log: /home/lab-user/.acs-roadshow/lab-environment-....log
 ----

@@ -1,4 +1,4 @@
-= Appendix: instructor two-day grouping
+= Appendix: Instructor Two-Day Grouping
 :toc:
 :toclevels: 1
 
@@ -19,7 +19,7 @@ Day 2 has more Checks (eleven) than Day 1 (seven gated plus the ungated intro). 
 == Suggested grouping
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/72
-image::instructor-two-day-grouping.png[Instructor two-day grouping: Day 1 tracks 1–3, Day 2 tracks 4–7,width=700,link=self,window=blank]
+image::instructor-two-day-grouping.png[Instructor Two-Day Grouping: Day 1 tracks 1–3, Day 2 tracks 4–7,width=700,link=self,window=blank]
 
 === Day 1 — trusted inputs and source (tracks 1–3)
 
@@ -37,23 +37,23 @@ Orientation plus every Check that pins *what the app is allowed to consume*.
 |1
 |Published digest and Hardened Images key. Arm64 is a callout, not a Check.
 
-|xref:tssc-02-hummingbird-mirror.adoc[1.2 Mirror into the trust boundary]
+|xref:tssc-02-hummingbird-mirror.adoc[1.2 Mirror into the Trust Boundary]
 |1
 |Learner-run oc-mirror. Dest digest is what later `FROM` lines use.
 
-|xref:tssc-03-enterprise-proxy.adoc[2.1 Enterprise proxy]
+|xref:tssc-03-enterprise-proxy.adoc[2.1 Enterprise Proxy]
 |2
 |Author `settings.xml` against in-cluster Nexus. Python / Artifactory are callouts.
 
-|xref:tssc-04-remediated-pin.adoc[2.2 Remediated pin]
+|xref:tssc-04-remediated-pin.adoc[2.2 Remediated Pin]
 |2
 |Exact `.rhlw-*` on a broken `pom.xml`. Track 7 VEX is this GAV.
 
-|xref:tssc-05-golden-path-source.adoc[3.1 Golden-path source]
+|xref:tssc-05-golden-path-source.adoc[3.1 Golden-Path Source]
 |3
 |Learner-owned Gitea remotes. Templates stay in `workshop-templates`.
 
-|xref:tssc-06-bind-base-deps.adoc[3.2 Bind base and deps]
+|xref:tssc-06-bind-base-deps.adoc[3.2 Bind Base and Deps]
 |3
 |Runtime `FROM` the dest Hummingbird digest plus Lightwell pins.
 
@@ -72,11 +72,11 @@ Hermetic build, sign, promote, then prove the pin in TPA.
 |===
 |Page |Track |Why it belongs on Day 2
 
-|xref:tssc-08-forbid-list.adoc[4.1 Source forbid-list]
+|xref:tssc-08-forbid-list.adoc[4.1 Source Forbid-List]
 |4
 |Strip public `FROM` / Central / `curl` from active build files.
 
-|xref:tssc-09-prefetch.adoc[4.2 Prefetch (Hermeto mapping)]
+|xref:tssc-09-prefetch.adoc[4.2 Prefetch (Hermeto Mapping)]
 |4
 |Wire Task `prefetch-dependencies`. Not hosted Konflux Hermeto.
 
@@ -88,7 +88,7 @@ Hermetic build, sign, promote, then prove the pin in TPA.
 |4
 |OpenShift BuildConfig image plus SBOM. Known-bad Dockerfile still fails.
 
-|xref:tssc-12-sign-keyless.adoc[5.1 Sign (keyless)]
+|xref:tssc-12-sign-keyless.adoc[5.1 Sign (Keyless)]
 |5
 |RHTAS Fulcio / Rekor / TUF on the *app* digest.
 
@@ -96,23 +96,23 @@ Hermetic build, sign, promote, then prove the pin in TPA.
 |5
 |Tighten the weak seed; fail then pass.
 
-|xref:tssc-14-disconnected-verify.adoc[5.3 Disconnected verify]
+|xref:tssc-14-disconnected-verify.adoc[5.3 Disconnected Verify]
 |5
 |Second Check: learner TUF root plus `--key`. Cluster stays networked.
 
-|xref:tssc-15-gitops-admission.adoc[6.1 GitOps + admission]
+|xref:tssc-15-gitops-admission.adoc[6.1 GitOps + Admission]
 |6
 |Stage GitOps; unsigned deny. VM / canary / blue-green are callouts.
 
-|xref:tssc-16-prod-gitops.adoc[6.2 Promote to prod repo]
+|xref:tssc-16-prod-gitops.adoc[6.2 Promote to Prod Repo]
 |6
 |Commit the signed digest to the *prod* remote. Prod Argo must not still track stage.
 
-|xref:tssc-17-sbom-sor.adoc[7.1 SBOM system of record]
+|xref:tssc-17-sbom-sor.adoc[7.1 SBOM System of Record]
 |7
 |Ingest the promoted digest into TPA.
 
-|xref:tssc-18-vex-acs.adoc[7.2 VEX blast radius + ACS]
+|xref:tssc-18-vex-acs.adoc[7.2 VEX Blast Radius + ACS]
 |7
 |Lightwell GAV-bound VEX from Track 2; ACS is not the disabled stub.
 |===
@@ -133,10 +133,10 @@ Coverage first. Do *not* cut a gated page.
 
 Safe to defer (read later, not a Check):
 
-* xref:appendix-consultant-delivery.adoc[Consultant delivery map]
-* xref:appendix-konflux-mapping.adoc[Konflux mapping]
-* xref:appendix-disconnected-playbook.adoc[Disconnected transfer]
-* xref:appendix-lightwell-concepts.adoc[Lightwell concepts]
+* xref:appendix-consultant-delivery.adoc[Consultant Delivery Map]
+* xref:appendix-konflux-mapping.adoc[Konflux Mapping]
+* xref:appendix-disconnected-playbook.adoc[Disconnected Transfer]
+* xref:appendix-lightwell-concepts.adoc[Lightwell Concepts]
 * This page
 
 Not safe to defer: 3.3, 5.3, 6.2, 7.2. Later pages assume those edits landed.
@@ -159,7 +159,7 @@ Lab fixtures on GitHub are `pom.xml.example` and `requirements.txt.example`. Git
 
 == After the workshop
 
-Finishing the claim is not the enablement metric. Score xref:appendix-enablement-checklist.adoc[Appendix: internal enablement checklist] *after* the event. It is not a live customer proof-of-value during these two days.
+Finishing the claim is not the enablement metric. Score xref:appendix-enablement-checklist.adoc[Appendix: Internal Enablement Checklist] *after* the event. It is not a live customer proof-of-value during these two days.
 
 == After dry runs
 
@@ -172,6 +172,6 @@ When you have wall-clock notes:
 == Related
 
 * xref:tssc-INDEX.adoc[Workshop home] — learner map and honor system
-* xref:appendix-enablement-checklist.adoc[Internal enablement checklist] — scored after the event, not during
-* xref:appendix-consultant-delivery.adoc[Consultant delivery map] — engagement activity → track
-* xref:appendix-konflux-mapping.adoc[Konflux mapping] — names used in client engagements
+* xref:appendix-enablement-checklist.adoc[Internal Enablement Checklist] — scored after the event, not during
+* xref:appendix-consultant-delivery.adoc[Consultant Delivery Map] — engagement activity → track
+* xref:appendix-konflux-mapping.adoc[Konflux Mapping] — names used in client engagements

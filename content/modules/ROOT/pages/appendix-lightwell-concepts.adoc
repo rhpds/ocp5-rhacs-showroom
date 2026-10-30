@@ -1,4 +1,4 @@
-= Appendix: Lightwell concepts (FAQ distill)
+= Appendix: Lightwell Concepts (FAQ Distill)
 :toc:
 :toclevels: 1
 
@@ -80,7 +80,7 @@ image::lwn-vs-clearinghouse-premier.png[Lightwell Network catalog versus Clearin
 
 == OSV, SBOM, and pipelines
 
-Acronym expansions: xref:appendix-acronyms.adoc[Acronym glossary]. First teaching definitions also appear on the workshop xref:tssc-INDEX.adoc[home] page.
+Acronym expansions: xref:appendix-acronyms.adoc[Acronym Glossary]. First teaching definitions also appear on the workshop xref:tssc-INDEX.adoc[home] page.
 
 [cols="1,2",options="header"]
 |===
