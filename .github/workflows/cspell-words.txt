@@ -12,6 +12,7 @@ checkpointctl
 clusterrole
 CMDB
 cmdline
+configmap
 Conforma
 creds
 CRIU
@@ -28,6 +29,8 @@ Fulcio
 Gitea
 gitsign
 Hermeto
+hyperconverged
+imageintegrations
 Infosec
 ISSO
 ITSM
@@ -49,6 +52,7 @@ Multus
 musthave
 netcat
 netpol
+nftables
 nonroot
 OCIL
 packagemanifest
@@ -64,6 +68,7 @@ RHBK
 RHCOS
 RHDA
 RHDH
+rhlw
 RHSA
 rhsso
 RHTAS
@@ -73,6 +78,7 @@ Samepage
 schedstats
 seccomp
 secretstore
+serviceaccount
 selfsigned
 SIEM
 Sigstore
@@ -90,14 +96,18 @@ syft
 tlog
 TSSC
 ungated
+undeployed
 unreviewable
 unscanned
+urlopen
 Untailored
 unvetted
 uvicorn
 Venafi
 vfio
 virtio
+virtiofs
+VMIM
 vulns
 YAMLS
 ZTWIM
