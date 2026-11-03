@@ -4,10 +4,9 @@
 # The primary-user-defined-network label is only accepted when the namespace
 # is created.
 #
-# checkout-service joins checkout-web and checkout-api on 192.168.210.0/24.
+# checkout-service joins checkout-web, checkout-api, and the rhel-webserver
+# virtual machine on 192.168.210.0/24.
 # ledger-service is a separate network on 192.168.211.0/24.
-# The rhel-webserver network is applied later, after rhacs-virt-webserver
-# exists with the primary-user-defined-network label.
 apiVersion: k8s.ovn.org/v1
 kind: ClusterUserDefinedNetwork
 metadata:

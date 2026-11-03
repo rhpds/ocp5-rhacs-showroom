@@ -29,7 +29,7 @@ spec:
                 bus: virtio
               name: cloudinitdisk
           interfaces:
-            - name: default
+            - name: checkout-service
               binding:
                 name: l2bridge
               model: virtio
@@ -63,7 +63,7 @@ spec:
                   - key: node-role.kubernetes.io/master
                     operator: DoesNotExist
       networks:
-        - name: default
+        - name: checkout-service
           pod: {}
       terminationGracePeriodSeconds: 180
       volumes:

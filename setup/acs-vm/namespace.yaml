@@ -3,8 +3,10 @@ kind: Namespace
 metadata:
   name: rhacs-virt-webserver
   labels:
-    # Accepted only when this namespace is created. Selects ClusterUserDefinedNetwork/webserver.
+    # Accepted only when this namespace is created. Joins ClusterUserDefinedNetwork/checkout-service
+    # with the checkout-web and checkout-api pods.
     k8s.ovn.org/primary-user-defined-network: ""
+    app.kubernetes.io/part-of: checkout-service
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/audit: privileged
     pod-security.kubernetes.io/warn: privileged
