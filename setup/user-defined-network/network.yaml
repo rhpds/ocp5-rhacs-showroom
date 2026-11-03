@@ -1,8 +1,11 @@
-# Roadshow-only primary user-defined network.
+# Roadshow-only primary user-defined networks.
 # Applied by setup/lab-environment.sh. Does not label or select the shared
 # demo-apps namespaces (operations, backend, frontend, medical, payments).
 # The primary-user-defined-network label is only accepted when the namespace
 # is created.
+#
+# roadshow-udn joins roadshow-udn-a and roadshow-udn-b on 192.168.210.0/24.
+# roadshow-udn-demo is a separate network on 192.168.211.0/24.
 apiVersion: k8s.ovn.org/v1
 kind: ClusterUserDefinedNetwork
 metadata:
@@ -36,4 +39,29 @@ metadata:
     app.kubernetes.io/part-of: openshift-security-roadshow
     app.kubernetes.io/component: user-defined-network
     roadshow.openshift.io/user-defined-network: example
+    k8s.ovn.org/primary-user-defined-network: ""
+---
+apiVersion: k8s.ovn.org/v1
+kind: ClusterUserDefinedNetwork
+metadata:
+  name: roadshow-udn-demo
+spec:
+  namespaceSelector:
+    matchLabels:
+      roadshow.openshift.io/user-defined-network: demo
+  network:
+    topology: Layer2
+    layer2:
+      role: Primary
+      subnets:
+        - "192.168.211.0/24"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: roadshow-udn-demo
+  labels:
+    app.kubernetes.io/part-of: openshift-security-roadshow
+    app.kubernetes.io/component: user-defined-network
+    roadshow.openshift.io/user-defined-network: demo
     k8s.ovn.org/primary-user-defined-network: ""

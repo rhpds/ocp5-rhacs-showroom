@@ -1491,29 +1491,36 @@ acs_vm_status() {
   fi
 }
 
-# Roadshow-only primary UDN. Namespaces are created here, with the
+# Roadshow-only primary UDNs. Namespaces are created here, with the
 # primary-user-defined-network label, so this does not relabel demo-apps.
 do_user_defined_network() {
   local net_manifest="${SCRIPT_DIR}/user-defined-network/network.yaml"
   local workload_manifest="${SCRIPT_DIR}/user-defined-network/workloads.yaml"
-  local deadline status
-  echo "Deploying roadshow user-defined network example"
+  local deadline name status missing
+  echo "Deploying roadshow user-defined networks"
   oc apply -f "${net_manifest}"
   deadline=$((SECONDS + 180))
   while true; do
-    status="$(oc get clusteruserdefinednetwork roadshow-udn -o jsonpath='{range .status.conditions[?(@.type=="NetworkCreated")]}{.status}{end}' 2>/dev/null || true)"
-    if [[ "${status}" == "True" ]]; then
+    missing=""
+    for name in roadshow-udn roadshow-udn-demo; do
+      status="$(oc get clusteruserdefinednetwork "${name}" -o jsonpath='{range .status.conditions[?(@.type=="NetworkCreated")]}{.status}{end}' 2>/dev/null || true)"
+      if [[ "${status}" != "True" ]]; then
+        missing="${missing} ${name}=${status:-absent}"
+      fi
+    done
+    if [[ -z "${missing}" ]]; then
       break
     fi
     if (( SECONDS >= deadline )); then
-      echo "Error: ClusterUserDefinedNetwork roadshow-udn did not report NetworkCreated within 180s (status=${status:-absent})." >&2
-      oc get clusteruserdefinednetwork roadshow-udn -o yaml >&2 || true
+      echo "Error: a roadshow ClusterUserDefinedNetwork did not report NetworkCreated within 180s:${missing}." >&2
+      oc get clusteruserdefinednetwork roadshow-udn roadshow-udn-demo -o yaml >&2 || true
       return 1
     fi
     sleep 3
   done
   oc apply -f "${workload_manifest}"
   echo "ClusterUserDefinedNetwork roadshow-udn is ready on 192.168.210.0/24 (namespaces roadshow-udn-a, roadshow-udn-b)."
+  echo "ClusterUserDefinedNetwork roadshow-udn-demo is ready on 192.168.211.0/24 (namespace roadshow-udn-demo)."
 }
 
 # rhel-webserver is the second guest. GitOps keeps rhel9-vm in rhacs-virt.
