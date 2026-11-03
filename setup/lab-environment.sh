@@ -1553,14 +1553,14 @@ do_acs_vm() {
   oc apply -f "${SCRIPT_DIR}/acs-vm/namespace.yaml"
   deadline=$((SECONDS + 180))
   while true; do
-    if oc get network-attachment-definitions.k8s.cni.cncf.io checkout-service -n "${ns}" >/dev/null 2>&1; then
-      echo "Namespace ${ns} joined checkout-service (192.168.210.0/24)."
+    status="$(oc get clusteruserdefinednetwork checkout-service -o jsonpath='{range .status.conditions[?(@.type=="NetworkCreated")]}{.status}{" "}{.message}{end}' 2>/dev/null || true)"
+    if [[ "${status}" == True*"${ns}"* ]]; then
+      echo "Namespace ${ns} joined checkout-service (192.168.210.0/24) with checkout-web and checkout-api."
       break
     fi
     if (( SECONDS >= deadline )); then
-      echo "Error: ${ns} did not join checkout-service within 180s." >&2
+      echo "Error: ${ns} did not join checkout-service within 180s (status=${status:-absent})." >&2
       oc get clusteruserdefinednetwork checkout-service -o yaml >&2 || true
-      oc get network-attachment-definitions.k8s.cni.cncf.io -n "${ns}" >&2 || true
       return 1
     fi
     acs_vm_status "Deploy rhel-webserver (waiting for checkout-service)"
@@ -1616,8 +1616,9 @@ do_acs_vm() {
     status="$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.status.printableStatus}' 2>/dev/null || true)"
     if [[ "${phase}" == "Running" ]]; then
       binding="$(oc -n "${ns}" get "vmi/${vm}" -o jsonpath='{.spec.domain.devices.interfaces[0].binding.name}' 2>/dev/null || true)"
-      if [[ "${binding}" == "l2bridge" ]]; then
-        echo "${vm} is Running in ${ns} on the webserver network (192.168.212.0/24). Cloud-init still registers the guest and starts roxagent."
+      iface="$(oc -n "${ns}" get "vmi/${vm}" -o jsonpath='{.spec.domain.devices.interfaces[0].name}' 2>/dev/null || true)"
+      if [[ "${binding}" == "l2bridge" && "${iface}" == "checkout-service" ]]; then
+        echo "${vm} is Running in ${ns} on checkout-service (192.168.210.0/24) with checkout-web and checkout-api. Cloud-init still registers the guest and starts roxagent."
         return 0
       fi
     fi
