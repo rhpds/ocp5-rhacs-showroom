@@ -1505,7 +1505,7 @@ do_user_defined_network() {
   deadline=$((SECONDS + 180))
   while true; do
     missing=""
-    for name in checkout-service ledger-service webserver; do
+    for name in checkout-service ledger-service; do
       status="$(oc get clusteruserdefinednetwork "${name}" -o jsonpath='{range .status.conditions[?(@.type=="NetworkCreated")]}{.status}{end}' 2>/dev/null || true)"
       if [[ "${status}" != "True" ]]; then
         missing="${missing} ${name}=${status:-absent}"
@@ -1516,7 +1516,7 @@ do_user_defined_network() {
     fi
     if (( SECONDS >= deadline )); then
       echo "Error: a ClusterUserDefinedNetwork did not report NetworkCreated within 180s:${missing}." >&2
-      oc get clusteruserdefinednetwork checkout-service ledger-service webserver -o yaml >&2 || true
+      oc get clusteruserdefinednetwork checkout-service ledger-service -o yaml >&2 || true
       return 1
     fi
     sleep 3
@@ -1524,7 +1524,6 @@ do_user_defined_network() {
   oc apply -f "${workload_manifest}"
   echo "ClusterUserDefinedNetwork checkout-service is ready on 192.168.210.0/24 (namespaces checkout-web, checkout-api)."
   echo "ClusterUserDefinedNetwork ledger-service is ready on 192.168.211.0/24 (namespace ledger)."
-  echo "ClusterUserDefinedNetwork webserver is ready on 192.168.212.0/24 (namespace rhacs-virt-webserver)."
 }
 
 # rhel-webserver is the second guest. GitOps keeps rhel9-vm in rhacs-virt.
@@ -1544,6 +1543,25 @@ do_acs_vm() {
     fi
   fi
   oc apply -f "${SCRIPT_DIR}/acs-vm/namespace.yaml"
+  # The primary label has to be on the namespace before this network is
+  # reconciled. An earlier apply against the unlabeled namespace stays
+  # NetworkCreated=False until that namespace is replaced.
+  oc apply -f "${SCRIPT_DIR}/acs-vm/webserver-network.yaml"
+  deadline=$((SECONDS + 180))
+  while true; do
+    status="$(oc get clusteruserdefinednetwork webserver -o jsonpath='{range .status.conditions[?(@.type=="NetworkCreated")]}{.status}{end}' 2>/dev/null || true)"
+    if [[ "${status}" == "True" ]]; then
+      echo "ClusterUserDefinedNetwork webserver is ready on 192.168.212.0/24 (namespace ${ns})."
+      break
+    fi
+    if (( SECONDS >= deadline )); then
+      echo "Error: ClusterUserDefinedNetwork webserver did not report NetworkCreated within 180s (status=${status:-absent})." >&2
+      oc get clusteruserdefinednetwork webserver -o yaml >&2 || true
+      return 1
+    fi
+    acs_vm_status "Deploy rhel-webserver (waiting for webserver network)"
+    sleep 3
+  done
 
   if oc -n "${ns}" get "vm/${vm}" >/dev/null 2>&1; then
     machine="$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.spec.template.spec.domain.machine.type}' 2>/dev/null || true)"
