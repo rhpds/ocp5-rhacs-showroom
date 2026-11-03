@@ -8,7 +8,9 @@
 # (cosign, oc-mirror, ec, and mvn).
 # Cluster-wide RHACS/Compliance/demo-app deploy is owned by OpenShift GitOps
 # (roadshow-prereqs + roadshow-demo-apps). This script also applies
-# rhel-webserver in rhacs-virt-webserver. GitOps keeps rhel9-vm in rhacs-virt.
+# rhel-webserver in rhacs-virt-webserver and the roadshow-only user-defined
+# network example under setup/user-defined-network/. GitOps keeps rhel9-vm
+# in rhacs-virt. The example does not modify demo-apps namespaces.
 #
 # Quiet by default (progress bar + current step). Use --verbose for full logs.
 #
@@ -296,7 +298,7 @@ load_roadshow_env
 
 # Count top-level lab steps.
 TOTAL=0
-TOTAL=$((TOTAL + 7)) # admin + ACS MCP + quay env + tssc clis + CLI vars + verify API + ACS VM
+TOTAL=$((TOTAL + 8)) # admin + user-defined network + ACS MCP + quay env + tssc clis + CLI vars + verify API + ACS VM
 [[ "${SKIP_RHACS_CONFIGURE}" != true ]] && TOTAL=$((TOTAL + 1))
 [[ "${SKIP_DEMO_APPS}" != true ]] && TOTAL=$((TOTAL + 1)) # clone
 [[ "${SKIP_DEMO_APPS}" != true && "${SKIP_DEMO_APPLY}" != true ]] && TOTAL=$((TOTAL + 1)) # apply
@@ -1489,6 +1491,31 @@ acs_vm_status() {
   fi
 }
 
+# Roadshow-only primary UDN. Namespaces are created here, with the
+# primary-user-defined-network label, so this does not relabel demo-apps.
+do_user_defined_network() {
+  local net_manifest="${SCRIPT_DIR}/user-defined-network/network.yaml"
+  local workload_manifest="${SCRIPT_DIR}/user-defined-network/workloads.yaml"
+  local deadline status
+  echo "Deploying roadshow user-defined network example"
+  oc apply -f "${net_manifest}"
+  deadline=$((SECONDS + 180))
+  while true; do
+    status="$(oc get clusteruserdefinednetwork roadshow-udn -o jsonpath='{range .status.conditions[?(@.type=="NetworkCreated")]}{.status}{end}' 2>/dev/null || true)"
+    if [[ "${status}" == "True" ]]; then
+      break
+    fi
+    if (( SECONDS >= deadline )); then
+      echo "Error: ClusterUserDefinedNetwork roadshow-udn did not report NetworkCreated within 180s (status=${status:-absent})." >&2
+      oc get clusteruserdefinednetwork roadshow-udn -o yaml >&2 || true
+      return 1
+    fi
+    sleep 3
+  done
+  oc apply -f "${workload_manifest}"
+  echo "ClusterUserDefinedNetwork roadshow-udn is ready on 192.168.210.0/24 (namespaces roadshow-udn-a, roadshow-udn-b)."
+}
+
 # rhel-webserver is the second guest. GitOps keeps rhel9-vm in rhacs-virt.
 # The agent binary is still served by roxagent-bin in that namespace.
 do_acs_vm() {
@@ -1560,6 +1587,7 @@ do_acs_vm() {
 }
 
 progress_run "Verify OpenShift access" do_verify_admin
+progress_run "Deploy user-defined network example" do_user_defined_network
 progress_run "Deploy rhel-webserver" do_acs_vm
 progress_run "Register ACS MCP with Lightspeed" lightspeed_ensure_acs_mcp
 progress_run "Read Quay credentials and account token" load_quay_env

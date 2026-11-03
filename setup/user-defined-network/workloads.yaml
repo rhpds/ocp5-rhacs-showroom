@@ -1,0 +1,71 @@
+# Sample pods on the roadshow user-defined network. Applied after
+# ClusterUserDefinedNetwork/roadshow-udn reports NetworkCreated.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udn-example
+  namespace: roadshow-udn-a
+  labels:
+    app: udn-example
+    app.kubernetes.io/part-of: openshift-security-roadshow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: udn-example
+  template:
+    metadata:
+      labels:
+        app: udn-example
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ubi
+          image: registry.access.redhat.com/ubi9/ubi:latest
+          command: ["sleep", "infinity"]
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udn-example
+  namespace: roadshow-udn-b
+  labels:
+    app: udn-example
+    app.kubernetes.io/part-of: openshift-security-roadshow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: udn-example
+  template:
+    metadata:
+      labels:
+        app: udn-example
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ubi
+          image: registry.access.redhat.com/ubi9/ubi:latest
+          command: ["sleep", "infinity"]
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
