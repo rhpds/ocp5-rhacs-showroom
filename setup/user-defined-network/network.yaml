@@ -1,19 +1,21 @@
-# Roadshow-only primary user-defined networks.
+# Primary user-defined networks for the security demo.
 # Applied by setup/lab-environment.sh. Does not label or select the shared
 # demo-apps namespaces (operations, backend, frontend, medical, payments).
 # The primary-user-defined-network label is only accepted when the namespace
 # is created.
 #
-# roadshow-udn joins roadshow-udn-a and roadshow-udn-b on 192.168.210.0/24.
-# roadshow-udn-demo is a separate network on 192.168.211.0/24.
+# checkout-service joins checkout-web and checkout-api on 192.168.210.0/24.
+# ledger-service is a separate network on 192.168.211.0/24.
+# webserver is the primary network for the rhel-webserver virtual machine
+# on 192.168.212.0/24. Persistent IPAM keeps the guest address across restarts.
 apiVersion: k8s.ovn.org/v1
 kind: ClusterUserDefinedNetwork
 metadata:
-  name: roadshow-udn
+  name: checkout-service
 spec:
   namespaceSelector:
     matchLabels:
-      roadshow.openshift.io/user-defined-network: example
+      app.kubernetes.io/part-of: checkout-service
   network:
     topology: Layer2
     layer2:
@@ -24,31 +26,29 @@ spec:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: roadshow-udn-a
+  name: checkout-web
   labels:
-    app.kubernetes.io/part-of: openshift-security-roadshow
-    app.kubernetes.io/component: user-defined-network
-    roadshow.openshift.io/user-defined-network: example
+    app.kubernetes.io/part-of: checkout-service
+    app.kubernetes.io/name: checkout-web
     k8s.ovn.org/primary-user-defined-network: ""
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: roadshow-udn-b
+  name: checkout-api
   labels:
-    app.kubernetes.io/part-of: openshift-security-roadshow
-    app.kubernetes.io/component: user-defined-network
-    roadshow.openshift.io/user-defined-network: example
+    app.kubernetes.io/part-of: checkout-service
+    app.kubernetes.io/name: checkout-api
     k8s.ovn.org/primary-user-defined-network: ""
 ---
 apiVersion: k8s.ovn.org/v1
 kind: ClusterUserDefinedNetwork
 metadata:
-  name: roadshow-udn-demo
+  name: ledger-service
 spec:
   namespaceSelector:
     matchLabels:
-      roadshow.openshift.io/user-defined-network: demo
+      app.kubernetes.io/part-of: ledger-service
   network:
     topology: Layer2
     layer2:
@@ -59,9 +59,27 @@ spec:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: roadshow-udn-demo
+  name: ledger
   labels:
-    app.kubernetes.io/part-of: openshift-security-roadshow
-    app.kubernetes.io/component: user-defined-network
-    roadshow.openshift.io/user-defined-network: demo
+    app.kubernetes.io/part-of: ledger-service
+    app.kubernetes.io/name: ledger
     k8s.ovn.org/primary-user-defined-network: ""
+---
+apiVersion: k8s.ovn.org/v1
+kind: ClusterUserDefinedNetwork
+metadata:
+  name: webserver
+spec:
+  namespaceSelector:
+    matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: In
+        values: ["rhacs-virt-webserver"]
+  network:
+    topology: Layer2
+    layer2:
+      role: Primary
+      ipam:
+        lifecycle: Persistent
+      subnets:
+        - "192.168.212.0/24"

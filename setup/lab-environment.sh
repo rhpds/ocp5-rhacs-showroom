@@ -8,9 +8,11 @@
 # (cosign, oc-mirror, ec, and mvn).
 # Cluster-wide RHACS/Compliance/demo-app deploy is owned by OpenShift GitOps
 # (roadshow-prereqs + roadshow-demo-apps). This script also applies
-# rhel-webserver in rhacs-virt-webserver and the roadshow-only user-defined
-# network example under setup/user-defined-network/. GitOps keeps rhel9-vm
-# in rhacs-virt. The example does not modify demo-apps namespaces.
+# rhel-webserver in rhacs-virt-webserver and the checkout-service,
+# ledger-service, and webserver user-defined networks under
+# setup/user-defined-network/. rhel-webserver uses the webserver network.
+# GitOps keeps rhel9-vm in rhacs-virt. Those networks do not modify
+# demo-apps namespaces.
 #
 # Quiet by default (progress bar + current step). Use --verbose for full logs.
 #
@@ -1491,18 +1493,19 @@ acs_vm_status() {
   fi
 }
 
-# Roadshow-only primary UDNs. Namespaces are created here, with the
-# primary-user-defined-network label, so this does not relabel demo-apps.
+# Primary UDNs for the checkout and ledger demos. Namespaces are created
+# here, with the primary-user-defined-network label, so this does not
+# relabel demo-apps.
 do_user_defined_network() {
   local net_manifest="${SCRIPT_DIR}/user-defined-network/network.yaml"
   local workload_manifest="${SCRIPT_DIR}/user-defined-network/workloads.yaml"
   local deadline name status missing
-  echo "Deploying roadshow user-defined networks"
+  echo "Deploying checkout-service and ledger-service networks"
   oc apply -f "${net_manifest}"
   deadline=$((SECONDS + 180))
   while true; do
     missing=""
-    for name in roadshow-udn roadshow-udn-demo; do
+    for name in checkout-service ledger-service webserver; do
       status="$(oc get clusteruserdefinednetwork "${name}" -o jsonpath='{range .status.conditions[?(@.type=="NetworkCreated")]}{.status}{end}' 2>/dev/null || true)"
       if [[ "${status}" != "True" ]]; then
         missing="${missing} ${name}=${status:-absent}"
@@ -1512,30 +1515,41 @@ do_user_defined_network() {
       break
     fi
     if (( SECONDS >= deadline )); then
-      echo "Error: a roadshow ClusterUserDefinedNetwork did not report NetworkCreated within 180s:${missing}." >&2
-      oc get clusteruserdefinednetwork roadshow-udn roadshow-udn-demo -o yaml >&2 || true
+      echo "Error: a ClusterUserDefinedNetwork did not report NetworkCreated within 180s:${missing}." >&2
+      oc get clusteruserdefinednetwork checkout-service ledger-service webserver -o yaml >&2 || true
       return 1
     fi
     sleep 3
   done
   oc apply -f "${workload_manifest}"
-  echo "ClusterUserDefinedNetwork roadshow-udn is ready on 192.168.210.0/24 (namespaces roadshow-udn-a, roadshow-udn-b)."
-  echo "ClusterUserDefinedNetwork roadshow-udn-demo is ready on 192.168.211.0/24 (namespace roadshow-udn-demo)."
+  echo "ClusterUserDefinedNetwork checkout-service is ready on 192.168.210.0/24 (namespaces checkout-web, checkout-api)."
+  echo "ClusterUserDefinedNetwork ledger-service is ready on 192.168.211.0/24 (namespace ledger)."
+  echo "ClusterUserDefinedNetwork webserver is ready on 192.168.212.0/24 (namespace rhacs-virt-webserver)."
 }
 
 # rhel-webserver is the second guest. GitOps keeps rhel9-vm in rhacs-virt.
 # The agent binary is still served by roxagent-bin in that namespace.
+# The guest uses the webserver primary UDN. That label can only be set
+# when rhacs-virt-webserver is created, so an older namespace is replaced.
 do_acs_vm() {
   local ns=rhacs-virt-webserver
   local vm=rhel-webserver
-  local deadline phase status machine
+  local deadline phase status machine binding udn_state
   acs_vm_status "Deploy rhel-webserver (namespace ${ns})"
+  if oc get ns "${ns}" >/dev/null 2>&1; then
+    udn_state="$(oc get ns "${ns}" -o json | jq -r 'if .metadata.labels["k8s.ovn.org/primary-user-defined-network"] == null then "missing" else "present" end')"
+    if [[ "${udn_state}" == "missing" ]]; then
+      acs_vm_status "Deploy rhel-webserver (recreating ${ns} on the webserver network)"
+      oc delete ns "${ns}" --wait=true --timeout=180s
+    fi
+  fi
   oc apply -f "${SCRIPT_DIR}/acs-vm/namespace.yaml"
 
   if oc -n "${ns}" get "vm/${vm}" >/dev/null 2>&1; then
     machine="$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.spec.template.spec.domain.machine.type}' 2>/dev/null || true)"
     secure="$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.spec.template.spec.domain.firmware.bootloader.efi.secureBoot}' 2>/dev/null || true)"
-    if [[ "${machine}" != "pc-q35-rhel9.6.0" || "${secure}" != "false" || "$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || true)" != "" ]]; then
+    binding="$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.spec.template.spec.domain.devices.interfaces[0].binding.name}' 2>/dev/null || true)"
+    if [[ "${machine}" != "pc-q35-rhel9.6.0" || "${secure}" != "false" || "${binding}" != "l2bridge" || "$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || true)" != "" ]]; then
       acs_vm_status "Deploy rhel-webserver (removing previous guest)"
       oc -n "${ns}" delete "vm/${vm}" --wait=false --ignore-not-found || true
       deadline=$((SECONDS + 120))
@@ -1560,7 +1574,11 @@ do_acs_vm() {
   # keeps kernel lockdown until it is replaced.
   if oc -n "${ns}" get "vmi/${vm}" >/dev/null 2>&1; then
     secure="$(oc -n "${ns}" get "vmi/${vm}" -o jsonpath='{.spec.domain.firmware.bootloader.efi.secureBoot}' 2>/dev/null || true)"
-    if [[ "${secure}" != "false" ]]; then
+    binding="$(oc -n "${ns}" get "vmi/${vm}" -o jsonpath='{.spec.domain.devices.interfaces[0].binding.name}' 2>/dev/null || true)"
+    if [[ "${binding}" != "l2bridge" ]]; then
+      acs_vm_status "Deploy rhel-webserver (restarting guest on the webserver network)"
+      oc -n "${ns}" delete "vmi/${vm}" --wait=false
+    elif [[ "${secure}" != "false" ]]; then
       acs_vm_status "Deploy rhel-webserver (restarting guest without Secure Boot)"
       oc -n "${ns}" delete "vmi/${vm}" --wait=false
     fi
@@ -1571,8 +1589,11 @@ do_acs_vm() {
     phase="$(oc -n "${ns}" get "vmi/${vm}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
     status="$(oc -n "${ns}" get "vm/${vm}" -o jsonpath='{.status.printableStatus}' 2>/dev/null || true)"
     if [[ "${phase}" == "Running" ]]; then
-      echo "${vm} is Running in ${ns}. Cloud-init still registers the guest and starts roxagent."
-      return 0
+      binding="$(oc -n "${ns}" get "vmi/${vm}" -o jsonpath='{.spec.domain.devices.interfaces[0].binding.name}' 2>/dev/null || true)"
+      if [[ "${binding}" == "l2bridge" ]]; then
+        echo "${vm} is Running in ${ns} on the webserver network (192.168.212.0/24). Cloud-init still registers the guest and starts roxagent."
+        return 0
+      fi
     fi
     case "${status}" in
       Error|CrashLoop|ErrImagePull|ImagePullBackOff|DataVolumeError)
@@ -1594,7 +1615,7 @@ do_acs_vm() {
 }
 
 progress_run "Verify OpenShift access" do_verify_admin
-progress_run "Deploy user-defined network example" do_user_defined_network
+progress_run "Deploy checkout and ledger networks" do_user_defined_network
 progress_run "Deploy rhel-webserver" do_acs_vm
 progress_run "Register ACS MCP with Lightspeed" lightspeed_ensure_acs_mcp
 progress_run "Read Quay credentials and account token" load_quay_env

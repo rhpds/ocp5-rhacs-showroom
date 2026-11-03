@@ -29,9 +29,10 @@ spec:
                 bus: virtio
               name: cloudinitdisk
           interfaces:
-            - masquerade: {}
+            - name: default
+              binding:
+                name: l2bridge
               model: virtio
-              name: default
           rng: {}
         features:
           acpi: {}

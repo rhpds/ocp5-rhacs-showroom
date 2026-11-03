@@ -1,29 +1,32 @@
-# Sample pods on the roadshow user-defined networks. Applied after both
+# Sample pods on the checkout and ledger networks. Applied after both
 # ClusterUserDefinedNetworks report NetworkCreated.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: udn-example
-  namespace: roadshow-udn-a
+  name: web
+  namespace: checkout-web
   labels:
-    app: udn-example
-    app.kubernetes.io/part-of: openshift-security-roadshow
+    app: web
+    app.kubernetes.io/part-of: checkout-service
+    app.kubernetes.io/name: checkout-web
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: udn-example
+      app: web
   template:
     metadata:
       labels:
-        app: udn-example
+        app: web
+        app.kubernetes.io/part-of: checkout-service
+        app.kubernetes.io/name: checkout-web
     spec:
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: ubi
+        - name: web
           image: registry.access.redhat.com/ubi9/ubi:latest
           command: ["sleep", "infinity"]
           securityContext:
@@ -38,27 +41,30 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: udn-example
-  namespace: roadshow-udn-demo
+  name: api
+  namespace: checkout-api
   labels:
-    app: udn-example
-    app.kubernetes.io/part-of: openshift-security-roadshow
+    app: api
+    app.kubernetes.io/part-of: checkout-service
+    app.kubernetes.io/name: checkout-api
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: udn-example
+      app: api
   template:
     metadata:
       labels:
-        app: udn-example
+        app: api
+        app.kubernetes.io/part-of: checkout-service
+        app.kubernetes.io/name: checkout-api
     spec:
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: ubi
+        - name: api
           image: registry.access.redhat.com/ubi9/ubi:latest
           command: ["sleep", "infinity"]
           securityContext:
@@ -73,27 +79,30 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: udn-example
-  namespace: roadshow-udn-b
+  name: ledger
+  namespace: ledger
   labels:
-    app: udn-example
-    app.kubernetes.io/part-of: openshift-security-roadshow
+    app: ledger
+    app.kubernetes.io/part-of: ledger-service
+    app.kubernetes.io/name: ledger
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: udn-example
+      app: ledger
   template:
     metadata:
       labels:
-        app: udn-example
+        app: ledger
+        app.kubernetes.io/part-of: ledger-service
+        app.kubernetes.io/name: ledger
     spec:
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: ubi
+        - name: ledger
           image: registry.access.redhat.com/ubi9/ubi:latest
           command: ["sleep", "infinity"]
           securityContext:

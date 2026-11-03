@@ -3,6 +3,8 @@ kind: Namespace
 metadata:
   name: rhacs-virt-webserver
   labels:
+    # Accepted only when this namespace is created. Selects ClusterUserDefinedNetwork/webserver.
+    k8s.ovn.org/primary-user-defined-network: ""
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/audit: privileged
     pod-security.kubernetes.io/warn: privileged
