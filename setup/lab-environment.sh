@@ -1589,14 +1589,16 @@ do_acs_vm() {
   oc apply -f "${SCRIPT_DIR}/acs-vm/rhel-webserver-cloudinit-secret.yaml"
   oc apply -f "${SCRIPT_DIR}/acs-vm/rhel-webserver-vm.yaml"
   # Firmware is fixed at guest start. A VMI that booted with Secure Boot
-  # keeps kernel lockdown until it is replaced.
+  # keeps kernel lockdown until it is replaced. Only restart when Secure Boot
+  # is explicitly on. An empty value is the new guest still writing its spec,
+  # and deleting that VMI is what virt-controller reports as CrashLoopBackOff.
   if oc -n "${ns}" get "vmi/${vm}" >/dev/null 2>&1; then
     secure="$(oc -n "${ns}" get "vmi/${vm}" -o jsonpath='{.spec.domain.firmware.bootloader.efi.secureBoot}' 2>/dev/null || true)"
     binding="$(oc -n "${ns}" get "vmi/${vm}" -o jsonpath='{.spec.domain.devices.interfaces[0].binding.name}' 2>/dev/null || true)"
-    if [[ "${binding}" != "l2bridge" ]]; then
+    if [[ -n "${binding}" && "${binding}" != "l2bridge" ]]; then
       acs_vm_status "Deploy rhel-webserver (restarting guest on the webserver network)"
       oc -n "${ns}" delete "vmi/${vm}" --wait=false
-    elif [[ "${secure}" != "false" ]]; then
+    elif [[ "${secure}" == "true" ]]; then
       acs_vm_status "Deploy rhel-webserver (restarting guest without Secure Boot)"
       oc -n "${ns}" delete "vmi/${vm}" --wait=false
     fi
@@ -1614,10 +1616,16 @@ do_acs_vm() {
       fi
     fi
     case "${status}" in
-      Error|CrashLoop|ErrImagePull|ImagePullBackOff|DataVolumeError)
+      Error|CrashLoop|CrashLoopBackOff|ErrImagePull|ImagePullBackOff|DataVolumeError)
         echo "Error: ${vm} is ${status} (VMI phase=${phase:-absent})." >&2
         oc -n "${ns}" describe "vm/${vm}" >&2 || true
         oc -n "${ns}" describe "vmi/${vm}" >&2 || true
+        oc -n "${ns}" get events --sort-by='.lastTimestamp' >&2 || true
+        oc -n "${ns}" get pods -l "kubevirt.io/domain=${vm}" -o name 2>/dev/null | while read -r pod; do
+          echo "----- logs ${pod} -----" >&2
+          oc -n "${ns}" logs "${pod}" --all-containers --tail=60 >&2 || true
+          oc -n "${ns}" logs "${pod}" --all-containers --tail=60 --previous >&2 || true
+        done
         return 1
         ;;
     esac

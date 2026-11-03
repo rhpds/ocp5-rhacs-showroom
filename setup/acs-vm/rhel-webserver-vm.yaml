@@ -40,7 +40,11 @@ spec:
             enabled: true
         firmware:
           bootloader:
-            efi: {}
+            # EFI defaults to Secure Boot. The setup script treats that as a
+            # guest that must be replaced, and virt-controller records the
+            # delete as CrashLoopBackOff. roxagent also needs Secure Boot off.
+            efi:
+              secureBoot: false
         machine:
           type: pc-q35-rhel9.6.0
         memory:
