@@ -119,6 +119,20 @@ python3 main.py --csv bastions.csv
 python3 main.py --csv bastions.csv --modules 101-01,101-02,00
 ----
 
+== Update running environments
+
+From an RHDP SSH export (`guid,hostname,port,username,password,ssh_command`), refresh the Showroom guide or re-run bastion setup on every environment. See `updates/README.md`. Do not commit the credential CSV.
+
+[source,bash]
+----
+cd updates
+python3 -m pip install -r requirements.txt
+python3 refresh_showroom.py --csv /path/to/ssh_access.csv
+python3 configure_environments.py --csv /path/to/ssh_access.csv
+----
+
+`refresh_showroom.py` restarts the Showroom deployment so its init container reclones the configured git ref. `configure_environments.py` fast-forwards `~/ocp5-rhacs-showroom` on each bastion and runs `setup/lab-environment.sh`, then reports whether that environment is up to date and configured.
+
 == Optional cluster theming
 
 To brand the console as ACME Financial Services, apply console customization from the upstream workshop:

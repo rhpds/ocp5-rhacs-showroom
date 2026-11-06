@@ -7,10 +7,13 @@
 # Upstream alignment: Roadshow-ZTWIM scripts/00-install-ztwim-operator.sh
 set -euo pipefail
 
-DEFAULT_OPERATOR_NAMESPACE="openshift-zero-trust-workload-identity-manager"
+# Operators cannot be installed in openshift-* or default. The productized
+# package name is openshift-zero-trust-workload-identity-manager.
+DEFAULT_OPERATOR_NAMESPACE="zero-trust-workload-identity-manager"
+UNSUPPORTED_OPERATOR_NAMESPACE="openshift-zero-trust-workload-identity-manager"
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-}"
 SUBSCRIPTION_NAME="${ZTWIM_SUBSCRIPTION_NAME:-openshift-zero-trust-workload-identity-manager}"
-PACKAGE_NAME="${ZTWIM_PACKAGE:-zero-trust-workload-identity-manager}"
+PACKAGE_NAME="${ZTWIM_PACKAGE:-openshift-zero-trust-workload-identity-manager}"
 CSI_DRIVER_COMPONENT="spiffe-csi-driver"
 INSTALL_MODE="${1:-setup}"
 
@@ -51,7 +54,7 @@ detect_operator_namespace() {
   fi
 
   local ns
-  for ns in "${DEFAULT_OPERATOR_NAMESPACE}" zero-trust-workload-identity-manager; do
+  for ns in "${DEFAULT_OPERATOR_NAMESPACE}"; do
     if namespace_has_operator_artifacts "${ns}"; then
       OPERATOR_NAMESPACE="${ns}"
       log "Operator namespace: ${OPERATOR_NAMESPACE} (detected)"
@@ -66,7 +69,7 @@ detect_operator_namespace() {
 operator_csv_name() {
   oc get csv -n "${OPERATOR_NAMESPACE}" \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null \
-    | grep -E '^zero-trust-workload-identity-manager\.' | head -1
+    | grep -E '^(openshift-)?zero-trust-workload-identity-manager\.' | head -1
 }
 
 operator_csv_phase() {
@@ -273,20 +276,30 @@ print_platform_status() {
   oc get csidriver csi.spiffe.io 2>/dev/null || true
 }
 
+remove_unsupported_operator_install() {
+  if ! oc get namespace "${UNSUPPORTED_OPERATOR_NAMESPACE}" >/dev/null 2>&1; then
+    return 0
+  fi
+  log "Removing operator install from unsupported namespace ${UNSUPPORTED_OPERATOR_NAMESPACE}..."
+  oc delete subscription "${SUBSCRIPTION_NAME}" -n "${UNSUPPORTED_OPERATOR_NAMESPACE}" --ignore-not-found --timeout=120s >/dev/null 2>&1 || true
+  oc delete operatorgroup zero-trust-workload-identity-manager -n "${UNSUPPORTED_OPERATOR_NAMESPACE}" --ignore-not-found --timeout=120s >/dev/null 2>&1 || true
+  oc delete csv -n "${UNSUPPORTED_OPERATOR_NAMESPACE}" -l "operators.coreos.com/${PACKAGE_NAME}.${UNSUPPORTED_OPERATOR_NAMESPACE}" --ignore-not-found --timeout=120s >/dev/null 2>&1 || true
+}
+
 ensure_operator_subscription() {
+  remove_unsupported_operator_install
   oc create namespace "${OPERATOR_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
-  if ! oc get operatorgroup zero-trust-workload-identity-manager -n "${OPERATOR_NAMESPACE}" >/dev/null 2>&1; then
+  if ! oc get operatorgroup "${SUBSCRIPTION_NAME}" -n "${OPERATOR_NAMESPACE}" >/dev/null 2>&1; then
     log "Creating OperatorGroup..."
     oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: zero-trust-workload-identity-manager
+  name: ${SUBSCRIPTION_NAME}
   namespace: ${OPERATOR_NAMESPACE}
 spec:
-  targetNamespaces:
-  - ${OPERATOR_NAMESPACE}
+  upgradeStrategy: Default
 EOF
   fi
 
@@ -479,6 +492,49 @@ wait_for_workloads() {
   done
 }
 
+publish_node_kubelet_dns() {
+  # The SPIRE agent dials https://<node-name>:10250. These node names are not
+  # in cluster DNS, so workload attestation fails and spiffe-helper never exits.
+  oc get namespace "${OPERATOR_NAMESPACE}" >/dev/null 2>&1 || return 0
+
+  local name ip
+  while read -r name ip; do
+    [[ -n "${name}" && -n "${ip}" ]] || continue
+    oc apply -f - >/dev/null <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${name}
+  namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    app.kubernetes.io/part-of: zero-trust-workload-identity-manager
+    app.kubernetes.io/component: kubelet-dns
+spec:
+  clusterIP: None
+  ports:
+    - name: kubelet
+      port: 10250
+      targetPort: 10250
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: ${name}
+  namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    app.kubernetes.io/part-of: zero-trust-workload-identity-manager
+    app.kubernetes.io/component: kubelet-dns
+subsets:
+  - addresses:
+      - ip: ${ip}
+    ports:
+      - name: kubelet
+        port: 10250
+EOF
+  done < <(oc get nodes -o go-template='{{range .items}}{{.metadata.name}} {{range .status.addresses}}{{if eq .type "InternalIP"}}{{.address}}{{end}}{{end}}{{"\n"}}{{end}}')
+  log "Published kubelet DNS names in ${OPERATOR_NAMESPACE}"
+}
+
 ensure_lab_platform() {
   if ! operator_usable; then
     log "Operator not ready — installing or waiting for existing subscription..."
@@ -499,6 +555,8 @@ ensure_lab_platform() {
   else
     log "SPIRE workloads already ready — skipping wait"
   fi
+
+  publish_node_kubelet_dns
 }
 
 setup_platform() {
@@ -506,6 +564,7 @@ setup_platform() {
   detect_cluster_config
   detect_operator_namespace
   survey_platform
+  publish_node_kubelet_dns
 
   if check_platform_ready; then
     log "ZTWIM platform is ready for the PostgreSQL SPIFFE lab."
@@ -550,7 +609,7 @@ Usage: $0 [setup|check]
 
 Environment:
   OPERATOR_NAMESPACE       Operator namespace (auto-detected when unset)
-  ZTWIM_PACKAGE            OLM package name (default: zero-trust-workload-identity-manager)
+  ZTWIM_PACKAGE            OLM package name (default: openshift-zero-trust-workload-identity-manager)
   ZTWIM_SUBSCRIPTION_NAME  Subscription name (default: openshift-zero-trust-workload-identity-manager)
 EOF
 }

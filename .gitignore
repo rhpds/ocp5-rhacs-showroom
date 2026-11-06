@@ -60,3 +60,9 @@ package-lock.json
 gameify/results.log
 gameify/bastion_output_local.log
 gameify/.venv/
+
+# Instructor bastion credentials and update logs
+updates/bastions.csv
+updates/ssh_access.csv
+updates/logs/
+updates/.venv/

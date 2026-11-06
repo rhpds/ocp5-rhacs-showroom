@@ -146,6 +146,14 @@ spec:
     spec:
       restartPolicy: Always
       serviceAccountName: postgresql-spiffe
+      # This cluster's control plane is schedulable. Keep the database on a worker.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
       schedulerName: default-scheduler
       terminationGracePeriodSeconds: 30
       securityContext:

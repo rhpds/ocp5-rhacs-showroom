@@ -81,6 +81,13 @@ spec:
     spec:
       restartPolicy: Always
       serviceAccountName: postgresql-spiffe-client
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
       schedulerName: default-scheduler
       terminationGracePeriodSeconds: 30
       securityContext:
