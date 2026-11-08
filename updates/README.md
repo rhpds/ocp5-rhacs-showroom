@@ -30,7 +30,7 @@ See [bastions.example.csv](bastions.example.csv).
 
 ## Refresh the lab guide
 
-Showroom clones the guide in an init container (`git-cloner`) every time the pod starts. Restarting the deployment reclones the git ref already configured on that cluster. It does not change the ref. A catalog pin such as `security-roadshow-ocp5-cnv-1.0.2` still tracks that tag.
+Showroom clones the guide in an init container (`git-cloner`) every time the pod starts. The catalog stores a pinned `GIT_REPO_REF`. This script changes the cloner so each rebuild checks out `main` and then builds the site. The catalog pin is left in place and is not what the cloner checks out.
 
 Wetty runs in the same pod, so open Showroom terminals drop until the new pod is Ready.
 
@@ -46,7 +46,7 @@ python3 refresh_showroom.py -H ssh.example.com --port 32194 --user lab-user -P '
 
 Useful flags: `--workers` (default 5), `--namespace`, `--deployment`, `--timeout` (default 420 seconds).
 
-Each host prints the namespace, deployment, pod Ready state, and `GIT_REPO_REF`. The run ends with `N/M refreshed`.
+Each host prints the namespace, deployment, pod Ready state, and `GIT_REF`. The run ends with `N/M refreshed`.
 
 ## Re-run bastion setup
 

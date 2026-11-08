@@ -26,9 +26,10 @@ DEFAULT_RESULTS = SCRIPT_DIR / "results.log"
 DEFAULT_LOG_DIR = SCRIPT_DIR / "logs"
 ROLLOUT_TIMEOUT = "300s"
 
-# The catalog deploys showroom-single-pod. git-cloner runs on every start,
-# so a rollout restart pulls GIT_REPO_REF again. On these clusters the
-# namespace is showroom-<guid>-1 (also accept showroom-<guid> and other suffixes).
+# The catalog deploys showroom-single-pod. git-cloner checks out GIT_REPO_REF,
+# which the catalog pins to one tag. This script checks out main instead, so
+# each rebuild publishes the current lab guide. On these clusters the
+# namespace is showroom-<guid>-1.
 REFRESH_SCRIPT = r"""
 set -u
 GUID="${1:-}"
@@ -123,16 +124,43 @@ else
   fi
 fi
 
+# Check out main at pod start, then run the image entrypoint.
+# GIT_REPO_REF in the deployment stays as the catalog pin; this command overrides it.
+latest_tag_patch="$(mktemp)"
+cat > "${latest_tag_patch}" << 'EOF'
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: git-cloner
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              echo "Checking out ref: main"
+              export GIT_REPO_REF="main"
+              exec /entrypoint.sh
+EOF
+
 fail=0
 for target in "${TARGETS[@]}"; do
   ns="${target%% *}"
   deploy="${target##* }"
   echo "NAMESPACE=${ns}"
   echo "DEPLOYMENT=${deploy}"
-  if ! oc -n "$ns" rollout restart "deploy/${deploy}"; then
-    echo "ERROR: rollout restart failed for ${ns}/${deploy}"
+  before_gen="$(oc -n "$ns" get "deploy/${deploy}" -o jsonpath='{.metadata.generation}')"
+  if ! oc -n "$ns" patch "deploy/${deploy}" --type=strategic --patch "$(cat "${latest_tag_patch}")"; then
+    echo "ERROR: failed to set main checkout on ${ns}/${deploy}"
     fail=1
     continue
+  fi
+  after_gen="$(oc -n "$ns" get "deploy/${deploy}" -o jsonpath='{.metadata.generation}')"
+  if [[ "${before_gen}" == "${after_gen}" ]]; then
+    if ! oc -n "$ns" rollout restart "deploy/${deploy}"; then
+      echo "ERROR: rollout restart failed for ${ns}/${deploy}"
+      fail=1
+      continue
+    fi
   fi
   if ! oc -n "$ns" rollout status "deploy/${deploy}" --timeout=__ROLLOUT_TIMEOUT__; then
     echo "ERROR: rollout did not become ready for ${ns}/${deploy}"
@@ -148,9 +176,12 @@ for target in "${TARGETS[@]}"; do
       -o jsonpath='{range .items[*]}POD={.metadata.name} ready={.status.conditions[?(@.type=="Ready")].status} phase={.status.phase}{"\n"}{end}' \
       2>/dev/null || true
   fi
-  ref="$(oc -n "$ns" get "deploy/${deploy}" -o jsonpath='{range .spec.template.spec.initContainers[?(@.name=="git-cloner")].env[?(@.name=="GIT_REPO_REF")]}{.value}{end}' 2>/dev/null || true)"
-  echo "GIT_REPO_REF=${ref:-(not set)}"
+  latest="$(oc -n "$ns" logs "deploy/${deploy}" -c git-cloner 2>/dev/null | sed -n 's/^Checking out ref: //p' | tail -n 1)"
+  echo "GIT_REF=${latest:-unknown}"
+  page="$(oc -n "$ns" exec "deploy/${deploy}" -c content -- grep -o 'cd ~/[^<]*setup/ztwim-lab' /showroom/www/modules/301-08-zero-trust-workload-identity.html 2>/dev/null | head -n 1 || true)"
+  echo "ZTWIM_COMMAND=${page:-not found}"
 done
+rm -f "${latest_tag_patch}"
 
 if [[ "$fail" -ne 0 ]]; then
   echo "STATUS: failed"
@@ -176,7 +207,7 @@ def refresh_one(bastion: Bastion, namespace: str, deployment: str, timeout: int)
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Restart Showroom on each bastion so the lab guide reclones its configured git ref."
+        description="Rebuild each Showroom from the main branch of the lab guide."
     )
     add_connection_args(parser)
     parser.add_argument("--namespace", default="", help="Override the showroom namespace")
