@@ -40,13 +40,13 @@ Usage: rhacs-configure.sh [options]
 Phases:
   1) Sequential: API token, RHACS verify/upgrade
   2) Parallel:   collector networks + Compliance Operator install
-  3) Parallel:   settings, CO scan schedule+run, 4.11, monitoring, MCP (+ demo-apps check)
+  3) Parallel:   settings, CO scan schedule+run, 5.0, monitoring, MCP (+ demo-apps check)
   4) Sequential: Lightspeed helpers (after MCP)
 
 Options:
   --skip-upgrade       Skip RHACS operator channel upgrade in 01
   --skip-compliance    Skip Compliance Operator install + scan schedule/trigger (03,06,07)
-  --skip-411           Skip 4.11 TP flags / Attach-to-Pod policy (08)
+  --skip-411           Skip 5.0 Central/SecuredCluster feature step (08). Lightspeed risk enrichment still runs.
   --skip-monitoring    Skip setup/monitoring
   --skip-mcp           Skip setup/mcp-server
   --skip-lightspeed    Skip setup/lightspeed LLM helpers
@@ -94,6 +94,7 @@ PHASE3=1 # demo apps check always
 PHASE3=$((PHASE3 + 1)) # settings always
 [[ "${SKIP_COMPLIANCE}" != true ]] && PHASE3=$((PHASE3 + 1)) # 06 then 07
 [[ "${SKIP_411}" != true ]] && PHASE3=$((PHASE3 + 1))
+[[ "${SKIP_411}" == true ]] && TOTAL=$((TOTAL + 1)) # risk enrichment still runs
 [[ "${SKIP_MONITORING}" != true ]] && PHASE3=$((PHASE3 + 1))
 [[ "${SKIP_MCP}" != true ]] && PHASE3=$((PHASE3 + 1))
 TOTAL=$((TOTAL + PHASE3))
@@ -161,7 +162,7 @@ if [[ "${SKIP_COMPLIANCE}" != true ]]; then
   phase3_args+=("Compliance scans" "bash '${RHACS_DIR}/06-setup-co-scan-schedule.sh' && bash '${RHACS_DIR}/07-trigger-compliance-scan.sh'")
 fi
 if [[ "${SKIP_411}" != true ]]; then
-  phase3_args+=("RHACS 4.11 features" "bash '${RHACS_DIR}/08-configure-rhacs-411-features.sh'")
+  phase3_args+=("RHACS 5.0 features" "bash '${RHACS_DIR}/08-configure-rhacs-411-features.sh'")
 fi
 if [[ "${SKIP_MONITORING}" != true ]]; then
   phase3_args+=("Monitoring stack" "bash '${SCRIPT_DIR}/monitoring/install.sh'")
@@ -173,6 +174,13 @@ if [[ "${SKIP_MCP}" != true ]]; then
   phase3_args+=("StackRox MCP" "bash '${SCRIPT_DIR}/mcp-server/install.sh'")
 fi
 progress_run_parallel "${phase3_args[@]}"
+
+# Risk enrichment is required even when the rest of the 5.0 feature step is skipped.
+# The full 08 script enables it itself, so this runs only on the skip path.
+if [[ "${SKIP_411}" == true ]]; then
+  progress_run "Lightspeed risk enrichment" \
+    bash "${RHACS_DIR}/08-configure-rhacs-411-features.sh" --risk-enrichment-only
+fi
 
 # ---- Phase 4: Lightspeed after MCP ----
 if [[ "${SKIP_LIGHTSPEED}" != true ]]; then

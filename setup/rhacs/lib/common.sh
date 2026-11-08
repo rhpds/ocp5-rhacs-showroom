@@ -65,19 +65,24 @@ require_oc() {
   fi
 }
 
-# GitOps installs Central in rhacs-operator; older labs used stackrox.
+# GitOps installs Central in acs. Older labs used rhacs-operator or stackrox.
 detect_rhacs_namespace() {
   local ns
   if [[ -n "${RHACS_NAMESPACE:-}" ]] && oc -n "${RHACS_NAMESPACE}" get deploy central >/dev/null 2>&1; then
     printf '%s' "${RHACS_NAMESPACE}"
     return 0
   fi
-  for ns in rhacs-operator stackrox; do
+  for ns in acs rhacs-operator stackrox; do
     if oc -n "${ns}" get deploy central >/dev/null 2>&1; then
       printf '%s' "${ns}"
       return 0
     fi
   done
+  ns="$(oc get central -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)"
+  if [[ -n "${ns}" ]]; then
+    printf '%s' "${ns}"
+    return 0
+  fi
   return 1
 }
 

@@ -221,6 +221,13 @@ update_rhacs_config() {
             "cve_severity": { "labels": ["Cluster","CVE","IsFixable","Severity"] },
             "node_severity": { "labels": ["Cluster","Node","IsFixable","Severity"] }
           }
+        },
+        "administrativeEvents": {
+          "gatheringPeriodMinutes": 1,
+          "descriptors": {
+            "domain_level": { "labels": ["Domain","Level","Type"] },
+            "resource_level": { "labels": ["Domain","Level","Type","ResourceType","ResourceName"] }
+          }
         }
       }
     },
@@ -242,14 +249,34 @@ update_rhacs_config() {
 EOF
 )
     
-    # Apply configuration
+    # Start from the live config so 5.0 fields this payload does not know about are kept,
+    # then overlay the roadshow settings and turn on administration-event metrics.
     print_info "Sending configuration to ${api_base}/config..."
-    
-    local response=$(curl -k -s -w "\n%{http_code}" \
+
+    local current_config merged_payload response
+    current_config=$(curl -k -s --connect-timeout 15 --max-time 60 \
+        -H "Authorization: Bearer ${token}" \
+        -H "Content-Type: application/json" \
+        "${api_base}/config" 2>/dev/null || echo "")
+    if echo "${current_config}" | jq -e '.config.privateConfig' >/dev/null 2>&1; then
+        merged_payload=$(jq -n --argjson current "${current_config}" --argjson desired "${config_payload}" '
+            $current
+            | .config.publicConfig = ((.config.publicConfig // {}) * $desired.config.publicConfig)
+            | .config.privateConfig = ((.config.privateConfig // {}) * $desired.config.privateConfig)
+            | .config.privateConfig.metrics = ((.config.privateConfig.metrics // {}) * $desired.config.privateConfig.metrics)
+            | .config.privateConfig.metrics.administrativeEvents = $desired.config.privateConfig.metrics.administrativeEvents
+            | .config.platformComponentConfig = $desired.config.platformComponentConfig
+        ')
+    else
+        print_warn "Could not read the current RHACS config; sending the roadshow payload"
+        merged_payload="${config_payload}"
+    fi
+
+    response=$(curl -k -s -w "\n%{http_code}" \
         -X PUT \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/json" \
-        -d "${config_payload}" \
+        -d "${merged_payload}" \
         "${api_base}/config" 2>&1)
     
     local http_code=$(echo "${response}" | tail -n1)

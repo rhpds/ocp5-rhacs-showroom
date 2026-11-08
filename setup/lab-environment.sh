@@ -489,7 +489,7 @@ do_wait_central() {
       return 0
     fi
   done
-  echo "Error: RHACS Central route not found (tried namespaces rhacs-operator, stackrox)." >&2
+  echo "Error: RHACS Central route not found (tried acs, rhacs-operator, and stackrox)." >&2
   echo "Ensure the GitOps rhacs-operator Application has synced." >&2
   return 1
 }
@@ -508,7 +508,7 @@ map_quay_route_for_central() {
     return 1
   fi
   ns="$(detect_rhacs_namespace)" || {
-    echo "Error: Central deployment not found (tried rhacs-operator, stackrox)." >&2
+    echo "Error: Central deployment not found (tried acs, rhacs-operator, and stackrox)." >&2
     return 1
   }
   central_cr="$(oc -n "${ns}" get central -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
@@ -524,8 +524,8 @@ ip = os.environ["ROUTER_IP"]
 spec = json.load(sys.stdin).get("spec") or {}
 checks = [
     ((spec.get("central") or {}).get("hostAliases") or []),
-    (((spec.get("scanner") or {}).get("analyzer") or {}).get("hostAliases") or []),
     (((spec.get("scannerV4") or {}).get("indexer") or {}).get("hostAliases") or []),
+    (((spec.get("scannerV4") or {}).get("matcher") or {}).get("hostAliases") or []),
 ]
 def has_alias(aliases):
     return any(a.get("ip") == ip and host in (a.get("hostnames") or []) for a in aliases)
@@ -539,13 +539,15 @@ import json, os
 alias = {"ip": os.environ["ROUTER_IP"], "hostnames": [os.environ["QUAY_HOST"]]}
 print(json.dumps({"spec": {
     "central": {"hostAliases": [alias]},
-    "scanner": {"analyzer": {"hostAliases": [alias]}},
-    "scannerV4": {"indexer": {"hostAliases": [alias]}},
+    "scannerV4": {
+        "indexer": {"hostAliases": [alias]},
+        "matcher": {"hostAliases": [alias]},
+    },
 }}))
 ')"
   echo "Mapping ${quay_host} to router ${router_ip}"
   oc -n "${ns}" patch central "${central_cr}" --type=merge -p "${patch}"
-  for deploy in central scanner scanner-v4-indexer; do
+  for deploy in central scanner-v4-indexer scanner-v4-matcher; do
     if oc -n "${ns}" get "deploy/${deploy}" >/dev/null 2>&1; then
       oc -n "${ns}" rollout status "deploy/${deploy}" --timeout=300s
     fi

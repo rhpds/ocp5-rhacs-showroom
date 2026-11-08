@@ -259,6 +259,23 @@ delete_scan_config() {
     return 0
 }
 
+# Compliance Operator 1.10 adds the OpenShift Virtualization and RHCOS 10 profiles.
+warn_if_compliance_operator_older_than_1_10() {
+    local csv ver oldest
+    csv="$(oc get subscription compliance-operator -n "${COMPLIANCE_NAMESPACE}" -o jsonpath='{.status.currentCSV}' 2>/dev/null || true)"
+    ver="$(printf '%s\n' "${csv}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+    if [ -z "${ver}" ]; then
+        print_warn "Could not determine the Compliance Operator version"
+        return 0
+    fi
+    oldest="$(printf '%s\n%s\n' "1.10.0" "${ver}" | sort -V | head -1)"
+    if [ "${oldest}" = "${ver}" ] && [ "${ver}" != "1.10.0" ]; then
+        print_warn "Compliance Operator ${ver} is older than 1.10. OpenShift Virtualization and RHCOS 10 profiles need 1.10 or later."
+    else
+        print_info "Compliance Operator ${ver}"
+    fi
+}
+
 # Function to collect Compliance Operator TailoredProfile names (RHACS 4.11)
 get_tailored_profile_names() {
     if ! oc get crd tailoredprofiles.compliance.openshift.io &>/dev/null 2>&1; then
@@ -282,6 +299,15 @@ create_scan_config() {
         "ocp4-e8" "ocp4-high" "ocp4-high-node" "ocp4-nerc-cip"
         "ocp4-nerc-cip-node" "ocp4-pci-dss" "ocp4-pci-dss-node" "ocp4-stig-node"
     )
+    local virt_profile
+    for virt_profile in ocp4-cis-vm-extension ocp4-cis-vm-extension-node ocp4-stig-vm-extension; do
+        if oc get profile.compliance.openshift.io "${virt_profile}" -n "${COMPLIANCE_NAMESPACE}" >/dev/null 2>&1; then
+            stock_profiles+=("${virt_profile}")
+            print_info "Including OpenShift Virtualization profile ${virt_profile}"
+        else
+            print_info "Skipping ${virt_profile} (Profile is not installed)"
+        fi
+    done
     local tailored=()
     local tp name
     while IFS= read -r tp; do
@@ -398,6 +424,7 @@ main() {
     
     # Wait for Compliance Operator pods (do not wait for RHACS profile listing)
     wait_for_compliance_pods || true
+    warn_if_compliance_operator_older_than_1_10
     
     print_info ""
     
@@ -413,7 +440,7 @@ main() {
     print_info ""
     print_info "Scan Configuration: ${SCAN_NAME}"
     print_info "Schedule: Daily at 12:00 PM"
-    print_info "Profiles: ocp4-cis, ocp4-moderate, ocp4-high, ocp4-pci-dss, etc."
+    print_info "Profiles: ocp4-cis, ocp4-moderate, ocp4-high, ocp4-pci-dss, and OpenShift Virtualization extensions when installed"
     print_info ""
 }
 
