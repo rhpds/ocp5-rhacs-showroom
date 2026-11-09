@@ -124,7 +124,7 @@ Red Hat Quay is an enterprise-quality registry for building, securing, and servi
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 cookie=$(mktemp)
-quay="https://${QUAY_URL}"
+quay="https://$QUAY_URL"
 
 csrf=$(curl -sk -c "$cookie" -b "$cookie" "${quay}/csrf_token" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf_token"])')
@@ -133,20 +133,20 @@ curl -sk -c "$cookie" -b "$cookie" -X POST \
   -H "Content-Type: application/json" \
   -H "X-Requested-With: XMLHttpRequest" \
   -H "X-CSRF-Token: ${csrf}" \
-  -d "{\"username\":\"${QUAY_USER}\",\"password\":\"${QUAY_PASSWORD}\"}" \
+  -d "{\"username\":\"$QUAY_USER\",\"password\":\"$QUAY_PASSWORD\"}" \
   "${quay}/api/v1/signin"
 echo
 
 for repo in frontend python-alpine-golden; do
   csrf=$(curl -sk -c "$cookie" -b "$cookie" "${quay}/csrf_token" \
     | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf_token"])')
-  echo "== ${QUAY_USER}/${repo}"
+  echo "== $QUAY_USER/${repo}"
   curl -sk -b "$cookie" -c "$cookie" -X POST \
     -H "Content-Type: application/json" \
     -H "X-Requested-With: XMLHttpRequest" \
     -H "X-CSRF-Token: ${csrf}" \
     -d '{"visibility":"public"}' \
-    "${quay}/api/v1/repository/${QUAY_USER}/${repo}/changevisibility"
+    "${quay}/api/v1/repository/$QUAY_USER/${repo}/changevisibility"
   echo
 done
 rm -f "$cookie"
@@ -175,7 +175,7 @@ Central has no registry credentials for the workshop Quay route until you create
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 roxctl --insecure-skip-tls-verify -e "$ROX_CENTRAL_ADDRESS:443" \
-  image scan --image="${QUAY_URL}/${QUAY_USER}/frontend:0.1" --force -o table
+  image scan --image="$QUAY_URL/$QUAY_USER/frontend:0.1" --force -o table
 ----
 
 [.console-output]
@@ -225,7 +225,7 @@ echo
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 roxctl --insecure-skip-tls-verify -e "$ROX_CENTRAL_ADDRESS:443" \
-  image scan --image="${QUAY_URL}/${QUAY_USER}/frontend:0.1" --force -o table | head -25
+  image scan --image="$QUAY_URL/$QUAY_USER/frontend:0.1" --force -o table | head -25
 ----
 
 [.console-output]
@@ -318,7 +318,7 @@ include::partial$security-exercise-task-intro.adoc[]
 ----
 oc get deploy frontend -n patient-portal \
   -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
-echo "Expected: ${QUAY_URL}/${QUAY_USER}/frontend:0.1"
+echo "Expected: $QUAY_URL/$QUAY_USER/frontend:0.1"
 ----
 ====
 
@@ -348,7 +348,7 @@ The `imageID` on the pod should include the same digest prefix (`sha256:...`) as
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-podman inspect --format='Quay digest: {{.Digest}}' ${QUAY_URL}/${QUAY_USER}/frontend:0.1
+podman inspect --format='Quay digest: {{.Digest}}' $QUAY_URL/$QUAY_USER/frontend:0.1
 oc get pod -n patient-portal -l app=frontend -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[0].imageID}{"\n"}{end}'
 ----
 ====
@@ -362,7 +362,7 @@ Confirm the scanned image matches what you deployed.
 ----
 GRPC_ENFORCE_ALPN_ENABLED=false \
 roxctl --insecure-skip-tls-verify -e "$ROX_CENTRAL_ADDRESS:443" \
-  image scan --image=${QUAY_URL}/${QUAY_USER}/frontend:0.1 --force -o table | head -15
+  image scan --image=$QUAY_URL/$QUAY_USER/frontend:0.1 --force -o table | head -15
 ----
 ====
 
