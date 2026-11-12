@@ -55,9 +55,9 @@ http://tuf.trusted-artifact-signer.svc
 https://fulcio-server-trusted-artifact-signer.apps.cluster-wprcr.dyn.redhatworkshops.io
 https://rekor-server-trusted-artifact-signer.apps.cluster-wprcr.dyn.redhatworkshops.io
 https://tuf-trusted-artifact-signer.apps.cluster-wprcr.dyn.redhatworkshops.io
-fulcio-server-2c7h9
-rekor-server-hp66n
-tuf-gmkkb
+fulcio-server-
+rekor-server-
+tuf-
 ----
 
 Confirm the hints against live Routes. Do not leave `apps.<domain>` in the PipelineRun.
@@ -101,8 +101,9 @@ Gitea pipelinerun is filled
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
 cd /tmp/spring-boot-lw-poc
 oc -n "${BUILD_NS}" apply -f .tekton/pipeline.yaml
-oc -n "${BUILD_NS}" create -f .tekton/pipelinerun.yaml
-oc -n "${BUILD_NS}" get pipelinerun -w
+PR="$(oc -n "${BUILD_NS}" create -f .tekton/pipelinerun.yaml -o name)"
+oc -n "${BUILD_NS}" wait "${PR}" --for=condition=Succeeded --timeout=20m || true
+oc -n "${BUILD_NS}" get "${PR}"
 ----
 
 Wait until `cosign-sign-keyless` Succeeded. ACS may still fail; this Check is the signature, not ACS.
@@ -155,10 +156,10 @@ The following checks were performed on each of these signatures:
   - The cosign claims were validated
   - Existence of the claims in the transparency log was verified offline
   - The code-signing certificate was verified using trusted certificate authority certificates
-image-registry.openshift-image-registry.svc:5000/lw-poc-build/spring-boot-lw-poc@sha256:55d2219fb675de8099432cf4985c57275b8028b8a8901bd5aca6e91427695d86
+image-registry.openshift-image-registry.svc:5000/lw-poc-build/spring-boot-lw-poc@sha256:
 ----
 
-Pass when that command exits 0 on *your* app digest. The digest above is the one Track 6 promotes on this cluster. Delete the pod so the short-lived token is not left in the pod spec.
+Pass when that command exits 0 on your app digest. The digest is whatever `istag spring-boot-lw-poc:latest` prints. Delete the pod so the short-lived token is not left in the pod spec.
 
 Continue to xref:tssc-13-attest-conforma.adoc[5.2] when you are ready.
 

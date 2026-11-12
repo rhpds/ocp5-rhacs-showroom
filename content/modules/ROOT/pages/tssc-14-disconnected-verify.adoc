@@ -45,8 +45,7 @@ ls ~/lab-trust 2>/dev/null || echo 'lab-trust empty (expected before your change
 Expected output:
 +
 ----
-image-registry.openshift-image-registry.svc:5000/lw-poc-build/spring-boot-lw-poc@sha256:55d2219fb675de8099432cf4985c57275b8028b8a8901bd5aca6e91427695d86
-lab-trust empty (expected before your change)
+image-registry.openshift-image-registry.svc:5000/lw-poc-build/spring-boot-lw-poc@sha256:
 ----
 
 == Worked example (not the Check)
@@ -76,6 +75,7 @@ cd /home/lab-user/lab-trust
 if [[ ! -f cosign.key ]]; then
   COSIGN_PASSWORD="" cosign generate-key-pair
 fi
+test -f cosign.key && test -f cosign.pub && echo "key pair present"
 TOKEN="$(oc -n "${BUILD_NS}" create token pipeline --duration=10m)"
 oc -n default delete secret lab-cosign-key --ignore-not-found
 oc -n default create secret generic lab-cosign-key \
@@ -146,13 +146,12 @@ oc -n tssc-admission create configmap lab-cosign-pubkey \
 Expected output:
 +
 ----
-Private key written to cosign.key
-Public key written to cosign.pub
+key pair present
 SIGN_OK
 Verification for image-registry.openshift-image-registry.svc:5000/lw-poc-build/spring-boot-lw-poc:latest --
   - The cosign claims were validated
 VERIFY_OK
-configmap/lab-cosign-pubkey configured
+configmap/lab-cosign-pubkey
 ----
 
 Pass when `/home/lab-user/lab-trust/cosign.pub` exists, `sign` exits 0, and ConfigMap `tssc-admission/lab-cosign-pubkey` has that PEM. Copying the worked-example path fails the Check. The private key stays on the bastion. The pod and Secret are deleted so the key is not left in the cluster.

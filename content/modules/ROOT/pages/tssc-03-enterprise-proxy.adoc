@@ -231,6 +231,14 @@ The seed looks like this (placeholders fail):
 +
 [source,bash,role=execute]
 ----
+NEXUS="$(oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo -o jsonpath='{.data.nexus_url}')"
+VALIDATED="$(oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo -o jsonpath='{.data.channel_validated}')"
+REMEDIATED="$(oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo -o jsonpath='{.data.channel_remediated}')"
+sed -i \
+  -e "s|REPLACE_ME_NEXUS_URL|${NEXUS}|g" \
+  -e "s|REPLACE_ME_CHANNEL_VALIDATED|${VALIDATED}|g" \
+  -e "s|REPLACE_ME_CHANNEL_REMEDIATED|${REMEDIATED}|g" \
+  ~/track-2-1-settings.xml
 oc -n lightwell-repo create configmap stub-03-enterprise-proxy \
   --from-file=settings.xml=$HOME/track-2-1-settings.xml \
   --dry-run=client -o yaml | oc apply -f -
@@ -240,7 +248,7 @@ grep -E 'REPLACE_ME' ~/track-2-1-settings.xml && echo 'STILL HAS PLACEHOLDERS' |
 Expected output:
 +
 ----
-configmap/stub-03-enterprise-proxy configured
+configmap/stub-03-enterprise-proxy
 placeholders gone
 ----
 
@@ -250,6 +258,8 @@ placeholders gone
 +
 [source,bash,role=execute]
 ----
+export MVN_LOCAL='-Dmaven.repo.local=/tmp/m2'
+rm -rf /tmp/m2/org/apache/commons/commons-lang3
 mvn -s ~/track-2-1-settings.xml ${MVN_LOCAL} -Plightwell-validated \
   org.apache.maven.plugins:maven-dependency-plugin:3.7.0:get \
   -Dartifact=org.apache.commons:commons-lang3:3.14.0

@@ -68,7 +68,8 @@ oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo \
   -o jsonpath='dest={.data.dest_registry_host}{"\n"}internal={.data.dest_registry_internal_host}{"\n"}'
 echo 'Dest image path is hi/openjdk — not dest_registry_repo (hummingbird-mirror).'
 echo '3.2 uses dest_registry_host (Route). 4.1 retargets runtime FROM to an internal ImageStream so 4.4 still works after 4.3.'
-oc -n lightwell-repo logs job/oc-mirror-learner -c copy-signatures | grep '^DEST_PULLSPEC=' || true
+MIRROR_POD="$(oc -n lightwell-repo get pods -l job-name=oc-mirror-learner --field-selector=status.phase=Succeeded -o jsonpath='{range .items[*]}{.metadata.creationTimestamp} {.metadata.name}{"\n"}{end}' | sort | awk 'END {print $2}')"
+oc -n lightwell-repo logs "${MIRROR_POD}" -c copy-signatures | grep '^DEST_PULLSPEC=' || true
 ----
 +
 Expected output:
@@ -102,12 +103,16 @@ FROM registry.example.invalid/not-hummingbird:latest
 cd /tmp/spring-boot-lw-poc
 git config user.name student
 git config user.email student@workshop.local
-: "${STUDENT_USER:=$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_username}')}"
-: "${STUDENT_PASS:=$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_password}')}"
+export STUDENT_USER="${STUDENT_USER:-$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_username}')}"
+export STUDENT_PASS="${STUDENT_PASS:-$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_password}')}"
 hostpath="$(git remote get-url origin)"
 hostpath="${hostpath#https://}"
 hostpath="${hostpath#http://}"
-git remote set-url origin "https://${STUDENT_USER}:${STUDENT_PASS}@${hostpath}"
+# A second run already has user:password@ in the remote. Strip through the last @ before adding credentials again.
+hostpath="${hostpath##*@}"
+enc_user="$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["STUDENT_USER"], safe=""))')"
+enc_pass="$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["STUDENT_PASS"], safe=""))')"
+git remote set-url origin "https://${enc_user}:${enc_pass}@${hostpath}"
 ----
 +
 Expected output: no output. Do not print the remote URL after this step. It contains the Gitea password.
@@ -117,6 +122,30 @@ Expected output: no output. Do not print the remote URL after this step. It cont
 [source,bash,role=execute]
 ----
 cd /tmp/spring-boot-lw-poc
+MIRROR_POD="$(oc -n lightwell-repo get pods -l job-name=oc-mirror-learner --field-selector=status.phase=Succeeded -o jsonpath='{range .items[*]}{.metadata.creationTimestamp} {.metadata.name}{"\n"}{end}' | sort | awk 'END {print $2}')"
+DEST="$(oc -n lightwell-repo logs "${MIRROR_POD}" -c copy-signatures | grep '^DEST_PULLSPEC=' | cut -d= -f2-)"
+test -n "${DEST}"
+python3 - "${DEST}" << 'PY'
+import pathlib, sys
+dest = sys.argv[1]
+path = pathlib.Path("Dockerfile")
+lines = path.read_text().splitlines()
+seen = 0
+out = []
+for line in lines:
+    if line.startswith("FROM "):
+        seen += 1
+        if seen == 2:
+            line = "FROM " + dest
+    out.append(line)
+path.write_text("\n".join(out) + "\n")
+pom = pathlib.Path("pom.xml")
+pom.write_text(pom.read_text().replace(
+    "<commons.lang3.version>3.14.0</commons.lang3.version>",
+    "<commons.lang3.version>3.14.0.rhlw-00001</commons.lang3.version>",
+    1,
+))
+PY
 git add Dockerfile pom.xml
 git status
 git diff --cached
@@ -129,9 +158,8 @@ git push origin HEAD
 Expected output:
 +
 ----
-[main 7b0b22d] Bind dest Hummingbird runtime and Lightwell default pin
- 2 files changed, 2 insertions(+), 2 deletions(-)
-   087c9cd..7b0b22d  HEAD -> main
+Bind dest Hummingbird runtime and Lightwell default pin
+ 2 files changed
 ----
 
 == Check: committed files on your remote

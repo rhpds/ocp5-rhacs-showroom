@@ -112,12 +112,10 @@ oc -n openshift-gitops label applications.argoproj.io "${PROD_APP}" app.kubernet
 Expected output:
 +
 ----
-application.argoproj.io/lw-poc-prod created
-Created Application lw-poc-prod
 application.argoproj.io/lw-poc-prod annotated
 ----
 
-. Tag the signed image into prod. `oc tag` copies the image, not `.sig` tags. The bastion cannot reach the internal registry, so `cosign copy` and `cosign sign` run in a short-lived pod in `default`, the same way as xref:tssc-15-gitops-admission.adoc[6.1]. Grant the prod `builder` service account `system:image-puller` on the build namespace. Sign the dest repo with the 5.3 key. `-f` overwrites an existing signature tag so you can run the step again.
+. Tag the signed image into prod. `oc tag` copies the image, not `.sig` tags. The bastion cannot reach the internal registry, so `cosign copy` and `cosign sign` run in a short-lived pod in `default`, the same way as xref:tssc-15-gitops-admission.adoc[6.1]. Grant the prod `builder` service account `system:image-puller` on the build namespace. `cosign copy -f` puts the build-repository signature on the prod digest. Admission matches that build repository. `-f` overwrites an existing signature tag so you can run the step again.
 +
 [source,bash,role=execute]
 ----
@@ -176,8 +174,6 @@ pod = {
       "args": [
         'cosign copy -f --allow-http-registry --allow-insecure-registry "${SRC}" "${DST}"\n'
         'echo COPY_OK\n'
-        'cosign sign --key /keys/cosign.key --yes --tlog-upload=false --allow-http-registry --allow-insecure-registry "${DST}"\n'
-        'echo SIGN_OK\n'
       ],
       "volumeMounts": [
         {"name": "work", "mountPath": "/work"},
@@ -205,14 +201,11 @@ Expected output:
 PROD_NS=lw-poc-prod
 PROD_GITOPS=https://gitea.apps.cluster-wprcr.dyn.redhatworkshops.io/lw-student/gitops-prod-spring-boot-lw-poc.git
 clusterrole.rbac.authorization.k8s.io/system:image-puller added: "system:serviceaccount:lw-poc-prod:builder"
-Tag lw-poc-prod/spring-boot-lw-poc:latest set to lw-poc-build/spring-boot-lw-poc@sha256:55d2219fb675de8099432cf4985c57275b8028b8a8901bd5aca6e91427695d86.
-sha256:55d2219fb675de8099432cf4985c57275b8028b8a8901bd5aca6e91427695d86
+Tag lw-poc-prod/spring-boot-lw-poc:latest set to lw-poc-build/spring-boot-lw-poc@sha256:
 secret/lab-cosign-key created
 pod/cosign-copy created
 pod/cosign-copy condition met
 COPY_OK
-Pushing signature to: image-registry.openshift-image-registry.svc:5000/lw-poc-prod/spring-boot-lw-poc
-SIGN_OK
 pod "cosign-copy" deleted from default namespace
 secret "lab-cosign-key" deleted from default namespace
 ----
@@ -230,6 +223,23 @@ git clone "https://${STUDENT_USER}:${STUDENT_PASS}@${hostpath}" /tmp/gitops-prod
 cd /tmp/gitops-prod
 git config user.name student
 git config user.email student@workshop.local
+PROD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_prod_namespace}')"
+DIGEST="$(oc -n "${PROD_NS}" get istag spring-boot-lw-poc:latest -o jsonpath='{.image.metadata.name}')"
+test -n "${DIGEST}"
+python3 - "${DIGEST}" "${PROD_NS}" << 'PY'
+import pathlib, sys
+digest, prod_ns = sys.argv[1:]
+path = pathlib.Path("values.yaml")
+text = path.read_text()
+text = text.replace("namespace: spring-boot-lw-poc", f"namespace: {prod_ns}", 1)
+text = text.replace("createNamespace: true", "createNamespace: false", 1)
+text = text.replace("sha256:REPLACE_ME_PROD_DIGEST", digest, 1)
+text = text.replace("replicas: 0", "replicas: 1", 1)
+path.write_text(text)
+PY
+git add values.yaml
+git commit -m "Promote signed digest to prod"
+git push origin HEAD
 ----
 +
 Expected output:
@@ -271,7 +281,7 @@ https://gitea.apps.cluster-wprcr.dyn.redhatworkshops.io/lw-student/gitops-prod-s
 prod remote OK
 expected prefix https://gitea.apps.cluster-wprcr.dyn.redhatworkshops.io/lw-student/gitops-prod-spring-boot-lw-poc.git
 deployment.apps/spring-boot-lw-poc   1/1     1            1
-pod/spring-boot-lw-poc-6b4dc58576-dbn2s   1/1     Running
+1/1     Running
 route.route.openshift.io/spring-boot-lw-poc   spring-boot-lw-poc-lw-poc-prod.apps.cluster-wprcr.dyn.redhatworkshops.io          spring-boot-lw-poc   http   edge/Redirect   None
 imagepolicy.config.openshift.io/tssc-prod-admission
 ----

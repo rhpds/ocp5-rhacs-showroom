@@ -7,13 +7,13 @@
 
 You promote the signed app digest into *stage* via GitOps, then turn on admission so unsigned images cannot run. You edit *one* file on the *stage* Gitea remote. That file is `admission/trust-policy.yaml` (`kind: TrustPolicy`). A CronJob renders namespaced `ImagePolicy` on `lw-poc-staging` *and* `lw-poc-prod`. Do not apply `ClusterImagePolicy`. Do not use RHACS Trusted image signers for this gate.
 
-Native `ImagePolicy` `signedEmail` must be an email. Track 5.1 identity is a Kubernetes service-account URI, so the CronJob renders `policyType: PublicKey` from ConfigMap `lab-cosign-pubkey` (the 5.3 `cosign.pub` you published). Keep the 5.1 service-account URI in TrustPolicy. That is still the Fulcio identity. `oc tag` does not copy `.sig` tags. Use `cosign copy` (and a dest-repo `cosign sign --key`) after the tag.
+Native `ImagePolicy` `signedEmail` must be an email. Track 5.1 identity is a Kubernetes service-account URI, so the CronJob renders `policyType: PublicKey` from ConfigMap `lab-cosign-pubkey` (the 5.3 `cosign.pub` you published). Keep the 5.1 service-account URI in TrustPolicy. That is still the Fulcio identity. `oc tag` does not copy `.sig` tags. Use `cosign copy` after the tag so the build-repository signature is on the dest digest.
 
 Prod GitOps is a *second remote*. Leave it for xref:tssc-16-prod-gitops.adoc[6.2]. `app-operate` NetworkPolicy on staging stays *open*. That is not the xref:tssc-10-build-networkpolicy.adoc[4.3] build-egress lab.
 
 == Why it matters
 
-Only the signed digest may run. Lightwell pins inside the image do not admit an unsigned tag. Unsigned deny is a *pull* failure (`ImagePullBackOff`), not `oc apply` stderr.
+Only the signed digest may run. Lightwell pins inside the image do not admit an unsigned tag. Unsigned deny is a container create failure (`CreateContainerError`: a signature was required, but no signature exists), not `oc apply` stderr.
 
 You fill TrustPolicy (`enforce: true`, live digest, pipeline service-account subject) and run `cosign copy` after `oc tag` because signatures do not travel with `oc tag` by themselves. Prod Argo stays on the prod remote.
 
@@ -134,8 +134,7 @@ oc -n tssc-admission label secret rhtas-tuf-keys app.kubernetes.io/instance- --o
 Expected output:
 +
 ----
-secret/rhtas-tuf-keys created
-Wrote tssc-admission/rhtas-tuf-keys
+secret/rhtas-tuf-keys annotated
 ----
 
 . Create Application `lw-poc-staging` when it is absent. The source repo and destination namespace come from `demo-userinfo-gitea`.
@@ -196,11 +195,10 @@ oc -n openshift-gitops label applications.argoproj.io "${ARGO}" app.kubernetes.i
 Expected output:
 +
 ----
-application.argoproj.io/lw-poc-staging created
-Created Application lw-poc-staging
+application.argoproj.io/lw-poc-staging annotated
 ----
 
-. Tag the signed image into staging (not prod). `oc tag` copies the image, not `.sig` tags. The bastion cannot reach the internal registry, so `cosign copy` and `cosign sign` run in a short-lived pod in `default`, the same way as xref:tssc-14-disconnected-verify.adoc[5.3]. Grant the staging `builder` service account `system:image-puller` on the build namespace so that pod can read the source digest and push the staging repo. Sign the dest repo with the 5.3 key. `-f` overwrites an existing signature tag so you can run the step again.
+. Tag the signed image into staging (not prod). `oc tag` copies the image, not `.sig` tags. The bastion cannot reach the internal registry, so `cosign copy` and `cosign sign` run in a short-lived pod in `default`, the same way as xref:tssc-14-disconnected-verify.adoc[5.3]. Grant the staging `builder` service account `system:image-puller` on the build namespace so that pod can read the source digest and push the staging repo. `cosign copy -f` puts the build-repository signature on the staging digest. Admission matches that build repository, so the copy is the signature the node accepts. `-f` overwrites an existing signature tag so you can run the step again.
 +
 [source,bash,role=execute]
 ----
@@ -256,8 +254,6 @@ pod = {
       "args": [
         'cosign copy -f --allow-http-registry --allow-insecure-registry "${SRC}" "${DST}"\n'
         'echo COPY_OK\n'
-        'cosign sign --key /keys/cosign.key --yes --tlog-upload=false --allow-http-registry --allow-insecure-registry "${DST}"\n'
-        'echo SIGN_OK\n'
       ],
       "volumeMounts": [
         {"name": "work", "mountPath": "/work"},
@@ -283,14 +279,11 @@ Expected output:
 +
 ----
 clusterrole.rbac.authorization.k8s.io/system:image-puller added: "system:serviceaccount:lw-poc-staging:builder"
-Tag lw-poc-staging/spring-boot-lw-poc:latest set to lw-poc-build/spring-boot-lw-poc@sha256:55d2219fb675de8099432cf4985c57275b8028b8a8901bd5aca6e91427695d86.
-sha256:55d2219fb675de8099432cf4985c57275b8028b8a8901bd5aca6e91427695d86
+Tag lw-poc-staging/spring-boot-lw-poc:latest set to lw-poc-build/spring-boot-lw-poc@sha256:
 secret/lab-cosign-key created
 pod/cosign-copy created
 pod/cosign-copy condition met
 COPY_OK
-Pushing signature to: image-registry.openshift-image-registry.svc:5000/lw-poc-staging/spring-boot-lw-poc
-SIGN_OK
 pod "cosign-copy" deleted from default namespace
 secret "lab-cosign-key" deleted from default namespace
 ----
@@ -310,6 +303,40 @@ git clone "https://${STUDENT_USER}:${STUDENT_PASS}@${hostpath}" /tmp/gitops-stag
 cd /tmp/gitops-stage
 git config user.name student
 git config user.email student@workshop.local
+PROMOTE_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_promote_namespace}')"
+BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
+PROD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_prod_namespace}')"
+DIGEST="$(oc -n "${PROMOTE_NS}" get istag spring-boot-lw-poc:latest -o jsonpath='{.image.metadata.name}')"
+test -n "${DIGEST}"
+python3 - "${DIGEST}" "${BUILD_NS}" "${PROMOTE_NS}" "${PROD_NS}" << 'PY'
+import pathlib, sys
+digest, build_ns, stage_ns, prod_ns = sys.argv[1:]
+values = pathlib.Path("values.yaml")
+text = values.read_text()
+text = text.replace("namespace: spring-boot-lw-poc", f"namespace: {stage_ns}", 1)
+text = text.replace('digest: ""', f'digest: "{digest}"', 1)
+text = text.replace("replicas: 0", "replicas: 1", 1)
+values.write_text(text)
+reg = "image-registry.openshift-image-registry.svc:5000"
+policy = pathlib.Path("admission/trust-policy.yaml")
+body = policy.read_text()
+body = body.replace("enforce: false", "enforce: true", 1)
+body = body.replace(
+    "- REPLACE_ME_REGISTRY/REPLACE_ME_REPO",
+    f"- {reg}/{stage_ns}/spring-boot-lw-poc\n    - {reg}/{prod_ns}/spring-boot-lw-poc",
+    1,
+)
+body = body.replace("REPLACE_ME_OIDC_ISSUER", "https://kubernetes.default.svc")
+body = body.replace(
+    "REPLACE_ME_IDENTITY",
+    f"https://kubernetes.io/namespaces/{build_ns}/serviceaccounts/pipeline",
+)
+body = body.replace("sha256:REPLACE_ME", digest)
+policy.write_text(body)
+PY
+git add values.yaml admission/trust-policy.yaml
+git commit -m "Promote signed digest and enforce TrustPolicy"
+git push origin HEAD
 ----
 +
 Expected output:
@@ -326,6 +353,7 @@ ARGO="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.studen
 PROMOTE_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_promote_namespace}')"
 oc -n openshift-gitops annotate applications.argoproj.io "${ARGO}" \
   argocd.argoproj.io/refresh=hard --overwrite
+oc -n "${PROMOTE_NS}" delete pod -l app=spring-boot-lw-poc --wait=false --ignore-not-found
 oc -n "${PROMOTE_NS}" wait deploy/spring-boot-lw-poc \
   --for=jsonpath='{.status.readyReplicas}'=1 --timeout=180s
 oc -n openshift-gitops get applications.argoproj.io "${ARGO}" \
@@ -339,7 +367,7 @@ Expected output:
 ----
 application.argoproj.io/lw-poc-staging annotated
 deployment.apps/spring-boot-lw-poc condition met
-sync=Synced health=Healthy rev=33e8f0928bdb570e9f7745fadb408beb0073139d
+health=Healthy rev=
 replicas=1 ready=1
 ----
 
@@ -357,7 +385,7 @@ CronJob `trust-policy-apply` in `tssc-admission` polls about every two minutes. 
 
 == Check: unsigned deny; stage Healthy
 
-Native `ImagePolicy` is CRI-O `policy.json`: `oc apply` of an unsigned Deployment can *succeed*; the pod fails at *pull*. Kyverno fallback (if the claim uses it) denies at admission instead — still look at the pod / events.
+Native `ImagePolicy` is CRI-O `policy.json`: `oc apply` of an unsigned Deployment can *succeed*; the pod stays `CreateContainerError` because a signature was required and none exists. Kyverno fallback (if the claim uses it) denies at admission instead — still look at the pod / events.
 
 . The gate only covers `spec.scopes`. Tag an *unsigned* digest onto the *same* ImageStream and deploy that tag. Do not point GitOps `image.digest` at it (that would flap the Healthy Check).
 +
@@ -366,6 +394,13 @@ Native `ImagePolicy` is CRI-O `policy.json`: `oc apply` of an unsigned Deploymen
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
 PROMOTE_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_promote_namespace}')"
 ARGO="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_argocd_app}')"
+POLICY="$(oc -n tssc-admission get cronjob trust-policy-apply -o jsonpath='{.spec.jobTemplate.spec.template.spec.containers[0].env[?(@.name=="POLICY_NAME")].value}')"
+for _i in $(seq 1 18); do
+  oc -n "${PROMOTE_NS}" get imagepolicy "${POLICY}" >/dev/null 2>&1 \
+    && oc -n lw-poc-prod get imagepolicy "${POLICY}" >/dev/null 2>&1 \
+    && break
+  sleep 10
+done
 # Unsigned digest, in-scope name:
 oc tag "${BUILD_NS}/openjdk-21-builder:latest" "${PROMOTE_NS}/spring-boot-lw-poc:unsigned"
 oc -n "${PROMOTE_NS}" create deployment unsigned-deny-test \
@@ -385,21 +420,21 @@ oc -n lw-poc-prod get imagepolicy
 Expected output:
 +
 ----
-Tag lw-poc-staging/spring-boot-lw-poc:unsigned set to lw-poc-build/openjdk-21-builder@sha256:f5fb676772fb6ed5c12aa3f6494075e4f97ab1b73bc2186b195485d0ccf54b64.
+Tag lw-poc-staging/spring-boot-lw-poc:unsigned set to lw-poc-build/openjdk-21-builder@sha256:
 deployment.apps/unsigned-deny-test created
 error: timed out waiting for the condition
-unsigned-deny-test-7dfcb789bd-xzx45   0/1   ImagePullBackOff
-Error: ImagePullBackOff
-Failed to pull image "image-registry.openshift-image-registry.svc:5000/lw-poc-staging/spring-boot-lw-poc:unsigned": SignatureValidationFailed: unable to pull image or OCI artifact: pull image err: Source image rejected: A signature was required, but no signature exists
-Error: SignatureValidationFailed
+unsigned-deny-test-
+CreateContainerError
+SignatureValidationFailed: A signature was required, but no signature exists
 deployment.apps "unsigned-deny-test" deleted from lw-poc-staging namespace
-lw-poc-staging   Synced   Healthy
+lw-poc-staging
+Healthy
 replicas=1 ready=1
 tssc-prod-admission
 tssc-prod-admission
 ----
 
-Pass when: TrustPolicy has no `REPLACE_ME` and `enforce: true`; ImagePolicy is live on staging *and* prod; the `:unsigned` pod is ImagePullBackOff (or signature error); `lw-poc-staging` stays Healthy on the signed digest. Do not retarget prod Argo at the stage remote.
+Pass when: TrustPolicy has no `REPLACE_ME` and `enforce: true`; ImagePolicy is live on staging and prod; the `:unsigned` pod stays unready with `CreateContainerError` and `SignatureValidationFailed`; `lw-poc-staging` stays Healthy on the signed digest. The pre-created namespace can leave the Application `OutOfSync` while the workload is Healthy. Do not retarget prod Argo at the stage remote.
 
 // VISUAL: https://github.com/NA-FSI-Services/lightwell-tssc-workshop/issues/69
 image::unsigned-deny-imagepullbackoff.png[Throwaway unsigned tag pod in ImagePullBackOff while signed latest stays running,width=700,link=self,window=blank]

@@ -41,7 +41,8 @@ The CronJob retries about every 20 minutes.
 [source,bash,role=execute]
 ----
 oc -n renovate get cronjob
-oc -n renovate get configmap demo-userinfo-renovate -o yaml
+oc -n renovate get configmap demo-userinfo-renovate \
+  -o jsonpath='bot={.data.renovate_bot_username}{"\n"}repo={.data.renovate_target_repo}{"\n"}pins={.data.pins_file}{"\n"}'
 oc -n renovate get configmap renovate-docs \
   -o jsonpath='{.data.example-renovate-pr\.md}'
 ----
@@ -51,7 +52,7 @@ The userinfo ConfigMap YAML is long. The lines that show the bot is configured a
 Expected output:
 +
 ----
-renovate   */20 * * * *   <none>     False     0        <age>   <age>
+renovate   */20 * * * *   <none>
 bot=renovate-bot
 repo=lw-student/spring-boot-lw-poc
 pins=lightwell-pins.properties

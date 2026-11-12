@@ -88,7 +88,7 @@ oc -n lightwell-tasks get configmap conforma-policy -o yaml \
 Expected output:
 +
 ----
-configmap/conforma-policy created
+configmap/conforma-policy
 ----
 
 The seed in `lightwell-tasks` stays `skip-image-sig-check=true`. Tighten the copy in `lw-poc-build`.
@@ -106,6 +106,74 @@ Fail path is the in-cluster ImageStream `openjdk-21-builder` you imported in xre
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
+oc -n "${BUILD_NS}" get configmap conforma-policy -o json > /tmp/conforma-cm.json
+python3 - "${BUILD_NS}" << 'PY'
+import json, pathlib, sys
+ns = sys.argv[1]
+cm = json.load(open("/tmp/conforma-cm.json"))
+data = cm["data"]
+ident = f"^https://kubernetes.io/namespaces/{ns}/serviceaccounts/pipeline$"
+issuer = "https://kubernetes.default.svc"
+data["skip-image-sig-check"] = "false"
+data["skip-att-sig-check"] = "true"
+data["certificate-identity-regexp"] = ident
+data["certificate-oidc-issuer-regexp"] = issuer
+policy = data["policy.yaml"]
+policy = policy.replace('subjectRegExp: ".*"', f'subjectRegExp: "{ident}"')
+policy = policy.replace('issuerRegExp: ".*"', f'issuerRegExp: "{issuer}"')
+policy = policy.replace('      exclude:\n        - "*"\n', "")
+data["policy.yaml"] = policy
+data["data.yaml"] = (
+    "restrict_max_cve_score: 998\n"
+    "allowed_registry_prefixes:\n"
+    '  - "image-registry.openshift-image-registry.svc"\n'
+)
+out = pathlib.Path("/tmp/conforma-tight")
+out.mkdir(exist_ok=True)
+for key, value in data.items():
+    text = value if value.endswith("\n") else value + "\n"
+    (out / key).write_text(text)
+PY
+oc -n "${BUILD_NS}" create configmap conforma-policy \
+  --from-file=/tmp/conforma-tight --dry-run=client -o yaml | oc apply -f -
+cd /tmp/spring-boot-lw-poc
+python3 << 'PY'
+from pathlib import Path
+pipe = Path(".tekton/pipeline.yaml")
+text = pipe.read_text()
+if "- name: conforma-policy" not in text:
+    block = """    - name: conforma-policy
+      runAfter:
+      - cosign-sign-keyless
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: conforma-policy
+          - name: namespace
+            value: lightwell-tasks
+      params:
+        - name: image
+          value: $(params.image-url)
+        - name: policy-configmap
+          value: conforma-policy
+        - name: policy-namespace
+          value: lw-poc-build
+        - name: tuf-url
+          value: $(params.cosign-tuf-url)
+        - name: rekor-url
+          value: $(params.cosign-rekor-url)
+"""
+    marker = "    # V2-15: Task conforma-policy"
+    text = text.replace(marker, block + marker, 1)
+    pipe.write_text(text)
+PY
+git add .tekton/pipeline.yaml
+git commit -m "Wire conforma-policy after keyless sign" || true
+git push origin HEAD
+oc -n "${BUILD_NS}" apply -f .tekton/pipeline.yaml
 TUF="$(oc -n trusted-artifact-signer get configmap demo-userinfo-rhtas -o jsonpath='{.data.tuf_url_hint}')"
 REKOR="$(oc -n trusted-artifact-signer get configmap demo-userinfo-rhtas -o jsonpath='{.data.rekor_url_hint}')"
 TOKEN="$(oc -n "${BUILD_NS}" create token pipeline --duration=10m)"

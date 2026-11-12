@@ -109,9 +109,8 @@ curl -sk -X POST -H "Authorization: Bearer ${TOKEN}" \
 Expected output:
 +
 ----
-{"id":"urn:uuid:01a18d06-9b26-75b3-850d-50905520c70b","document_id":"urn:uuid:d4444444-4444-4444-8444-444444444444/1"}
 CDX HTTP 201
-{"id":"a112f7ae-2ed3-41fb-8db8-cf988584420d","document_id":"LW-DEMO-0002"}
+document_id":"LW-DEMO-0002"
 OSV HTTP 201
 ----
 
@@ -138,7 +137,14 @@ Fill with `LW-DEMO-0002`, the remediated GAV (include `3.14.0.rhlw-00001`), stat
 ----
 oc -n lightwell-repo get configmap stub-18-blast-radius \
   -o jsonpath='{.data.blast-radius\.txt}' > ~/track-7-2-blast-radius.txt
-# edit ~/track-7-2-blast-radius.txt, then:
+VEX_ID="$(oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo -o jsonpath='{.data.scored_vex_id}')"
+VEX_GAV="$(oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo -o jsonpath='{.data.scored_vex_gav}')"
+sed -i \
+  -e "s/REPLACE_ME_VEX_ID/${VEX_ID}/" \
+  -e "s|REPLACE_ME_GAV|${VEX_GAV}|" \
+  -e "s/REPLACE_ME_STATUS/fixed/" \
+  -e "s/REPLACE_ME_VIA/via-lightwell-pin/" \
+  ~/track-7-2-blast-radius.txt
 oc -n lightwell-repo create configmap stub-18-blast-radius \
   --from-file=blast-radius.txt=$HOME/track-7-2-blast-radius.txt \
   --dry-run=client -o yaml | oc apply -f -
@@ -148,7 +154,9 @@ Expected output:
 +
 ----
 configmap/stub-18-blast-radius configured
----- Mint a Continuous Integration token into Secret `rhacs-ci-secrets` in the namespace from `demo-userinfo-rhacs` (this roadshow uses `rhacs-operator`). Copy that secret into the build namespace so `acs-image-check` can mount it. Register the in-cluster registry only when that integration is missing. On the learner Pipeline, pass `fail-on-skipped: "true"` on `acs-image-check` (seeded default is soft-skip). Re-run if the last TaskRun was `skipped`. Expect `passed` or `failed` — both prove the control is *on*. Do not screenshot Central as this Check.
+----
+
+Mint a Continuous Integration token into Secret `rhacs-ci-secrets` in the namespace from `demo-userinfo-rhacs` (this roadshow uses `rhacs-operator`). Copy that secret into the build namespace so `acs-image-check` can mount it. Register the in-cluster registry only when that integration is missing. On the learner Pipeline, pass `fail-on-skipped: "true"` on `acs-image-check` (seeded default is soft-skip). Re-run if the last TaskRun was `skipped`. Expect `passed` or `failed`. Both prove the control is on. Do not screenshot Central as this Check.
 +
 [source,bash,role=execute]
 ----
@@ -246,13 +254,10 @@ PY
 Expected output:
 +
 ----
-Stored rhacs-operator/rhacs-ci-secrets
-secret/rhacs-ci-secrets configured
-serviceaccount/rhacs-registry-puller created
-rolebinding.rbac.authorization.k8s.io/rhacs-registry-puller-image-puller created
-serviceaccount/rhacs-registry-puller annotated
-rolebinding.rbac.authorization.k8s.io/rhacs-registry-puller-image-puller annotated
-Created image integration openshift-internal-registry
+secret/rhacs-ci-secrets
+serviceaccount/rhacs-registry-puller
+rolebinding.rbac.authorization.k8s.io/rhacs-registry-puller-image-puller
+openshift-internal-registry
 ----
 
 A second run prints `rhacs-operator/rhacs-ci-secrets already has a token` and `image integration openshift-internal-registry already present`. `label "app.kubernetes.io/instance" not found` is harmless.
@@ -287,7 +292,6 @@ gav: org.apache.commons:commons-lang3:3.14.0.rhlw-00001
 remediation: via-lightwell-pin
 token present in rhacs-operator
 rhacs-ci-secrets   Opaque   2
-spring-boot-lw-poc-build-sign-z4hhp-acs-image-check   True        Succeeded
 ----
 
 Pass when: Nexus GAV files were ingested; the report has the scored id + GAV + via-Lightwell token and no `REPLACE_ME`; `acs-image-check` is not `skipped`; CSAF importer is still off.

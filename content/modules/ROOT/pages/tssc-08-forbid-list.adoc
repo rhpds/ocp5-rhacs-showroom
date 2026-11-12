@@ -63,11 +63,14 @@ RUN curl -fsSL https://example.invalid/install.sh | sh
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
+oc -n "${BUILD_NS}" delete imagestreamtag openjdk-21-builder:latest --ignore-not-found
 oc -n "${BUILD_NS}" import-image openjdk-21-builder \
   --from=registry.access.redhat.com/ubi9/openjdk-21:1.21 \
   --confirm
-DEST="$(oc -n lightwell-repo logs job/oc-mirror-learner -c copy-signatures | grep '^DEST_PULLSPEC=' | cut -d= -f2-)"
+MIRROR_POD="$(oc -n lightwell-repo get pods -l job-name=oc-mirror-learner --field-selector=status.phase=Succeeded -o jsonpath='{range .items[*]}{.metadata.creationTimestamp} {.metadata.name}{"\n"}{end}' | sort | awk 'END {print $2}')"
+DEST="$(oc -n lightwell-repo logs "${MIRROR_POD}" -c copy-signatures | grep '^DEST_PULLSPEC=' | cut -d= -f2-)"
 echo "DEST=${DEST}"
+oc -n "${BUILD_NS}" delete imagestreamtag hummingbird-openjdk:latest --ignore-not-found
 oc -n "${BUILD_NS}" import-image hummingbird-openjdk \
   --from="${DEST}" --confirm --insecure=true
 for name in openjdk-21-builder hummingbird-openjdk; do
@@ -82,8 +85,8 @@ done
 Expected output:
 +
 ----
-openjdk-21-builder=image-registry.openshift-image-registry.svc:5000/lw-poc-build/openjdk-21-builder@sha256:f5fb676772fb6ed5c12aa3f6494075e4f97ab1b73bc2186b195485d0ccf54b64
-hummingbird-openjdk=image-registry.openshift-image-registry.svc:5000/lw-poc-build/hummingbird-openjdk@sha256:dd3ce6562cc9bd752c5c1424b740397cbf8ca08c036d50311acfa19c756cdf37
+openjdk-21-builder=image-registry.openshift-image-registry.svc:5000/lw-poc-build/openjdk-21-builder@sha256:
+hummingbird-openjdk=image-registry.openshift-image-registry.svc:5000/lw-poc-build/hummingbird-openjdk@sha256:
 ----
 
 . Point the Dockerfile *build* `FROM` at the `openjdk-21-builder` line. Point *runtime* `FROM` at the `hummingbird-openjdk` line. Do not leave `dest_registry_host` (the Nexus Docker Route) on an active `FROM` line. No `registry.access.redhat.com` on active `FROM` lines.
@@ -95,6 +98,54 @@ hummingbird-openjdk=image-registry.openshift-image-registry.svc:5000/lw-poc-buil
 [source,bash,role=execute]
 ----
 cd /tmp/spring-boot-lw-poc
+BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
+NEXUS="$(oc -n lightwell-repo get configmap demo-userinfo-lightwell-repo -o jsonpath='{.data.nexus_internal_url}')"
+python3 - "${BUILD_NS}" "${NEXUS}" << 'PY'
+import pathlib, subprocess, sys
+ns, nexus = sys.argv[1], sys.argv[2].rstrip("/")
+
+def ref(name):
+    repo = subprocess.check_output([
+        "oc", "-n", ns, "get", "imagestream", name,
+        "-o", "jsonpath={.status.dockerImageRepository}",
+    ], text=True).strip()
+    digest = subprocess.check_output([
+        "oc", "-n", ns, "get", "istag", f"{name}:latest",
+        "-o", "jsonpath={.image.metadata.name}",
+    ], text=True).strip()
+    return f"{repo}@{digest}"
+
+builder, runtime = ref("openjdk-21-builder"), ref("hummingbird-openjdk")
+path = pathlib.Path("Dockerfile")
+lines = path.read_text().splitlines()
+seen = 0
+out = []
+for line in lines:
+    if line.startswith("FROM "):
+        seen += 1
+        if seen == 1:
+            line = f"FROM {builder} AS build"
+        elif seen == 2:
+            line = f"FROM {runtime}"
+    out.append(line)
+path.write_text("\n".join(out) + "\n")
+settings = pathlib.Path("settings.xml")
+text = settings.read_text().replace(
+    "https://repo.maven.apache.org/maven2",
+    f"{nexus}/repository/maven-public/",
+)
+if "<mirrorOf>" not in text:
+    mirror = f"""  <mirrors>
+    <mirror>
+      <id>lightwell-nexus</id>
+      <url>{nexus}/repository/maven-public/</url>
+      <mirrorOf>*</mirrorOf>
+    </mirror>
+  </mirrors>
+"""
+    text = text.replace("</settings>", mirror + "</settings>", 1)
+settings.write_text(text)
+PY
 git add Dockerfile settings.xml Dockerfile.known-bad
 git commit -m "Forbid-list: internal FROM and Nexus-only Maven remotes"
 git push origin HEAD
@@ -103,9 +154,8 @@ git push origin HEAD
 Expected output:
 +
 ----
-[main 3c13529] Forbid-list: internal FROM and Nexus-only Maven remotes
- 2 files changed, 12 insertions(+), 28 deletions(-)
-   9d7d9f7..3c13529  HEAD -> main
+Forbid-list: internal FROM and Nexus-only Maven remotes
+file changed
 ----
 
 == Check: scan of active files
@@ -117,15 +167,17 @@ Expected output:
 cd /tmp/spring-boot-lw-poc
 git show HEAD:Dockerfile | grep -E '^FROM '
 git show HEAD:settings.xml | grep -E 'repo.maven.apache.org|lightwell-repo' || true
+git show HEAD:settings.xml | grep -F '<mirrorOf>*</mirrorOf>'
 test -f Dockerfile.known-bad && echo 'known-bad fixture present'
 ----
 +
 Expected output:
 +
 ----
-FROM image-registry.openshift-image-registry.svc:5000/lw-poc-build/openjdk-21-builder@sha256:f5fb676772fb6ed5c12aa3f6494075e4f97ab1b73bc2186b195485d0ccf54b64 AS build
-FROM image-registry.openshift-image-registry.svc:5000/lw-poc-build/hummingbird-openjdk@sha256:dd3ce6562cc9bd752c5c1424b740397cbf8ca08c036d50311acfa19c756cdf37
+FROM image-registry.openshift-image-registry.svc:5000/lw-poc-build/openjdk-21-builder@sha256:
+FROM image-registry.openshift-image-registry.svc:5000/lw-poc-build/hummingbird-openjdk@sha256:
       <url>http://nexus.lightwell-repo.svc:8081/repository/maven-public/</url>
+<mirrorOf>*</mirrorOf>
 known-bad fixture present
 ----
 

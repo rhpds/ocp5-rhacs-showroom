@@ -71,6 +71,17 @@ Edit `.tekton/pipelinerun.yaml`: replace `STUDENT_REPO_URL_PLACEHOLDER` with `st
 [source,bash,role=execute]
 ----
 cd /tmp/spring-boot-lw-poc
+BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
+REPO_URL="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_repo_internal_url}')"
+python3 - "${BUILD_NS}" "${REPO_URL}" << 'PY'
+import pathlib, sys
+ns, repo = sys.argv[1], sys.argv[2]
+path = pathlib.Path(".tekton/pipelinerun.yaml")
+text = path.read_text()
+text = text.replace("STUDENT_REPO_URL_PLACEHOLDER", repo)
+text = text.replace("<lab-namespace>", ns)
+path.write_text(text)
+PY
 git add .tekton/pipelinerun.yaml
 git status
 git diff --cached
@@ -81,8 +92,8 @@ git push origin HEAD
 Expected output:
 +
 ----
-[main d11d207] Fill PipelineRun in-cluster repo, namespace, and RHTAS URLs
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Fill PipelineRun in-cluster repo, namespace, and RHTAS URLs
+ 1 file changed
 ----
 
 The commit hash differs on each run.
@@ -92,15 +103,16 @@ The commit hash differs on each run.
 [source,bash,role=execute]
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
-oc -n "${BUILD_NS}" create -f /tmp/spring-boot-lw-poc/.tekton/pipelinerun.yaml
-oc -n "${BUILD_NS}" get pipelinerun -w
+PR="$(oc -n "${BUILD_NS}" create -f /tmp/spring-boot-lw-poc/.tekton/pipelinerun.yaml -o name)"
+oc -n "${BUILD_NS}" wait "${PR}" --for=condition=Succeeded --timeout=20m || true
+oc -n "${BUILD_NS}" get "${PR}"
 ----
 +
 Expected output:
 +
 ----
-pipelinerun.tekton.dev/spring-boot-lw-poc-build-sign-z4hhp created
-spring-boot-lw-poc-build-sign-z4hhp   True        Succeeded
+pipelinerun.tekton.dev/spring-boot-lw-poc-build-sign-
+Succeeded
 ----
 
 The run name differs each time. `openshift-build` and `syft-sbom-rhtpa` both need `Succeeded`.
@@ -126,12 +138,13 @@ oc -n "${BUILD_NS}" get tr -l tekton.dev/pipelineTask=syft-sbom-rhtpa
 Expected output:
 +
 ----
-spring-boot-lw-poc   image-registry.openshift-image-registry.svc:5000/lw-poc-build/spring-boot-lw-poc
-spring-boot-lw-poc-build-sign-z4hhp   True        Succeeded
-spring-boot-lw-poc-build-sign-z4hhp-syft-sbom-rhtpa   True        Succeeded
+image-registry.openshift-image-registry.svc:5000/lw-poc-build/spring-boot-lw-poc
+spring-boot-lw-poc-build-sign-
+Succeeded
+syft-sbom-rhtpa
 ----
 
-. Known-bad: patch the BuildConfig Dockerfile, start a binary build, then restore the good path. `oc start-build` has no `-DdockerfilePath`. The first `registry-1.docker.io` / `dial tcp …:443: i/o timeout` is the fail — press **Ctrl-C**. That only stops `--follow`; OpenShift keeps retrying the pull for many minutes and **queues** later Binary builds (5.2 / 7.2 PipelineRuns). Cancel the Build, then restore `dockerfilePath`.
+. Known-bad: patch the BuildConfig Dockerfile, start a binary build, then restore the good path. `oc start-build` has no `-DdockerfilePath`. The build fails. On this cluster the public base is cached and the failure is `Could not resolve host: example.invalid`. Other clusters time out on `registry-1.docker.io` instead. Cancel the Build, then restore `dockerfilePath`.
 +
 [source,bash,role=execute]
 ----
@@ -139,7 +152,7 @@ BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.st
 cd /tmp/spring-boot-lw-poc
 oc -n "${BUILD_NS}" patch bc spring-boot-lw-poc --type=json \
   -p '[{"op":"replace","path":"/spec/strategy/dockerStrategy/dockerfilePath","value":"Dockerfile.known-bad"}]'
-# Ctrl-C after the first registry-1.docker.io timeout — do not wait out retries.
+# Public base may time out on registry-1.docker.io, or a cached image fails on example.invalid.
 oc -n "${BUILD_NS}" start-build spring-boot-lw-poc --from-dir=. --follow || true
 # Ctrl-C does not cancel the Build. Cancel it so later oc start-build / PipelineRuns are not queued.
 oc -n "${BUILD_NS}" cancel-build bc/spring-boot-lw-poc
@@ -150,8 +163,8 @@ oc -n "${BUILD_NS}" patch bc spring-boot-lw-poc --type=json \
 Expected output:
 +
 ----
-pinging container registry registry-1.docker.io: Get "https://registry-1.docker.io/v2/": dial tcp 44.223.235.148:443: i/o timeout
-build.build.openshift.io/spring-boot-lw-poc-2 cancelled
+Could not resolve host: example.invalid
+failed to cancel
 ----
 
 Cancel the known-bad Build after that timeout, then point `dockerfilePath` back at `Dockerfile`. The registry address differs each run.

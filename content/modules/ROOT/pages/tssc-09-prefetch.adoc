@@ -84,14 +84,52 @@ RUN mvn -B -o -s settings.xml -Dmaven.repo.local=.m2-offline -DskipTests package
 ----
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
 cd /tmp/spring-boot-lw-poc
+TASK_NS="$(oc get task -A --field-selector metadata.name=lightwell-dep-gate -o jsonpath='{.items[0].metadata.namespace}')"
+sed -i "s/value: stackrox/value: ${TASK_NS}/g" .tekton/pipeline.yaml
+python3 << 'PY'
+from pathlib import Path
+pipe = Path(".tekton/pipeline.yaml")
+text = pipe.read_text()
+if "name: prefetch-dependencies" not in text:
+    block = """    - name: prefetch-dependencies
+      runAfter:
+      - lightwell-dep-gate
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: prefetch-dependencies
+          - name: namespace
+            value: lightwell-tasks
+      workspaces:
+        - name: source
+          workspace: source
+"""
+    text = text.replace("    - name: openshift-build\n", block + "    - name: openshift-build\n", 1)
+    text = text.replace("runAfter: [lightwell-dep-gate]\n", "runAfter: [prefetch-dependencies]\n", 1)
+    pipe.write_text(text)
+docker = Path("Dockerfile")
+body = docker.read_text()
+old = "COPY pom.xml ./\nCOPY src ./src\nRUN mvn -B -DskipTests -Dcommons.lang3.version=3.14.0 package\n"
+new = "COPY pom.xml ./\nCOPY src ./src\nCOPY settings.xml ./\nCOPY .m2-offline ./.m2-offline\nRUN mvn -B -o -s settings.xml -Dmaven.repo.local=.m2-offline -DskipTests package\n"
+if old in body:
+    docker.write_text(body.replace(old, new, 1))
+elif "COPY .m2-offline ./.m2-offline" not in body:
+    raise SystemExit("Dockerfile build stage did not match the seed")
+PY
+git add Dockerfile .tekton/pipeline.yaml
+git commit -m "Wire prefetch-dependencies and offline Maven" || true
 oc -n "${BUILD_NS}" apply -f .tekton/rbac.yaml
 oc -n "${BUILD_NS}" apply -f .tekton/pipeline.yaml
+git push origin HEAD
 ----
 +
 Expected output:
 +
 ----
-pipeline.tekton.dev/spring-boot-lw-poc-build-sign created
+pipeline.tekton.dev/spring-boot-lw-poc-build-sign
 ----
 
 `oc apply` registers the Pipeline object so 4.4 can `create` a PipelineRun. It does *not* pull Task images — that happens on the first PipelineRun. The prefetch Task image is still UBI OpenJDK on `registry.access.redhat.com`; hermetic here is in-cluster Nexus + `mvn -o`, plus the xref:tssc-08-forbid-list.adoc[4.1] ImageStream `FROM` lines. Do not treat this apply as an image cache before xref:tssc-10-build-networkpolicy.adoc[4.3].
@@ -105,7 +143,7 @@ pipeline.tekton.dev/spring-boot-lw-poc-build-sign created
 BUILD_NS="$(oc -n gitea get configmap demo-userinfo-gitea -o jsonpath='{.data.student_build_namespace}')"
 oc -n "${BUILD_NS}" get pipeline spring-boot-lw-poc-build-sign -o yaml | grep -A20 prefetch-dependencies | head -30
 cd /tmp/spring-boot-lw-poc
-git show HEAD:settings.xml | grep repo.maven.apache.org && echo 'STILL HAS CENTRAL' || echo 'Central gone'
+git show HEAD:settings.xml | grep -E '<url>.*repo\.maven\.apache\.org' && echo 'STILL HAS CENTRAL' || echo 'Central gone'
 git show HEAD:Dockerfile | grep -E 'mvn.*-o'
 git show HEAD:Dockerfile | grep -E 'COPY .*m2-offline'
 ----

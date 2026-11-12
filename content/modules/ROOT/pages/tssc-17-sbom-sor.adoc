@@ -84,7 +84,8 @@ test -f ~/sbom.cyclonedx.json && jq '{bomFormat, specVersion, components:(.compo
 Expected output:
 +
 ----
-spring-boot-lw-poc-build-sign-z4hhp-syft-sbom-rhtpa   True        Succeeded
+syft-sbom-rhtpa
+Succeeded
 /home/lab-user/sbom.cyclonedx.json
 {
   "bomFormat": "CycloneDX",
@@ -117,7 +118,6 @@ curl -sk -X POST \
 Expected output:
 +
 ----
-{"id":"urn:uuid:01a18d05-a01d-7ed3-8251-a5a08868e9c9","document_id":"urn:uuid:274bc4c1-901c-4e04-838a-f750f4b5c1aa/1"}
 HTTP 201
 ----
 

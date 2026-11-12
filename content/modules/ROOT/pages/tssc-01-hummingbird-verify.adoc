@@ -52,7 +52,7 @@ Expected output:
 /home/lab-user/.local/bin/cosign
 /home/lab-user/.local/bin/oc-mirror
 GitVersion:    227f0ec0
-Client Version: version.Info{GitVersion:"4.20.0-202610240619.p2.g9786cf2.assembly.stream.el9-9786cf2", ...}
+GitVersion:"4.20.0-
 ----
 
 == Discover the published pin
@@ -105,18 +105,15 @@ oc -n lightwell-repo get configmap stub-01-hummingbird-verify \
 cat ~/track-1-1-published-verify.sh
 ----
 +
-You should see both `REPLACE_ME_*` strings.
+The first copy still has both `REPLACE_ME_*` strings. After you write the script back, the same command prints the pull spec and the `63405576.txt` key.
 
 Expected output:
 +
 ----
 #!/usr/bin/env bash
 set -euo pipefail
-export HUMMINGBIRD_PUBLISHED='REPLACE_ME_HUMMINGBIRD_PULLSPEC'
-cosign verify \
-  --key REPLACE_ME_COSIGN_KEY \
-  --insecure-ignore-tlog \
-  "${HUMMINGBIRD_PUBLISHED}"
+export HUMMINGBIRD_PUBLISHED=
+cosign verify
 ----
 
 . Fill both placeholders from live userinfo (do not type a digest from this page)

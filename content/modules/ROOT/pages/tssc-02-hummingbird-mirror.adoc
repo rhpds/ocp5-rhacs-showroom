@@ -56,7 +56,7 @@ oc -n lightwell-repo get configmap imageset-configuration \
 Expected output:
 +
 ----
-# Incomplete ImageSet (V2-11). Scored file -- not the Showroom worked example.
+# Incomplete ImageSet (V2-11). Scored file — not the Showroom worked example.
 # Replace additionalImages[0].name with the V2-1 digest pin from
 # ConfigMap demo-userinfo-lightwell-repo key hummingbird_source_pullspec.
 # Copying example-imageset.yaml from oc-mirror-tooling still fails the Check.
@@ -78,7 +78,7 @@ oc -n lightwell-repo get configmap oc-mirror-tooling \
 Expected output:
 +
 ----
-# Worked example ONLY -- different image from the scored ConfigMap.
+# Worked example ONLY — different image from the scored ConfigMap.
 # Pasting this into imageset-configuration still fails the Check.
 kind: ImageSetConfiguration
 apiVersion: mirror.openshift.io/v2alpha1
@@ -166,8 +166,10 @@ job.batch/oc-mirror-learner condition met
 +
 [source,bash,role=execute]
 ----
-oc -n lightwell-repo logs job/oc-mirror-learner -c oc-mirror
-oc -n lightwell-repo logs job/oc-mirror-learner -c copy-signatures
+# oc logs job/NAME follows one pod. A retry leaves a failed pod; read the Succeeded pod.
+MIRROR_POD="$(oc -n lightwell-repo get pods -l job-name=oc-mirror-learner --field-selector=status.phase=Succeeded -o jsonpath='{range .items[*]}{.metadata.creationTimestamp} {.metadata.name}{"\n"}{end}' | sort | awk 'END {print $2}')"
+oc -n lightwell-repo logs "${MIRROR_POD}" -c oc-mirror
+oc -n lightwell-repo logs "${MIRROR_POD}" -c copy-signatures
 ----
 +
 The oc-mirror log is long. The lines that show the mirror worked are:
@@ -200,8 +202,10 @@ Or copy the `DEST_PULLSPEC=` line from the `copy-signatures` container log.
 +
 [source,bash,role=execute]
 ----
-# Stub — fill DEST_PULLSPEC from Job logs + dest_registry_host. Not the worked UBI example.
-export DEST_PULLSPEC='REPLACE_ME_DEST_PULLSPEC'
+MIRROR_POD="$(oc -n lightwell-repo get pods -l job-name=oc-mirror-learner --field-selector=status.phase=Succeeded -o jsonpath='{range .items[*]}{.metadata.creationTimestamp} {.metadata.name}{"\n"}{end}' | sort | awk 'END {print $2}')"
+export DEST_PULLSPEC="$(oc -n lightwell-repo logs "${MIRROR_POD}" -c copy-signatures | grep '^DEST_PULLSPEC=' | cut -d= -f2-)"
+echo "DEST_PULLSPEC=${DEST_PULLSPEC}"
+test -n "${DEST_PULLSPEC}"
 cosign verify \
   --allow-insecure-registry \
   --key https://security.access.redhat.com/data/63405576.txt \
@@ -209,7 +213,7 @@ cosign verify \
   "${DEST_PULLSPEC}"
 ----
 +
-Replace `REPLACE_ME_DEST_PULLSPEC` with the `DEST_PULLSPEC=` line from the signature-copy log. `cosign` prints a JSON signature array. The lines that show success are:
+`cosign` prints a JSON signature array. The lines that show success are:
 +
 Expected output:
 +

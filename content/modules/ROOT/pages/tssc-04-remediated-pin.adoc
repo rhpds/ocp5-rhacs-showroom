@@ -163,6 +163,8 @@ Worked example pin (wrong GAV):
 +
 [source,bash,role=execute]
 ----
+sed -i 's|<commons.lang3.version>3.14.0</commons.lang3.version>|<commons.lang3.version>3.14.0.rhlw-00001</commons.lang3.version>|' \
+  ~/track-2-2/pom.xml
 oc -n lightwell-repo create configmap stub-04-remediated-pin \
   --from-file=pom.xml=$HOME/track-2-2/pom.xml \
   --dry-run=client -o yaml | oc apply -f -
@@ -172,7 +174,7 @@ grep commons.lang3.version ~/track-2-2/pom.xml
 Expected output:
 +
 ----
-configmap/stub-04-remediated-pin configured
+configmap/stub-04-remediated-pin
     <commons.lang3.version>3.14.0.rhlw-00001</commons.lang3.version>
       <version>${commons.lang3.version}</version>
 ----
@@ -183,6 +185,8 @@ configmap/stub-04-remediated-pin configured
 +
 [source,bash,role=execute]
 ----
+export MVN_LOCAL='-Dmaven.repo.local=/tmp/m2'
+rm -rf /tmp/m2/org/apache/commons/commons-lang3
 mvn -s ~/track-2-1-settings.xml ${MVN_LOCAL} -f ~/track-2-2/pom.xml \
   -Plightwell-remediated dependency:tree
 ----
