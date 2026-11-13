@@ -101,7 +101,7 @@ Let's run the check again to check if the policies were successful.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-roxctl -e $ROX_CENTRAL_ADDRESS:443 image check --image $QUAY_URL/$QUAY_USER/frontend:0.1
+roxctl -e $ROX_CENTRAL_ADDRESS:443 image check --image {quay_url}/{quay_user}/frontend:0.1
 ----
 
 *Expected:* Failing APK and GitOps-managed policies. If you created *Alpine Linux Package Manager in Image - Enforce Deploy* in xref:acs-02-policy-and-risk.adoc[02 Policy and Risk], it appears here as well.
@@ -188,7 +188,7 @@ This pipeline works by taking an image that you have created and passing it thro
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-echo $QUAY_URL/$QUAY_USER/frontend:0.1
+echo {quay_url}/{quay_user}/frontend:0.1
 ----
 
 image::05-cd-06.png[link=self, window=blank, width=100%]

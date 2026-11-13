@@ -30,7 +30,7 @@ Build a Tekton path FROM `python-alpine-golden` that refuses unscanned or unsign
 
 * OpenShift Pipelines (Tekton) Operator installed
 * Cosign installed locally, or simulate signing in the pipeline tasks
-* Lab setup already ran, so `QUAY_URL`, `QUAY_USER`, and the golden image `${QUAY_URL}/${QUAY_USER}/python-alpine-golden:0.1` are already in this shell
+* Lab setup already ran, and the golden image is {quay_url}/{quay_user}/python-alpine-golden:0.1
 * The `python-alpine-golden` repository is **public** in Quay (same API call as `frontend` in xref:acs-00-setup-install-navigation.adoc#navigating-the-registry[acs-00]) so the cluster can import it
 
 Click each step for the full solution.
@@ -55,11 +55,11 @@ This is the approved base from setup — not Docker Hub at pipeline time. Pull p
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-echo "${QUAY_URL}/${QUAY_USER}/python-alpine-golden:0.1"
-podman pull "${QUAY_URL}/${QUAY_USER}/python-alpine-golden:0.1"
+echo "{quay_url}/{quay_user}/python-alpine-golden:0.1"
+podman pull "{quay_url}/{quay_user}/python-alpine-golden:0.1"
 ----
 
-TIP: The pull should complete without `unauthorized` or `manifest unknown`. If `QUAY_URL` is empty, re-run the Welcome environment setup.
+TIP: The pull should complete without `unauthorized` or `manifest unknown`. If the pull fails with unauthorized, make the Quay repository public and retry.
 ====
 
 .Import python-alpine-golden into this project
@@ -70,7 +70,7 @@ Copy the golden image into the project ImageStream so the pipeline FROM line sta
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 oc import-image python-alpine-golden:0.1 \
-  --from="${QUAY_URL}/${QUAY_USER}/python-alpine-golden:0.1" \
+  --from="{quay_url}/{quay_user}/python-alpine-golden:0.1" \
   --confirm --insecure -n 201-04-s-pipeline
 ----
 

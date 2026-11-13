@@ -38,78 +38,6 @@ image::01-rhacs-login.png[RHACS console,link=self, window=blank, width=100%]
 
 image::01-rhacs-console-dashboard.png[RHACS console,link=self, window=blank, width=100%]
 
-== Lab environment setup
-
-The setup script below is the remaining *bastion* work: RHACS and Quay CLI variables, a local clone of `demo-apps`, and the TSSC CLIs (`cosign`, `oc-mirror`, `ec`, and `mvn`). Quay, the workshop images, MCP, and OpenShift Lightspeed are already synced by OpenShift GitOps. Lightspeed is preconfigured with the platform model.
-
-IMPORTANT: This will run quickly if it has already been run as part of the initial setup.
-
-=== Run the setup script
-
-OpenShift Lightspeed is already configured with the platform model. The script reads Quay and RHACS credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`, and `mvn`).
-
-You can skip this step and run the verification step below if you've already run the script.
-
-*Procedure*
-
-[start=1]
-. Clone the roadshow repository and run the lab setup script:
-
-[source,bash,subs="+macros,+attributes",role=execute]
-----
-cd ~/
-if [ ! -d "ocp5-rhacs-showroom" ]; then
-    git clone https://github.com/rhpds/ocp5-rhacs-showroom.git
-fi
-cd ocp5-rhacs-showroom
-bash setup/lab-environment.sh
-----
-
-[.console-output]
-[source,bash,subs="+macros,+attributes"]
-----
-Lab environment setup
-Details: /home/lab-user/.acs-roadshow/lab-environment-YYYYMMDD-HHMMSS.log
-
-[#####################-------] 6/8  Configure RHACS CLI variables
-
-[############################] 8/8  Lab environment setup complete
-
-================================================================
-  SUCCESS: Lab environment setup completed successfully
-================================================================
-
-  ✓ Quay credentials read from the cluster
-  ✓ RHACS CLI ready (ROX_CENTRAL_ADDRESS / ROX_API_TOKEN saved)
-  ✓ TSSC CLIs on PATH (cosign, oc-mirror, ec in ~/.local/bin; mvn from the Maven RPM)
-  ✓ Env file: /home/lab-user/.acs-roadshow/env
-  ✓ Detailed log: /home/lab-user/.acs-roadshow/lab-environment-....log
-----
-
-[start=2]
-. The script prints progress for each phase. When it completes, reload your shell environment:
-
-[source,bash,subs="+macros,+attributes",role=execute]
-----
-source ~/.bashrc
-echo "TUTORIAL_HOME=$TUTORIAL_HOME"
-echo "QUAY_URL=$QUAY_URL"
-echo "ROX_CENTRAL_ADDRESS=$ROX_CENTRAL_ADDRESS"
-test -n "$ROX_API_TOKEN" && echo "ROX_API_TOKEN is set" || echo "ROX_API_TOKEN is missing"
-----
-
-[.console-output]
-[source,bash,subs="+macros,+attributes"]
-----
-TUTORIAL_HOME=/home/lab-user/demo-apps
-QUAY_URL=registry-quay-quay.apps.cluster-tkwxg.dyn.redhatworkshops.io
-ROX_CENTRAL_ADDRESS=central-reencrypt-stackrox.apps.cluster-tkwxg.dyn.redhatworkshops.io
-ROX_API_TOKEN is set
-----
-
-[[quay]]
-[[build-a-container-image]]
-
 == Red Hat Quay
 
 Red Hat Quay is an enterprise-quality registry for building, securing, and serving container images. GitOps already pushed the *frontend* and *python-alpine-golden* images. Those repositories are private until you change visibility. OpenShift can pull them without your Quay password only after both are public.
@@ -123,8 +51,9 @@ Red Hat Quay is an enterprise-quality registry for building, securing, and servi
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
+cd ~/
 cookie=$(mktemp)
-quay="https://$QUAY_URL"
+quay="https://{quay_url}"
 
 csrf=$(curl -sk -c "$cookie" -b "$cookie" "${quay}/csrf_token" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf_token"])')
@@ -133,20 +62,20 @@ curl -sk -c "$cookie" -b "$cookie" -X POST \
   -H "Content-Type: application/json" \
   -H "X-Requested-With: XMLHttpRequest" \
   -H "X-CSRF-Token: ${csrf}" \
-  -d "{\"username\":\"$QUAY_USER\",\"password\":\"$QUAY_PASSWORD\"}" \
+  -d "{\"username\":\"{quay_user}\",\"password\":\"$QUAY_PASSWORD\"}" \
   "${quay}/api/v1/signin"
 echo
 
 for repo in frontend python-alpine-golden; do
   csrf=$(curl -sk -c "$cookie" -b "$cookie" "${quay}/csrf_token" \
     | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf_token"])')
-  echo "== $QUAY_USER/${repo}"
+  echo "== {quay_user}/${repo}"
   curl -sk -b "$cookie" -c "$cookie" -X POST \
     -H "Content-Type: application/json" \
     -H "X-Requested-With: XMLHttpRequest" \
     -H "X-CSRF-Token: ${csrf}" \
     -d '{"visibility":"public"}' \
-    "${quay}/api/v1/repository/$QUAY_USER/${repo}/changevisibility"
+    "${quay}/api/v1/repository/{quay_user}/${repo}/changevisibility"
   echo
 done
 rm -f "$cookie"
@@ -175,7 +104,7 @@ Central has no registry credentials for the workshop Quay route until you create
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 roxctl --insecure-skip-tls-verify -e "$ROX_CENTRAL_ADDRESS:443" \
-  image scan --image="$QUAY_URL/$QUAY_USER/frontend:0.1" --force -o table
+  image scan --image="{quay_url}/{quay_user}/frontend:0.1" --force -o table
 ----
 
 [.console-output]
@@ -185,7 +114,7 @@ ERROR:  Scanning image failed: retrieving image scan result: could not scan imag
 ----
 
 [start=2]
-. Register the workshop Quay route with `POST /v1/imageintegrations`. `jq` places the expanded `$QUAY_URL`, `$QUAY_USER`, and `$QUAY_PASSWORD` in the body. `insecure` is true because the route certificate comes from the cluster ingress CA.
+. Register the workshop Quay route with `POST /v1/imageintegrations`. `jq` places the workshop Quay host, the Quay user, and `$QUAY_PASSWORD` in the body. `insecure` is true because the route certificate comes from the cluster ingress CA.
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
@@ -203,8 +132,8 @@ curl -sk -X POST \
   -H "Content-Type: application/json" \
   "https://${ROX_CENTRAL_ADDRESS}/v1/imageintegrations" \
   -d "$(jq -n \
-    --arg endpoint "${QUAY_URL#*://}" \
-    --arg user "$QUAY_USER" \
+    --arg endpoint "{quay_url}" \
+    --arg user "{quay_user}" \
     --arg pass "$QUAY_PASSWORD" \
     '{name:"workshop-quay", type:"quay", categories:["REGISTRY"],
       quay:{endpoint:$endpoint, insecure:true,
@@ -225,7 +154,7 @@ echo
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 roxctl --insecure-skip-tls-verify -e "$ROX_CENTRAL_ADDRESS:443" \
-  image scan --image="$QUAY_URL/$QUAY_USER/frontend:0.1" --force -o table | head -25
+  image scan --image="{quay_url}/{quay_user}/frontend:0.1" --force -o table | head -25
 ----
 
 [.console-output]
@@ -318,7 +247,7 @@ include::partial$security-exercise-task-intro.adoc[]
 ----
 oc get deploy frontend -n patient-portal \
   -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
-echo "Expected: $QUAY_URL/$QUAY_USER/frontend:0.1"
+echo "Expected: {quay_url}/{quay_user}/frontend:0.1"
 ----
 ====
 
@@ -348,7 +277,7 @@ The `imageID` on the pod should include the same digest prefix (`sha256:...`) as
 
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
-podman inspect --format='Quay digest: {{.Digest}}' $QUAY_URL/$QUAY_USER/frontend:0.1
+podman inspect --format='Quay digest: {{.Digest}}' {quay_url}/{quay_user}/frontend:0.1
 oc get pod -n patient-portal -l app=frontend -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[0].imageID}{"\n"}{end}'
 ----
 ====
@@ -362,7 +291,7 @@ Confirm the scanned image matches what you deployed.
 ----
 GRPC_ENFORCE_ALPN_ENABLED=false \
 roxctl --insecure-skip-tls-verify -e "$ROX_CENTRAL_ADDRESS:443" \
-  image scan --image=$QUAY_URL/$QUAY_USER/frontend:0.1 --force -o table | head -15
+  image scan --image={quay_url}/{quay_user}/frontend:0.1 --force -o table | head -15
 ----
 ====
 
