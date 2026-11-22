@@ -20,7 +20,7 @@ echo "==> Simulating compromised exec intrusion..."
 for i in $(seq 1 "${ATTENDEE_COUNT}"); do
   namespace="payment-gateway-${i}"
   token=$(oc create token cicd-pipeline-runner-sa --namespace "${namespace}")
-  oc exec pod/payment-gateway \
+  oc exec deploy/payment-gateway \
     --namespace "${namespace}" \
     --token "${token}" \
     --container httpd \

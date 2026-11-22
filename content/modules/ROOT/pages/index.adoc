@@ -11,7 +11,7 @@ This course offers hands-on experience with Kubernetes-native security on Red Ha
 * *Use consoles in Showroom, or open them in a new tab* — Keep this guide open. Prefer the console tabs on the right of the lab UI. To open a link in a new browser tab: on a Mac, *<cmd> click*; on Windows/Linux, *<ctrl> click* or right-click → "Open in new tab."
 * *Use the terminal tab for command line work* — Run `oc`, `roxctl`, and `podman` on the RHEL bastion. After setup, `oc` and `roxctl` tab-complete in a new terminal.
 * *Cluster setup and services are managed by GitOps* — RHACS, Quay, GitOps, Compliance Operator, and the vulnerable demo apps are already synced by Argo CD. Deleting resources by accident is no problem, as they will be recreated by GitOps.
-* *Start any track from this page.* The tracks are independent: 101, 201, 301, then RHACS, Lightwell Java, Lightwell TSSC, and Virtualization. When you finish a track, *Next* brings you back here.
+* *Start any track from this page.* The tracks are independent: 101, 201, 301, then RHACS, OpenShift Security Response, Lightwell Java, Lightwell TSSC, and Virtualization. When you finish a track, *Next* brings you back here.
 
 IMPORTANT: Make sure to run the setup script below! OpenShift Lightspeed is already configured with the platform model. The script saves your CLI credentials and installs the TSSC CLIs (`cosign`, `oc-mirror`, `ec`, and `mvn`).
 
@@ -159,4 +159,4 @@ Use the *Terminal* tab (or SSH) for CLI work (`oc`, `roxctl`, `podman`, `curl`, 
 * xref:lwjava-INDEX.adoc[Lightwell Java rebuild] — A vulnerable Java release is already built and deployed by Argo CD. Patch it onto Lightwell libraries, then sign and roll the new digest.
 * xref:tssc-INDEX.adoc[Secure Software Supply Chain with Red HatLightwell ] — Hummingbird, Lightwell remediations, hermetic build, keyless signing, GitOps admission, and TPA/ACS compliance.
 * xref:virt-INDEX.adoc[OpenShift Virtualization Hardening Modules] — HyperConverged feature gates, virt RBAC, VM and storage isolation, VM networking, and host firmware/kernel controls from the link:https://access.redhat.com/sites/default/files/attachments/rh-openshift-virtualization-hardening-guide-detail-202512-en.pdf[Red Hat OpenShift Virtualization hardening guide^].
-* xref:security-response:index.adoc[OpenShift Security Response] — ACME incident response: audit and isolate the payment gateway, take a forensic checkpoint, roll a hardened Socket.IO image, and lock RHACS process baselines.
+* xref:security-response:index.adoc[OpenShift Security Response] — One ACME incident, then the controls that follow it: attribute the exec, deny egress, take a CRIU checkpoint, roll a hardened image, and lock RHACS process baselines.

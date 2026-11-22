@@ -15,6 +15,7 @@ from bastions import (
     bastions_from_args,
     ensure_paramiko,
     header,
+    identity,
     redact,
     run_remote,
     write_host_log,
@@ -179,7 +180,7 @@ def main(argv: list[str] | None = None) -> int:
 
     results = execute_all(bastions, worker, args.workers)
     ok_count = sum(1 for result in results if result.ok)
-    failed = [result.bastion.guid or result.bastion.hostname for result in results if not result.ok]
+    failed = [identity(result.bastion) for result in results if not result.ok]
     summary = f"Summary: {ok_count}/{len(results)} configured"
     if failed:
         summary += " (failed: " + ", ".join(failed) + ")"

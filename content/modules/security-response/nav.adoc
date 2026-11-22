@@ -1,5 +1,5 @@
 .OpenShift Security Response Exercises
-* xref:index.adoc[Overview]
+* xref:index.adoc[Workshop focus]
 * xref:sr-01-environment.adoc[1. Workshop Environment]
 * xref:sr-02-incident.adoc[2. The Incident]
 * xref:sr-03-forensics.adoc[3. Forensic Investigation]

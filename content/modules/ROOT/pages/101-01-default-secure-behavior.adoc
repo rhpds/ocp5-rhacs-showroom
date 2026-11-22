@@ -196,8 +196,6 @@ What breaks without this:
 
 NOTE: Restricted SCC defaults, UBI (or equivalent) bases, high ports, scanning/signing, digest pins, and tracked exceptions only when you must run as root.
 
-IMPORTANT: local Docker often allows root and port 80—OpenShift does not. Prefer fixing the image; treat `anyuid` as temporary debt with an owner and expiry.
-
 image::https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExa3R1YjV5eGt3MTQ2a2UxOGM0ZThzaTQwdXE3cHdmMGo3NXUzOHB0MiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/MrCYIN3x0SgdG/giphy.gif[link=self, window=blank, width=100%, class="center"]
 
 == Cleanup

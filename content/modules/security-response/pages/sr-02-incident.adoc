@@ -1,9 +1,11 @@
-= 2. The Incident
+= 2. The incident
 :toc:
 :toclevels: 1
 :icons: font
 
 xref:index.adoc[← Security response overview]
+
+**Duration:** ~25 minutes
 
 == Overview
 
@@ -11,15 +13,20 @@ It is 02:14. Morgan pages Sarah. Anomaly detection flagged irregular egress from
 
 image::fsi-security/sarah-call.png[Incident call,link=self, window=blank, width=100%]
 
+== Why it matters
+
+A pod name does not tell you who ran a command. The API audit log does. It records the user, the verb, and whether the API server upgraded the connection into a live exec. That is the difference between "a container looks busy" and "this service account token was used."
+
 == Your mission
 
-Find the exec in the API audit log, confirm the external connection in RHACS, apply a deny-egress NetworkPolicy, and collect audit logs with `must-gather`.
+Find the exec in the API audit log, confirm the external connection in RHACS, apply a deny-egress NetworkPolicy, and collect audit logs with `oc adm must-gather`.
 
-Use the *Terminal* tab for the commands below.
+Use the *Terminal* tab. Your namespace is `payment-gateway-{workshop_user_suffix}`.
 
-.On each master node, search kube-apiserver/audit.log for namespace payment-gateway-{workshop_user_suffix}, objectRef.name payment-gateway, verb create, and subresource exec. Expect user.username system:serviceaccount:payment-gateway-{workshop_user_suffix}:cicd-pipeline-runner-sa, responseStatus.code 101, an exec into container httpd, and annotations naming the RoleBinding
-[%collapsible]
-====
+== Find the exec
+
+On each control plane node, search `kube-apiserver/audit.log` for an exec in your namespace. The pod name starts with `payment-gateway` because the workload is a Deployment.
+
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 namespace=payment-gateway-{workshop_user_suffix}
@@ -27,31 +34,60 @@ namespace=payment-gateway-{workshop_user_suffix}
 for master in $(oc get nodes --selector node-role.kubernetes.io/master --output name); do
   echo "=== Searching logs on ${master} ==="
   oc adm node-logs "${master}" --path=kube-apiserver/audit.log \
-    | jq --arg ns "${namespace}" 'first(select(.objectRef.namespace == $ns
-          and .objectRef.name == "payment-gateway"
+    | jq -c --arg ns "${namespace}" 'select(.objectRef.namespace == $ns
+          and (.objectRef.name | startswith("payment-gateway"))
           and .verb == "create"
-          and .objectRef.subresource == "exec"))'
+          and .stage == "ResponseStarted"
+          and .objectRef.subresource == "exec")' \
+    | head -n 1
 done
 ----
-====
 
-.In RHACS Network Graph, filter namespace payment-gateway-{workshop_user_suffix} and deployment payment-gateway, then open External Entities and find 185.199.108.153. Sign in with the RHACS username and password on the home page
-[%collapsible]
-====
-. In RHACS, open *Network Graph*.
-. Filter to namespace `payment-gateway-{workshop_user_suffix}` and deployment `payment-gateway`.
-. Open *External Entities* and find the connection to `185.199.108.153`.
+If that prints nothing, the event is in a rotated log. List the audit files, then run the same `jq` filter against the newest `audit-*.log`.
+
+[source,bash,role=execute]
+----
+for master in $(oc get nodes --selector node-role.kubernetes.io/master --output name); do
+  echo "=== ${master} ==="
+  oc adm node-logs "${master}" --path=kube-apiserver/ | grep -E '^audit'
+done
+----
+
+Read the event. These are the fields that answer Morgan's question:
+
+[source,text,subs="+attributes"]
+----
+user.username
+  system:serviceaccount:payment-gateway-{workshop_user_suffix}:cicd-pipeline-runner-sa
+
+objectRef.subresource
+  exec
+
+responseStatus.code
+  101
+
+annotations["authorization.k8s.io/reason"]
+  RoleBinding workshop-sa-exec-binding, Role container-executor
+----
+
+`user.username` is a pipeline service account, not a person. `responseStatus.code` `101` means the API server switched the connection to a live stream, so the exec started. The annotation names the RoleBinding that allowed it. `requestURI` is the command that was sent. You do not need to replay it. The service account is the finding: that credential can exec into the live pod, and someone used it.
+
+The pipeline account is only supposed to push manifests. It also has Role `container-executor` through `workshop-sa-exec-binding`. That is the over-permissioned credential.
+
+== Confirm the egress
+
+In RHACS, open *Network Graph*. Filter to namespace `payment-gateway-{workshop_user_suffix}` and the `payment-gateway` workload. Open *External Entities*. The workload is connecting to `185.199.108.153`.
 
 image::fsi-security/rhacs-filters.png[RHACS network graph filters,link=self, window=blank, width=100%]
 
 image::fsi-security/rhacs-externalip.png[External connections in RHACS,link=self, window=blank, width=100%]
 
 Sign in with the RHACS username and password on the xref:ROOT:index.adoc[home page].
-====
 
-.Apply NetworkPolicy payment-gateway-deny-egress in payment-gateway-{workshop_user_suffix} selecting app=payment-gateway, policyTypes Egress, and an empty egress list. Expect the external connection to drop while the pod stays up
-[%collapsible]
-====
+== Isolate the workload
+
+A link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/network_security/network-policy[NetworkPolicy^] can drop that egress without deleting the process you still need to inspect. An empty `egress` list denies every outbound flow from the selected pods. In a real incident this would go through GitOps. During an active incident, Sarah applies it directly.
+
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 oc apply -f - <<EOF
@@ -71,11 +107,23 @@ EOF
 ----
 
 image::fsi-security/apply-networkpolicy.png[Deny egress NetworkPolicy,link=self, window=blank, width=100%]
-====
 
-.Collect audit logs with oc adm must-gather in namespace payment-gateway-{workshop_user_suffix} into /tmp/incident-artifacts using /usr/bin/gather_audit_logs, then find directories named audit_logs
-[%collapsible]
-====
+=== Verify
+
+The pod is still running, and the policy exists.
+
+[source,bash,subs="+macros,+attributes",role=execute]
+----
+oc get pods -n payment-gateway-{workshop_user_suffix} -l app=payment-gateway
+oc get networkpolicy payment-gateway-deny-egress -n payment-gateway-{workshop_user_suffix}
+----
+
+In the RHACS network graph, the connection to `185.199.108.153` drops. The pod stays up.
+
+== Package the audit logs
+
+`oc adm must-gather` writes a directory you can attach to a support case. This workshop does not open a case. The command is the part worth practicing.
+
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 oc adm must-gather \
@@ -86,11 +134,15 @@ find /tmp/incident-artifacts -type d -name 'audit_logs' -print
 ----
 
 image::fsi-security/sarah-support.png[Preparing audit logs for support,link=self, window=blank, width=100%]
-====
+
+== Stretch
+
+Open *Violations* in RHACS and see whether the exec or the egress was already detected. You will lock a process baseline for this workload in xref:sr-05-process-baseline.adoc[exercise 5].
 
 == What you learned
 
 * API audit attributes an exec to a service account, not just a pod name.
+* HTTP 101 on an exec means the stream started.
 * A deny-egress NetworkPolicy contains the workload without deleting the process you still need to inspect.
 * `oc adm must-gather` packages audit logs so someone else can review them.
 
