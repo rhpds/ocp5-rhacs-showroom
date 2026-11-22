@@ -1,3 +1,16 @@
+/* Copy sits to the left of the execute play icon. The theme sets display:none inline. */
+.doc .listingblock.execute .copy-button {
+  display: block !important;
+  top: 0.4rem;
+  right: 1.85rem;
+  z-index: 2;
+  cursor: pointer;
+}
+
+.doc .listingblock.execute pre.highlight code {
+  padding-right: 4.5rem;
+}
+
 /* In-page lab step titles: visual heading, not a section (keeps the outline short). */
 .doc .step-title p {
   color: #191919;

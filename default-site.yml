@@ -13,8 +13,17 @@ ui:
   bundle:
     url: https://github.com/jnewsome97/rhdp_showroom_theme_execute/releases/download/rh-one-2025-execute-v3/ui-bundle.zip
     snapshot: true
+  # A directory path in this list is not expanded. Name each file.
   supplemental_files:
     - path: ./content/supplemental-ui
+    - path: partials/head-meta.hbs
+      contents: ./content/supplemental-ui/partials/head-meta.hbs
+    - path: partials/footer-scripts.hbs
+      contents: ./content/supplemental-ui/partials/footer-scripts.hbs
+    - path: css/site-extra.css
+      contents: ./content/supplemental-ui/css/site-extra.css
+    - path: js/execute-copy.js
+      contents: ./content/supplemental-ui/js/execute-copy.js
     - path: ./content/lib
     - path: .nojekyll
     - path: ui.yml

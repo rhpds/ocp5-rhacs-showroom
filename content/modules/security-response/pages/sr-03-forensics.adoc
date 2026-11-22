@@ -1,9 +1,11 @@
-= 3. Forensic Investigation
+= 3. Forensic investigation
 :toc:
 :toclevels: 1
 :icons: font
 
 xref:index.adoc[← Security response overview]
+
+**Duration:** ~20 minutes
 
 == Overview
 
@@ -13,13 +15,16 @@ image::fsi-security/sarah-infosec.png[Reviewing the checkpoint,link=self, window
 
 Container checkpointing is generally available in OpenShift 4.17 and later. `checkpointctl` reads the archive afterward. Background: link:https://criu.org[CRIU^] and the link:https://access.redhat.com/solutions/7008477[OpenShift checkpoint solution^].
 
+== Why it matters
+
+Disk snapshots do not show a process that only lives in memory. A forensic checkpoint freezes that runtime state into files you can inspect on the bastion, without deleting the pod or tipping off a loop that would notice a restart.
+
 == Your mission
 
-Checkpoint the `httpd` container on `payment-gateway` and inspect the process tree.
+Checkpoint the `httpd` container on `payment-gateway` and find `exfil.sh` in the process tree.
 
-.Checkpoint the httpd container of the app=payment-gateway pod in payment-gateway-{workshop_user_suffix} through the node proxy checkpoint API, then copy the tarball to /tmp/$CHECKPOINT_FILE
-[%collapsible]
-====
+The kubelet checkpoint API is what records the container. You call it through the API server proxy, with your OpenShift token, then copy the archive off the node.
+
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 NODE_NAME=$(oc get pods -l app=payment-gateway -n payment-gateway-{workshop_user_suffix} -o jsonpath='{.items[0].spec.nodeName}')
@@ -50,11 +55,15 @@ ls -lah "/tmp/$CHECKPOINT_FILE"
 ----
 
 image::fsi-security/criu-checkpoint.png[CRIU checkpoint archive,link=self, window=blank, width=100%]
-====
 
-.Install checkpointctl from https://raw.githubusercontent.com/jmhbnz/checkpointctl/main/bin/checkpointctl to /tmp/checkpointctl, then run /tmp/checkpointctl inspect --ps-tree-env on /tmp/checkpoint-payment-gateway_payment-gateway*. Expect httpd and exfil.sh
-[%collapsible]
-====
+=== Verify
+
+The archive is a non-empty file under `/tmp` whose name starts with `checkpoint-payment-gateway_`.
+
+== Read the process tree
+
+Install `checkpointctl` on the bastion and inspect the archive. `--ps-tree-env` prints the process tree and the environment of those processes.
+
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 curl --silent --fail --location \
@@ -64,11 +73,37 @@ chmod +x /tmp/checkpointctl
 
 /tmp/checkpointctl inspect --ps-tree-env /tmp/checkpoint-payment-gateway_payment-gateway*
 ----
-====
+
+The tree should include `httpd` and a process named `exfil.sh`. An example shape:
+
+[source,text]
+----
+└── Process tree
+    └── [1]  httpd
+        ├── [48]  httpd
+        └── [235]  exfil.sh
+            └── [283]  sleep
+----
+
+That script is the process Morgan could not see from the network graph. Memory analysis beyond the process tree belongs with the information security tools Morgan's team already uses. From the platform side, the skill is taking the checkpoint and naming what was running.
+
+Other `checkpointctl inspect` flags are listed by:
+
+[source,bash,role=execute]
+----
+/tmp/checkpointctl inspect --help
+----
+
+== Further reading
+
+* link:https://criu.org[CRIU^], for how a Linux process is frozen and written to an image set
+* link:https://volatilityfoundation.org[Volatility Framework^], for memory forensics after you have a dump
+* link:https://www.cncf.io/training/certification/cks/[CNCF Kubernetes Security Specialist^], which covers runtime security and live response
 
 == What you learned
 
 * A forensic checkpoint keeps volatile state without deleting the pod.
-* The process tree is enough to name what was running. Memory analysis beyond that belongs with the infosec tools Morgan's team already uses.
+* The process tree is enough to name what was running.
+* `exfil.sh` was still in the container after egress was denied.
 
 Next: xref:sr-04-harden-workload.adoc[4. Harden the workload].

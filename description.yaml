@@ -1,4 +1,4 @@
-Red Hat OpenShift Container Platform 5.0 Preview and Red Hat Advanced Cluster Security give field and technical teams a hands-on environment for Kubernetes-native security. AgnosticD V2 provisions the cluster with 3 control-plane nodes and 3 worker nodes, and certificates are enabled on the ingress controllers. Learners work foundations, hardening, and zero-trust modules, then product paths for Advanced Cluster Security, OpenShift Virtualization, and Lightwell Trusted Software Supply Chain. Each module ends with a practical task.
+Red Hat OpenShift Container Platform 5.0 Preview and Red Hat Advanced Cluster Security give field and technical teams a hands-on environment for Kubernetes-native security. AgnosticD V2 provisions the cluster with 3 control-plane nodes and 3 worker nodes, and certificates are enabled on the ingress controllers. Learners work foundations, hardening, and zero-trust modules, then product paths for Advanced Cluster Security, OpenShift Security Response, OpenShift Virtualization, and Lightwell Trusted Software Supply Chain. Each module ends with a practical task.
 
 == Lab Guide
 

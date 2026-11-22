@@ -1,44 +1,51 @@
-= 5. Process Baselining
+= 5. Process baselining
 :toc:
 :toclevels: 1
 :icons: font
 
 xref:index.adoc[← Security response overview]
 
+**Duration:** ~25 minutes
+
 == Overview
 
 Image hardening takes time to reach every pipeline. Morgan wants a platform control that flags unexpected processes now. Sarah locks the RHACS process baseline for `payment-gateway`, then locks every baseline in the vulnerable-workload namespace through the API.
 
-RHACS records processes it sees while a baseline is unlocked. After the baseline is locked, a process that was not on that list raises *Unauthorized Process Execution*. Detection is on by default. Killing the pod is a later enforcement choice.
+RHACS uses eBPF probes on each node to see processes that start in a container. No change to the application is required. While a baseline is unlocked, RHACS adds newly observed processes to the list. After the baseline is locked, a process that was not on that list raises *Unauthorized Process Execution*. Detection is on by default. Killing the pod is a later enforcement choice.
 
 image::fsi-security/sarah-meeting-demo.png[Morgan and Sarah review baselining,link=self, window=blank, width=100%]
+
+Background: link:{docs-rhacs-url}[Evaluate security risks^].
+
+== Why it matters
+
+The NetworkPolicy from exercise 2 stops egress. It does not stop a new process from starting inside the container. A locked baseline tells the SOC that `/bin/bash` ran when the workload's normal process is `httpd`.
 
 == Your mission
 
 Show that a shell can run, remove that shell from the learned baseline, lock it, and confirm the violation. Then lock the `vulnerable-workload-{workshop_user_suffix}` baselines with the API token from lab setup.
 
-.In payment-gateway-{workshop_user_suffix}, exec deploy/payment-gateway with /bin/bash -c "whoami && hostname && echo 'Arbitrary process execution successful'". Expect the command to succeed
-[%collapsible]
-====
+== Show that a shell can run
+
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 oc -n payment-gateway-{workshop_user_suffix} exec deploy/payment-gateway -- \
   /bin/bash -c "whoami && hostname && echo 'Arbitrary process execution successful'"
 ----
-====
 
-.In RHACS Risk, open deployment payment-gateway in namespace payment-gateway-{workshop_user_suffix}, then open Process Discovery. Expect the baseline unlocked, so the shell may already be on the list and it does not alert
-[%collapsible]
-====
-. In RHACS, open *Risk* and select deployment `payment-gateway` in namespace `payment-gateway-{workshop_user_suffix}`.
-. Open *Process Discovery*.
-. The baseline is still unlocked, so the shell you just ran may already be on the list. An unlocked baseline keeps learning. It does not alert.
-====
+The command succeeds. Anyone who can exec can start a process the image did not need for serving traffic.
 
-.On Process Discovery for payment-gateway in payment-gateway-{workshop_user_suffix}, remove /bin/bash and leave httpd, then lock the baseline. Exec deploy/payment-gateway with /bin/bash -c "whoami && hostname && echo 'Can I still do this?'". Expect the exec to run, then open Violations and find Unauthorized Process Execution for payment-gateway
-[%collapsible]
-====
-. On *Process Discovery*, remove `/bin/bash` and any other shell you do not want treated as normal. Use the *X* next to that process.
+== See the unlocked baseline
+
+In RHACS, open *Risk* and select deployment `payment-gateway` in namespace `payment-gateway-{workshop_user_suffix}`. Open *Process Discovery*.
+
+The baseline is still unlocked, so the shell you just ran may already be on the list. An unlocked baseline keeps learning. It does not alert.
+
+== Lock the baseline
+
+On *Process Discovery* for `payment-gateway`:
+
+. Remove `/bin/bash` and any other shell you do not want treated as normal. Use the *X* next to that process.
 . Leave `httpd` and its workers on the list.
 . Click the lock icon.
 
@@ -48,20 +55,28 @@ image::fsi-security/locked2.png[Removing a shell from the baseline,link=self, wi
 
 image::fsi-security/locked3.png[Locked process baseline,link=self, window=blank, width=100%]
 
+Run the shell again. RHACS detects the process. It does not block it.
+
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 oc -n payment-gateway-{workshop_user_suffix} exec deploy/payment-gateway -- \
   /bin/bash -c "whoami && hostname && echo 'Can I still do this?'"
 ----
 
+Open *Violations*. Find *Unauthorized Process Execution* for `payment-gateway`. The detail names `/bin/bash`.
+
 image::fsi-security/locked4.png[Unauthorized process execution violation,link=self, window=blank, width=100%]
 
 image::fsi-security/locked5.png[Violation detail for the shell,link=self, window=blank, width=100%]
-====
 
-.Source ~/.acs-roadshow/env, list clusters from /v1/clusters, then PUT /v1/processbaselines/bulk/lock for namespace vulnerable-workload-{workshop_user_suffix} using the first cluster id. Expect success true. If more than one cluster is listed, set CLUSTER_ID and run the PUT again. In Risk, baselines in vulnerable-workload-{workshop_user_suffix} show locked
-[%collapsible]
-====
+Enforcement that kills the pod, or blocks the exec, is a follow-on policy. Detection is the control this exercise turns on.
+
+== Lock a namespace from the API
+
+Locking one deployment in the console does not scale to every workload Morgan wants covered today. The home page setup script saved an API token in `~/.acs-roadshow/env`. You do not need to create another token.
+
+List the clusters, then lock every baseline in `vulnerable-workload-{workshop_user_suffix}`.
+
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 source ~/.acs-roadshow/env
@@ -87,7 +102,10 @@ curl --silent --insecure \
   --data "{\"cluster_id\": \"${CLUSTER_ID}\", \"namespaces\": [\"vulnerable-workload-{workshop_user_suffix}\"]}" \
   | jq .
 ----
-====
+
+Expect `"success": true`. If more than one cluster is listed, set `CLUSTER_ID` to the cluster that runs your namespaces and run the PUT again.
+
+In *Risk*, baselines for deployments in `vulnerable-workload-{workshop_user_suffix}` show as locked.
 
 == What you learned
 

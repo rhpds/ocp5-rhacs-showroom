@@ -4,27 +4,61 @@
 
 xref:ROOT:index.adoc[← Back to HOME]
 
-This track follows Sarah, a platform engineer at ACME Financial Services, through one incident and the controls the team puts in place afterward. You will trace a compromised CI/CD credential, isolate the workload, keep a forensic checkpoint, roll a hardened image, and lock RHACS process baselines.
+**Duration:** about 1 hour 40 minutes
 
-The shortened ACME exercises at the end of the Advanced Cluster Security modules stay where they are. This path is the full workshop, on its own URL under `security-response`.
+== What this workshop focuses on
 
-Adapted from James Blair's link:https://github.com/jmhbnz/workshops[OpenShift security response workshop^] (`data/security-new`). Those pages are GPL-3.0. Attribution and the license boundary are in `content/modules/security-response/NOTICE.adoc` in this repository.
+One incident, then the controls that would have made the next one visible.
+
+ACME Financial Services runs customer workloads on OpenShift. You are Sarah, a platform engineer. Morgan, from information security, pages you at 02:14 because a `payment-gateway` workload is sending unexpected traffic. You leave the pod running, find who opened the shell, cut off egress, and keep a forensic checkpoint. The next morning you roll a hardened image and lock Red Hat Advanced Cluster Security for Kubernetes (RHACS) process baselines.
+
+The workshop stays on that arc:
+
+* **Attribute the access.** The API audit log names the CI/CD service account that exec'd into the pod.
+* **Contain without destroying evidence.** A deny-egress NetworkPolicy stops the outbound connection. The process stays up.
+* **Capture volatile state.** A CRIU checkpoint records the process tree, including `exfil.sh`, without restarting the pod.
+* **Shrink what a library bug can start.** CVE-2025-61765 is on the Socket.IO workload. You compare the images and roll a Red Hat Hardened Image with no shell.
+* **Detect the next unexpected process.** An unlocked RHACS baseline only learns. A locked baseline raises *Unauthorized Process Execution*.
+
+Plan on the *Terminal* tab, the OpenShift console, and RHACS. Credentials are on the xref:ROOT:index.adoc[roadshow home page].
+
+Adapted from James Blair's link:https://github.com/jmhbnz/workshops[OpenShift security response workshop^] (`data/security-new`). Those pages are GPL-3.0. Attribution and the license boundary are in `content/modules/security-response/NOTICE.adoc` in this repository. Exercise 4 in that workshop delivers an exploit payload. Here you inspect the finding, compare the Containerfiles, and roll the hardened image.
+
+== Exercise focus
+
+[cols="1,2,3",options="header"]
+|===
+|Exercise |Title |Focus
+
+|xref:sr-01-environment.adoc[1]
+|Workshop environment
+|ACME scenario, consoles, and the two namespaces
+
+|xref:sr-02-incident.adoc[2]
+|The incident
+|Audit the exec, confirm egress in RHACS, deny egress, collect logs
+
+|xref:sr-03-forensics.adoc[3]
+|Forensic investigation
+|CRIU checkpoint and the `exfil.sh` process tree
+
+|xref:sr-04-harden-workload.adoc[4]
+|Harden the workload
+|CVE-2025-61765, shell-free runtime, Valkey broker
+
+|xref:sr-05-process-baseline.adoc[5]
+|Process baselining
+|Lock one baseline in the console, then lock a namespace with the API
+|===
 
 == How to use this track
 
-* Credentials and console links are on the xref:ROOT:index.adoc[roadshow home page]. Sign in there. This track does not use a separate registration app.
+* Sign in from the xref:ROOT:index.adoc[roadshow home page]. This track does not use a separate registration app.
 * Run commands in the *Terminal* tab. `oc` is already logged in after the home page setup script.
 * Your namespaces are `payment-gateway-{workshop_user_suffix}` and `vulnerable-workload-{workshop_user_suffix}`.
+* OpenShift GitOps syncs Application `security-response`, which creates those namespaces for suffix `1`.
 * RHACS API calls use `ROX_CENTRAL_ADDRESS` and `ROX_API_TOKEN` from `~/.acs-roadshow/env`.
 
-If those namespaces have no pods, a cluster admin runs `./setup/deploy-incident-env.sh` from this repository. See `setup/README.adoc`.
-
-== Exercises
-
-. xref:sr-01-environment.adoc[1. Workshop environment]
-. xref:sr-02-incident.adoc[2. The incident]
-. xref:sr-03-forensics.adoc[3. Forensic investigation]
-. xref:sr-04-harden-workload.adoc[4. Harden the workload]
-. xref:sr-05-process-baseline.adoc[5. Process baselining]
+If those namespaces have no pods, sync Application `security-response` in OpenShift GitOps. For extra attendee suffixes, a cluster admin runs `./setup/deploy-incident-env.sh` from this repository. See `setup/README.adoc`.
 
 When you finish, xref:ROOT:index.adoc[return to the roadshow home page].

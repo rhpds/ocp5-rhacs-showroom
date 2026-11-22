@@ -1,4 +1,4 @@
-"""Load an RHDP bastion CSV and run a remote bash script over SSH."""
+"""Load a bastion CSV and run a remote bash script over SSH."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ DEFAULT_USER = "lab-user"
 DEFAULT_PORT = 22
 CONNECT_TIMEOUT = 20
 
-# hostname/user match the gameify CSV. guid/ssh_command come from an RHDP export.
+# Primary columns match the gameify CSV. RHDP export names stay as aliases.
 _ALIASES = {
     "guid": "guid",
     "hostname": "hostname",
@@ -24,6 +24,7 @@ _ALIASES = {
     "username": "username",
     "user": "username",
     "password": "password",
+    "email": "email",
     "ssh_command": "ssh_command",
 }
 
@@ -35,6 +36,7 @@ class Bastion:
     port: int
     username: str
     password: str
+    email: str = ""
 
 
 @dataclass
@@ -45,9 +47,19 @@ class HostResult:
     output: str
 
 
+def identity(bastion: Bastion) -> str:
+    if bastion.email:
+        return bastion.email
+    if bastion.guid:
+        return bastion.guid
+    return f"{bastion.hostname}:{bastion.port}"
+
+
 def header(bastion: Bastion) -> str:
-    guid = bastion.guid or "-"
-    return f"=== {guid} {bastion.username}@{bastion.hostname}:{bastion.port} ==="
+    return (
+        f"=== {identity(bastion)} "
+        f"{bastion.username}@{bastion.hostname}:{bastion.port} ==="
+    )
 
 
 def redact(text: str, secret: str) -> str:
@@ -72,8 +84,8 @@ def load_bastions(csv_path: str) -> list[Bastion]:
         if "hostname" not in fields or "password" not in fields:
             found = ", ".join(reader.fieldnames)
             raise SystemExit(
-                "Error: CSV must include hostname and password "
-                f"(RHDP columns: guid,hostname,port,username,password,ssh_command). "
+                "Error: CSV must include host and password "
+                "(columns: host,port,user,password,email). "
                 f"Found: {found}"
             )
         for row_num, row in enumerate(reader, start=2):
@@ -83,6 +95,9 @@ def load_bastions(csv_path: str) -> list[Bastion]:
             guid = ""
             if "guid" in fields:
                 guid = (row.get(fields["guid"]) or "").strip()
+            email = ""
+            if "email" in fields:
+                email = (row.get(fields["email"]) or "").strip()
             port_raw = str(DEFAULT_PORT)
             if "port" in fields:
                 port_raw = (row.get(fields["port"]) or str(DEFAULT_PORT)).strip()
@@ -105,6 +120,7 @@ def load_bastions(csv_path: str) -> list[Bastion]:
                     port=port,
                     username=username,
                     password=password,
+                    email=email,
                 )
             )
     if not bastions:
@@ -132,7 +148,7 @@ def add_connection_args(parser) -> None:
     parser.add_argument(
         "--csv",
         dest="csv_path",
-        help="RHDP CSV: guid,hostname,port,username,password,ssh_command",
+        help="CSV: host,port,user,password,email (port, user, and email optional)",
     )
     parser.add_argument("-H", "--hostname", help="Single bastion hostname")
     parser.add_argument("-P", "--password", help="SSH password for single-host mode")
@@ -227,7 +243,7 @@ def _read_channel(channel, timeout: float | None) -> tuple[int, str]:
 
 def write_host_log(directory: Path, bastion: Bastion, output: str) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
-    label = bastion.guid or bastion.hostname
+    label = bastion.hostname
     safe = "".join(ch if ch.isalnum() or ch in ".-_" else "_" for ch in label)
     path = directory / f"{safe}-{bastion.port}.log"
     path.write_text(output, encoding="utf-8")

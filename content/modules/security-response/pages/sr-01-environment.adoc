@@ -1,23 +1,29 @@
-= 1. Workshop Environment
+= 1. Workshop environment
 :toc:
 :toclevels: 1
 :icons: font
 
 xref:index.adoc[← Security response overview]
 
+**Duration:** ~10 minutes
+
 == Overview
 
-ACME Financial Services runs customer-facing workloads on OpenShift. A small platform team keeps that cluster healthy, helps application teams ship, and takes a turn on the incident queue.
+ACME Financial Services is a bank that runs customer-facing workloads on OpenShift. A small platform team keeps the cluster healthy, helps application teams ship, and takes turns on the incident queue.
 
-You are Sarah, a senior platform engineer at ACME. Morgan, from infosec, is the person who pages you when something looks wrong.
+You are Sarah, a senior platform engineer at ACME. Morgan, from information security, is the person who pages you when something looks wrong.
 
 image::fsi-security/acme.jpg[ACME Financial Services,link=self, window=blank, width=100%]
 
-image::fsi-security/sarah-desk.png[Sarah at her desk,link=self, window=blank, width=100%]
+image::fsi-security/sarah-desk.png[Sarah at a desk,link=self, window=blank, width=100%]
+
+== Why it matters
+
+The rest of this track assumes you can open the consoles and see the two namespaces before the incident starts. Checking that now keeps the later exercises about the incident, not about login.
 
 == Your mission
 
-Confirm you can open this cluster and see the two namespaces this workshop uses.
+Confirm you can open this cluster and see `payment-gateway-{workshop_user_suffix}` and `vulnerable-workload-{workshop_user_suffix}`.
 
 === Prerequisites
 
@@ -25,31 +31,31 @@ Confirm you can open this cluster and see the two namespaces this workshop uses.
 * Console URLs and passwords from the xref:ROOT:index.adoc[home page]
 
 .Sign in to the OpenShift console at {openshift_cluster_console_url} as {openshift_cluster_admin_username} with the password on the home page
-[%collapsible]
-====
++
 . Open the *OpenShift Console* tab, or go to `{openshift_cluster_console_url}`.
 . Sign in with `{openshift_cluster_admin_username}` and the password on the home page.
 
 image::fsi-security/acme-cluster.png[OpenShift console,link=self, window=blank, width=100%]
-====
 
-.Run oc whoami, then list pods in payment-gateway-{workshop_user_suffix} and vulnerable-workload-{workshop_user_suffix}. Expect running pods in both. If a namespace is missing, the instructor runs ./setup/deploy-incident-env.sh
-[%collapsible]
-====
+.Run oc whoami, then list pods in payment-gateway-{workshop_user_suffix} and vulnerable-workload-{workshop_user_suffix}. Expect running pods in both
++
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 oc whoami
 oc get pods -n payment-gateway-{workshop_user_suffix}
 oc get pods -n vulnerable-workload-{workshop_user_suffix}
 ----
-====
++
+`payment-gateway-{workshop_user_suffix}` has one `payment-gateway` pod and an `httpd` container.
++
+`vulnerable-workload-{workshop_user_suffix}` has three pods: `message-broker`, `socketio-server`, and `edge-server`.
++
+If a namespace is missing, sync Application `security-response` in OpenShift GitOps. An instructor can also run `./setup/deploy-incident-env.sh` for more than one attendee suffix.
 
 .Sign in to RHACS at {acs_route} as {acs_portal_username} with the password on the home page
-[%collapsible]
-====
++
 . Open the *Red Hat Advanced Cluster Security* tab, or go to `{acs_route}[{acs_route}^]`.
 . Sign in with `{acs_portal_username}` and the password on the home page.
-====
 
 == What you learned
 

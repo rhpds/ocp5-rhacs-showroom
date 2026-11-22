@@ -1,69 +1,73 @@
-= 4. Harden the Workload
+= 4. Harden the workload
 :toc:
 :toclevels: 1
 :icons: font
 
 xref:index.adoc[← Security response overview]
 
+**Duration:** ~20 minutes
+
 == Overview
 
 The next morning Morgan asks Sarah to show that image hardening would have limited a real vulnerability in ACME's Socket.IO workloads.
 
-CVE-2025-61765 affects `python-socketio` before 5.14.0. When several servers share a message broker, the library unpickles broker messages. Untrusted data in that path can cause the process to run a command. The published condition for that command path is a shell inside the image. A distroless runtime image has no shell, so the same condition cannot start `/bin/bash`.
+CVE-2025-61765 affects `python-socketio` before 5.14.0. When several servers share a message broker, the library unpickles broker messages. Untrusted data on that path can cause the process to run a command. The published condition for that command path is a shell inside the image. A distroless runtime image has no shell, so the same condition cannot start `/bin/bash`.
 
-This exercise does not run an exploit. You inspect the vulnerable deployment, compare the two Containerfiles, and roll out the hardened image that is already built for this lab.
+This exercise does not run an exploit. You inspect the vulnerable deployment, compare the two Containerfiles, and roll the hardened image that is already built for this lab.
+
+== Why it matters
+
+Patching every library takes time to move through pipelines. Removing the shell does not fix the library. It limits what that class of bug can start. The broker image is a separate choice: community Redis has no Red Hat CVE lifecycle, and a Red Hat image does.
 
 == Your mission
 
-See the CVE on the running Socket.IO deployment, then replace it with `quay.io/smileyfritz/socketio-server:0.1.0-hardened`.
+See the finding on the running Socket.IO deployment, then replace it with `quay.io/smileyfritz/socketio-server:0.1.0-hardened`. Then move the broker to `registry.access.redhat.com/hi/valkey:latest`.
 
-.In RHACS Vulnerability Management, filter namespace vulnerable-workload-{workshop_user_suffix} and deployment socketio-server. Review critical and important findings, including python-socketio
-[%collapsible]
-====
-. In RHACS, open *Vulnerability Management*.
-. Filter to namespace `vulnerable-workload-{workshop_user_suffix}` and deployment `socketio-server`.
-. Review the critical and important findings, including `python-socketio`.
-====
+== See the running workload
 
-.List pods in vulnerable-workload-{workshop_user_suffix}. Expect message-broker, socketio-server, and edge-server
-[%collapsible]
-====
+In RHACS, open *Vulnerability Management*. Filter to namespace `vulnerable-workload-{workshop_user_suffix}` and deployment `socketio-server`. Review the critical and important findings, including `python-socketio`.
+
+List the pods. Expect `message-broker`, `socketio-server`, and `edge-server`.
+
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 oc get pods -n vulnerable-workload-{workshop_user_suffix} -o wide
 ----
 
 image::fsi-security/vulnerable-pods-running.png[Vulnerable application pods,link=self, window=blank, width=100%]
-====
 
-.Compare Containerfiles in vendor/security-response/data/security-new/setup/exercise4/socketio-server/. Vulnerable image uses registry.redhat.io/ubi9/python-311 and python-socketio==5.13.0. Hardened image uses registry.access.redhat.com/hi/python:latest-builder, then registry.access.redhat.com/hi/python:latest, and copies /opt/venv. The lab does not build them
-[%collapsible]
-====
-[source,dockerfile]
+== Compare the images
+
+The lab does not build these images. Read the Containerfiles in the repository you cloned at the start of the roadshow.
+
+The vulnerable image starts from UBI 9 Python, which includes a shell, and pins `python-socketio==5.13.0`.
+
+[source,bash,role=execute]
 ----
-FROM registry.redhat.io/ubi9/python-311
+cd ~/ocp5-rhacs-showroom
+sed -n '1,20p' vendor/security-response/data/security-new/setup/exercise4/socketio-server/Containerfile
+echo "----- requirements.txt -----"
+cat vendor/security-response/data/security-new/setup/exercise4/socketio-server/requirements.txt
 ----
 
-[source,text]
-----
-python-socketio==5.13.0
-----
+The hardened image builds dependencies on `registry.access.redhat.com/hi/python:latest-builder`, then copies the virtualenv into `registry.access.redhat.com/hi/python:latest`. That runtime image has no shell and no package manager. `requirements-hardened.txt` does not pin `python-socketio`, so the build takes a current release.
 
-[source,dockerfile]
+[source,bash,role=execute]
 ----
-FROM registry.access.redhat.com/hi/python:latest-builder AS builder
-# pip install from requirements-hardened.txt
-
-FROM registry.access.redhat.com/hi/python:latest
-COPY --from=builder /opt/venv /opt/venv
+cd ~/ocp5-rhacs-showroom
+sed -n '1,30p' vendor/security-response/data/security-new/setup/exercise4/socketio-server/Containerfile.hardened
+echo "----- requirements-hardened.txt -----"
+cat vendor/security-response/data/security-new/setup/exercise4/socketio-server/requirements-hardened.txt
 ----
 
 image::fsi-security/hardened-image.png[Hardened image,link=self, window=blank, width=100%]
-====
 
-.In namespace vulnerable-workload-{workshop_user_suffix}, apply setup/exercise4/k8s/socketio-server-hardened.yaml, then wait for rollout of deploy/socketio-server and print its image. Expect quay.io/smileyfritz/socketio-server:0.1.0-hardened
-[%collapsible]
-====
+Red Hat Hardened Images are the minimal images in the link:https://images.redhat.com[Red Hat image catalog^].
+
+== Roll the hardened runtime
+
+Apply the prepared manifest and wait for the rollout. The running image should be `quay.io/smileyfritz/socketio-server:0.1.0-hardened`.
+
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 export NAMESPACE=vulnerable-workload-{workshop_user_suffix}
@@ -75,11 +79,11 @@ oc -n "$NAMESPACE" get deploy socketio-server \
 ----
 
 image::fsi-security/hardened-image-running.png[Hardened socketio-server running,link=self, window=blank, width=100%]
-====
 
-.In namespace vulnerable-workload-{workshop_user_suffix}, exec deploy/socketio-server with /bin/bash -c 'echo shell-present'. Expect No shell in the running socketio-server container.
-[%collapsible]
-====
+=== Verify
+
+`/bin/bash` is not in the running container. The command fails, and the message is `No shell in the running socketio-server container.`
+
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 export NAMESPACE=vulnerable-workload-{workshop_user_suffix}
@@ -89,24 +93,30 @@ else
   echo "No shell in the running socketio-server container."
 fi
 ----
-====
 
-.In namespace vulnerable-workload-{workshop_user_suffix}, apply setup/exercise4/k8s/valkey.yaml so deploy/message-broker uses registry.access.redhat.com/hi/valkey:latest, then wait for the rollout
-[%collapsible]
-====
+== Move the broker to a Red Hat image
+
+`message-broker` is still `docker.io/redis:7-alpine`. That image is outside Red Hat's CVE lifecycle. The catalog has a Valkey image you can drop in without changing the Service name the application uses.
+
 [source,bash,subs="+macros,+attributes",role=execute]
 ----
 export NAMESPACE=vulnerable-workload-{workshop_user_suffix}
 cd ~/ocp5-rhacs-showroom
 envsubst < setup/exercise4/k8s/valkey.yaml | oc apply -f -
 oc -n "$NAMESPACE" rollout status deploy/message-broker
+oc -n "$NAMESPACE" get deploy message-broker \
+  -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 ----
-====
+
+Expect `registry.access.redhat.com/hi/valkey:latest`.
+
+image::fsi-security/hummingbird-images.png[Red Hat image catalog,link=self, window=blank, width=100%]
 
 == What you learned
 
 * RHACS ties CVE-2025-61765 to the running `socketio-server` deployment.
-* The hardened runtime image removes the shell that the command path needs.
+* The hardened runtime image removes the shell that the command path needs, and it installs a current `python-socketio`.
+* Removing the shell does not patch the library by itself. It is one layer in front of the library pin.
 * Swapping the broker to a Red Hat image is a separate supply-chain decision from the application runtime.
 
 Next: xref:sr-05-process-baseline.adoc[5. Process baselining].

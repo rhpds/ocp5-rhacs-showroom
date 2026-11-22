@@ -62,6 +62,7 @@ gameify/bastion_output_local.log
 gameify/.venv/
 
 # Instructor bastion credentials and update logs
+gameify/bastions.csv
 updates/bastions.csv
 updates/ssh_access.csv
 updates/logs/

@@ -1,3 +1,3 @@
-guid,hostname,port,username,password,ssh_command
-exampl,ssh.example.com,30903,lab-user,changeme,ssh lab-user@ssh.example.com -p 30903
-sample,ssh.example.com,30904,lab-user,changeme,ssh lab-user@ssh.example.com -p 30904
+host,port,user,password,email
+ssh.example.com,30903,lab-user,changeme,student@example.com
+ssh.example.com,30904,lab-user,changeme,student@example.com

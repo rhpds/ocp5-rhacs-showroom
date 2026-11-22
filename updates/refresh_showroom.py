@@ -15,6 +15,7 @@ from bastions import (
     bastions_from_args,
     ensure_paramiko,
     header,
+    identity,
     redact,
     run_remote,
     write_host_log,
@@ -61,7 +62,8 @@ add_target() {
       [[ "$existing" == "${ns} ${deploy}" ]] && return 0
     done
   fi
-  if oc -n "$ns" get "deploy/${deploy}" >/dev/null 2>&1; then
+  # oc 5 rejects flags before the command name (oc -n ns get fails; oc get -n ns works).
+  if oc get "deploy/${deploy}" -n "$ns" >/dev/null 2>&1; then
     TARGETS+=("${ns} ${deploy}")
     return 0
   fi
@@ -71,16 +73,31 @@ add_target() {
 # Deployment objects are unlabeled. The pods carry app.kubernetes.io/name=showroom.
 collect_from_pods() {
   local only_ns="${1:-}"
-  local ns_flag=(-A)
+  local ns_args=()
   if [[ -n "$only_ns" ]]; then
-    ns_flag=(-n "$only_ns")
+    ns_args=(-n "$only_ns")
+  else
+    ns_args=(-A)
   fi
   local ns
   while read -r ns; do
     [[ -z "${ns:-}" ]] && continue
     add_target "$ns" "${DEPLOY_OVERRIDE:-showroom}" || true
-  done < <(oc "${ns_flag[@]}" get pods -l app.kubernetes.io/name=showroom \
+  done < <(oc get pods "${ns_args[@]}" -l app.kubernetes.io/name=showroom \
     -o jsonpath='{range .items[*]}{.metadata.namespace}{"\n"}{end}' 2>/dev/null || true)
+}
+
+# The gameify CSV has no cluster guid. These labs deploy into showroom-<guid>-1.
+collect_showroom_namespaces() {
+  local ns
+  while read -r ns; do
+    [[ -z "${ns:-}" ]] && continue
+    case "$ns" in
+      showroom|showroom-*)
+        add_target "$ns" "${DEPLOY_OVERRIDE:-showroom}" || true
+        ;;
+    esac
+  done < <(oc get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
 }
 
 collect_from_guid() {
@@ -113,6 +130,8 @@ elif [[ -n "$NS_OVERRIDE" ]]; then
 else
   if [[ -n "$GUID" ]]; then
     collect_from_guid "$GUID"
+  else
+    collect_showroom_namespaces
   fi
   if [[ ${#TARGETS[@]} -eq 0 ]]; then
     echo "No showroom deployment in a showroom-${GUID:-*} namespace; searching pods labeled app.kubernetes.io/name=showroom"
@@ -148,37 +167,37 @@ for target in "${TARGETS[@]}"; do
   deploy="${target##* }"
   echo "NAMESPACE=${ns}"
   echo "DEPLOYMENT=${deploy}"
-  before_gen="$(oc -n "$ns" get "deploy/${deploy}" -o jsonpath='{.metadata.generation}')"
-  if ! oc -n "$ns" patch "deploy/${deploy}" --type=strategic --patch "$(cat "${latest_tag_patch}")"; then
+  before_gen="$(oc get "deploy/${deploy}" -n "$ns" -o jsonpath='{.metadata.generation}')"
+  if ! oc patch "deploy/${deploy}" -n "$ns" --type=strategic --patch "$(cat "${latest_tag_patch}")"; then
     echo "ERROR: failed to set main checkout on ${ns}/${deploy}"
     fail=1
     continue
   fi
-  after_gen="$(oc -n "$ns" get "deploy/${deploy}" -o jsonpath='{.metadata.generation}')"
+  after_gen="$(oc get "deploy/${deploy}" -n "$ns" -o jsonpath='{.metadata.generation}')"
   if [[ "${before_gen}" == "${after_gen}" ]]; then
-    if ! oc -n "$ns" rollout restart "deploy/${deploy}"; then
+    if ! oc rollout restart "deploy/${deploy}" -n "$ns"; then
       echo "ERROR: rollout restart failed for ${ns}/${deploy}"
       fail=1
       continue
     fi
   fi
-  if ! oc -n "$ns" rollout status "deploy/${deploy}" --timeout=__ROLLOUT_TIMEOUT__; then
+  if ! oc rollout status "deploy/${deploy}" -n "$ns" --timeout=__ROLLOUT_TIMEOUT__; then
     echo "ERROR: rollout did not become ready for ${ns}/${deploy}"
     fail=1
     continue
   fi
-  ready="$(oc -n "$ns" get "deploy/${deploy}" -o jsonpath='{.status.readyReplicas}/{.spec.replicas}' 2>/dev/null || true)"
+  ready="$(oc get "deploy/${deploy}" -n "$ns" -o jsonpath='{.status.readyReplicas}/{.spec.replicas}' 2>/dev/null || true)"
   echo "READY=${ready:-unknown}"
-  sel="$(oc -n "$ns" get "deploy/${deploy}" -o go-template='{{range $k,$v := .spec.selector.matchLabels}}{{$k}}={{$v}},{{end}}' 2>/dev/null || true)"
+  sel="$(oc get "deploy/${deploy}" -n "$ns" -o go-template='{{range $k,$v := .spec.selector.matchLabels}}{{$k}}={{$v}},{{end}}' 2>/dev/null || true)"
   sel="${sel%,}"
   if [[ -n "$sel" ]]; then
-    oc -n "$ns" get pods -l "$sel" \
+    oc get pods -n "$ns" -l "$sel" \
       -o jsonpath='{range .items[*]}POD={.metadata.name} ready={.status.conditions[?(@.type=="Ready")].status} phase={.status.phase}{"\n"}{end}' \
       2>/dev/null || true
   fi
-  latest="$(oc -n "$ns" logs "deploy/${deploy}" -c git-cloner 2>/dev/null | sed -n 's/^Checking out ref: //p' | tail -n 1)"
+  latest="$(oc logs "deploy/${deploy}" -n "$ns" -c git-cloner 2>/dev/null | sed -n 's/^Checking out ref: //p' | tail -n 1)"
   echo "GIT_REF=${latest:-unknown}"
-  page="$(oc -n "$ns" exec "deploy/${deploy}" -c content -- grep -o 'cd ~/[^<]*setup/ztwim-lab' /showroom/www/modules/301-08-zero-trust-workload-identity.html 2>/dev/null | head -n 1 || true)"
+  page="$(oc exec "deploy/${deploy}" -n "$ns" -c content -- grep -o 'cd ~/[^<]*setup/ztwim-lab' /showroom/www/modules/301-08-zero-trust-workload-identity.html 2>/dev/null | head -n 1 || true)"
   echo "ZTWIM_COMMAND=${page:-not found}"
 done
 rm -f "${latest_tag_patch}"
@@ -236,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
 
     results = execute_all(bastions, worker, args.workers)
     ok_count = sum(1 for result in results if result.ok)
-    failed = [result.bastion.guid or result.bastion.hostname for result in results if not result.ok]
+    failed = [identity(result.bastion) for result in results if not result.ok]
     summary = f"Summary: {ok_count}/{len(results)} refreshed"
     if failed:
         summary += " (failed: " + ", ".join(failed) + ")"
