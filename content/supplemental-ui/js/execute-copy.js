@@ -30,6 +30,13 @@
     button.setAttribute('title', 'Copy')
     if (!button.getAttribute('aria-label')) button.setAttribute('aria-label', 'Copy')
 
+    var content = block.querySelector('.content')
+    if (content) {
+      Array.prototype.forEach.call(content.children, function (child) {
+        if (child.textContent === '▶') child.classList.add('execute-run')
+      })
+    }
+
     button.addEventListener('click', function (event) {
       event.preventDefault()
       event.stopPropagation()

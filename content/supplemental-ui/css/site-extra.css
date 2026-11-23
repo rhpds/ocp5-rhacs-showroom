@@ -1,14 +1,49 @@
-/* Copy sits to the left of the execute play icon. The theme sets display:none inline. */
+/* Runnable blocks already show a play mark. Hide the hover language chip
+   so it does not stack on the copy button. */
+.doc .listingblock.execute code[data-lang]::before,
+.doc .listingblock.execute:hover code[data-lang]::before {
+  display: none;
+}
+
+/* Copy sits just left of the play mark. The theme sets display:none inline. */
 .doc .listingblock.execute .copy-button {
   display: block !important;
-  top: 0.4rem;
-  right: 1.85rem;
+  top: 0.35rem;
+  right: 1.65rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background-color: transparent;
+  background-size: 0.95rem 0.95rem;
+  box-shadow: none;
+  opacity: 0.55;
   z-index: 2;
   cursor: pointer;
 }
 
+.doc .listingblock.execute .copy-button:hover,
+.doc .listingblock.execute .copy-button:focus {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.55);
+}
+
+.doc .listingblock.execute .execute-run {
+  top: 0.35rem !important;
+  right: 0.35rem !important;
+  width: 1.35rem;
+  height: 1.35rem;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem !important;
+  line-height: 1;
+}
+
 .doc .listingblock.execute pre.highlight code {
-  padding-right: 4.5rem;
+  padding-right: 3.4rem;
 }
 
 /* In-page lab step titles: visual heading, not a section (keeps the outline short). */
